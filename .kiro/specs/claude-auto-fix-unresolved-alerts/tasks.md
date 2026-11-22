@@ -352,7 +352,7 @@
   - 受入基準とテストの対応: 次の3つである
     - 要件3の受入基準3(Claude に GitHub の中身を変える権限を渡さない)と、要件2の受入基準3のうちワークフローの組み立ては、`test-claude-auto-fix-workflows.sh` の場合で確かめる
     - 要件2の受入基準1、受入基準2、受入基準8と要件5の受入基準2のうち、各ジョブがスクリプトの結果に従って次のジョブか report ジョブに進むことは、テストの「前のジョブが結果を出して止まったとき、あとのジョブを飛ばして report ジョブに進む」で確かめる
-    - 実物の実行は、マージのあとに本物の実行を確かめるタスク 8.3 で確かめる
+    - 実物の実行は、マージのあとに本物の実行を確かめるタスク 10.3 で確かめる
   - _要件: 2.1, 2.2, 2.3, 2.8, 3.3, 5.2_
   - _依存: 4.8_
 
@@ -404,7 +404,7 @@
   - _要件: 7.1, 7.2_
   - _対象の部品: 基盤構築手順と PR の本文の変更_
 
-- [ ] 8. 所有者が置いたファイルで全体を確かめ、出荷し、マージのあとに本物の実行を確かめる
+- [x] 8. 所有者が置いたファイルで全体を確かめる
 - [x] 8.1 所有者にファイルを置いてもらい、置いた場所ですべてのテストと検査を流す
 
   Claude は、置き場所の `dot-github/` のファイルを本来の場所に写すコマンドを1つ所有者に示し、そのコマンドでファイルを置くよう所有者に頼む。依頼には、Claude が `.github/` に書けないことを添える。所有者が置いたら、Claude は、置いたファイルが置き場所のファイルと同じかを `cmp` で確かめ、本来の場所で、この spec で作るか変えた `.github/scripts/tests/` のテストのすべてと、shellcheck と、actionlint と、版の書き場所の検査を流す。
@@ -418,24 +418,198 @@
   - 受入基準とテストの対応: ほかの受入基準は、各タスクの受入基準とテストの対応のとおりである。このタスクでは、それらのテストを、所有者が置いた本来の場所でまとめて流し直す
   - _要件: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 3.1, 3.2, 3.3, 3.4, 3.5, 4.1, 4.2, 4.3, 4.4, 4.5, 5.1, 5.2, 6.1, 6.2, 6.3, 6.4_
 
-- [ ] 8.2 実装の PR の本文に、鍵の初めての登録と、マージのあとの確認の手順を書いて出荷する
+- [ ] 9. 対象ごとの実行を専用のブランチ `claude-auto-fix/run` で起動し、その実行がキャッシュを読まず保存しないようにする
 
-  Claude は、`/ship` で実装の PR を作る。Claude は、PR の本文の「マージのあとにすること」に、今のリポジトリに初めて鍵を登録する手順と、設計の「テストの方針」の「マージのあとの確認」の手順を書く。この PR は `.github/` を変えるので、所有者が承認するまでマージされない。
+  Claude は、設計の「全体の構成」の節の専用のブランチの段落と、各部品の節の専用のブランチとキャッシュの項のとおりに、置き場所のスクリプトとワークフローとテストを直す。置き場所の `dot-github/` は、タスク 8.1 で所有者が置いた `.github/` と同じなので、Claude は、置き場所のファイルをそのまま直す。
+
+- [ ] 9.1 共通の関数のファイルに専用のブランチの名前を足し、仕組みの実行とみなす決まりを専用のブランチの実行に変える
+
+  Claude は、置き場所の `lib-claude-auto-fix.sh` と、それを使うスクリプトとテストを、専用のブランチの実行を数える形に直す。作業は次の6つである。
+  - 定数: Claude は、置き場所の `lib-claude-auto-fix.sh` に、設計の「lib-claude-auto-fix.sh」の部品の節のとおりに、定数 `CAF_RUN_BRANCH="claude-auto-fix/run"` を足す。
+  - `own_run` の定義: Claude は、jq の定義 `own_run` を、実行のブランチ(`head_branch`)が `main` の実行ではなく、`CAF_RUN_BRANCH` の実行を選ぶ形に直す。
+  - テストの偽の応答: 振り分けのスクリプトと後始末のスクリプトと、結果を書くスクリプト `claude-auto-fix-report.sh` が使う結果のファイルを読む関数は、どれも `own_run` を使うので、Claude は、`test-lib-claude-auto-fix.sh` と `test-claude-auto-fix-dispatch.sh` と `test-claude-auto-fix-sweep.sh` と `test-claude-auto-fix-report.sh` の偽の応答の対象ごとの実行のブランチを、`main` から `claude-auto-fix/run` に直す。
+  - 足す場合: Claude は、`test-lib-claude-auto-fix.sh` に、新しい場合「結果のファイルを読む関数が、実行のブランチが claude-auto-fix/run の実行だけを読み、実行のブランチが main の実行と、ほかのワークフローの実行を読まない」を足す。
+  - スクリプトの説明の行: Claude は、`own_run` を説明する行のうち、main で手で起動した実行を数えると書いた行と、対象ごとの実行を `--ref main` で起動すると書いた行も、専用のブランチに合わせて直す。直す行は、`lib-claude-auto-fix.sh` の `own_run` の定義の前の説明の行(265行目あたりと268行目あたり)と、`claude-auto-fix-sweep.sh` の27行目あたりから28行目あたりの説明の行と、`claude-auto-fix-dispatch.sh` の129行目あたりの説明の行である。振り分けのスクリプトの、起動の引数のそばの説明の行(60行目あたり)は、起動の引数と一緒にタスク 9.3 で直す。
+  - テストの場合の名前と説明の行: Claude は、テストの側で、main から手で起動した実行を数えると書いた場合の名前と説明の行も、専用のブランチに合わせて直す。直す行は、`test-lib-claude-auto-fix.sh` の449行目あたりの説明の行と457行目あたりと458行目あたりの場合の名前と、`test-claude-auto-fix-dispatch.sh` の262行目あたりと273行目あたりの説明の行と888行目あたりの場合の見出しと907行目あたりの場合の名前である。
+  - 完了の確かめ方: 次の4つが起きる
+    - Linux のコンテナで流した `test-lib-claude-auto-fix.sh` と `test-claude-auto-fix-dispatch.sh` と `test-claude-auto-fix-sweep.sh` と `test-claude-auto-fix-report.sh` の場合が、足した場合も含めて、すべて通る
+    - 置き場所の `lib-claude-auto-fix.sh` の `own_run` に、実行のブランチを `main` とする箇所が残っていない。4つのテストの偽の応答のうち、仕組みが起動した実行として読ませる対象ごとの実行にも、実行のブランチを `main` とする箇所が残っていない。足した場合は、結果のファイルを読む関数が実行のブランチが `main` の実行を読まないことを確かめるために、実行のブランチが `main` の実行を偽の応答に置く。Claude は、この確かめ方で偽の応答を調べるときに、その実行を除く。振り分けのスクリプトの関数 `own_trigger_run` の `head_branch == "main"` は、きっかけのワークフローの実行を読む決まりなので、Claude は変えない
+    - 置き場所の `lib-claude-auto-fix.sh` と `claude-auto-fix-sweep.sh` と `claude-auto-fix-dispatch.sh` に、`own_run` が main で起動した実行を数えると書いた説明の行と、`lib-claude-auto-fix.sh` の、対象ごとの実行を `--ref main` で起動すると書いた説明の行が残っていない。4つのテストにも、main から手で起動した実行を数えると書いた場合の名前と説明の行が残っていない
+    - 置き場所のすべての `.sh` を一度に渡した shellcheck の指摘が0件である
+  - 受入基準とテストの対応: 要件1の受入基準6と要件6の受入基準1のうち、仕組みが起動した対象ごとの実行の結果のファイルだけを読むことは、テストの「結果のファイルを読む関数が、実行のブランチが claude-auto-fix/run の実行だけを読み、実行のブランチが main の実行と、ほかのワークフローの実行を読まない」で確かめる
+  - _要件: 1.6, 6.1_
+
+- [ ] 9.2 専用のブランチを main の最新のコミットに合わせるスクリプトを作る (並行可)
+
+  Claude は、置き場所に、設計の「claude-auto-fix-run-branch.sh」の部品の節のとおりに、スクリプト `claude-auto-fix-run-branch.sh` と、そのテスト `test-claude-auto-fix-run-branch.sh` を作る。スクリプトは、ブランチの名前を `lib-claude-auto-fix.sh` の `CAF_RUN_BRANCH` から読む。テストは、偽の `gh` で GitHub の応答を置き換え、偽の `gh` に呼ばれた API と引数を記録させる。Claude は、テストを `KP_TEST_CASE` で場合を選んで流せる形にする。
+  - 完了の確かめ方: Linux のコンテナで流した `test-claude-auto-fix-run-branch.sh` の場合が、すべて通る。`KP_TEST_CASE` に場合の名前を入れると、その場合だけが流れる
+  - 受入基準とテストの対応: 次の2つである
+    - 要件1の受入基準1から受入基準5のうち、対象ごとの実行を起動する前に、専用のブランチを main の最新のコミットに合わせることは、テストの「ブランチがあるときは main の最新のコミットの SHA と force=true を渡した PATCH だけを呼ぶ」「偽の gh が 404 を返したときは ref=refs/heads/claude-auto-fix/run を渡した POST を呼ぶ」「偽の gh が 422 を返したときも同じ POST を呼ぶ」「main を読めないときは0以外で終わる」「PATCH が失敗したときは0以外で終わる」「POST が失敗したときは0以外で終わる」「合わせた SHA を GITHUB_STEP_SUMMARY に書く」で確かめる
+    - 要件3の受入基準3のうち、bot の PAT で動くこのスクリプトが main とほかのブランチを変えないことは、テストの「どの場合も main の参照を変える API を呼ばない」で確かめる
+  - _要件: 1.1, 1.2, 1.3, 1.4, 1.5, 3.3_
+  - _対象の部品: claude-auto-fix-run-branch.sh_
+  - _依存: 9.1_
+
+- [ ] 9.3 振り分けのスクリプトと後始末のスクリプトが、対象ごとの実行を専用のブランチで起動するようにする (並行可)
+
+  Claude は、置き場所の `claude-auto-fix-dispatch.sh` と `claude-auto-fix-sweep.sh` の `gh workflow run claude-auto-fix-target.yaml` の `--ref main` を、`--ref "$CAF_RUN_BRANCH"` に直す。Claude は、2つのスクリプトの説明の行のうち、対象ごとの実行を `--ref main` で起動すると書いた行も、専用のブランチで起動すると直す。振り分けのスクリプトでは、60行目あたりの説明の行がその1つである。Claude は、2つのスクリプトのテストのうち、起動のときの `--ref` が `main` であることを求める2つの箇所を、`claude-auto-fix/run` を求める形に直す。1つ目は、`test-claude-auto-fix-dispatch.sh` の場合「対象ごとのワークフローを main で起動する」である。Claude は、この場合の名前を「実行が --ref claude-auto-fix/run で起動される」に変える。2つ目は、`test-claude-auto-fix-sweep.sh` の偽の `gh` が、`--ref` が `main` でないときに0以外で終わる箇所である。Claude は、この偽の `gh` を使う場合として「赤の検査で起動する実行が --ref claude-auto-fix/run で起動される」を足す。振り分けのテストの偽の `gh workflow run` が待っている実行に付ける実行のブランチは、タスク 9.1 で直すので、Claude はこのタスクで変えない。
   - 完了の確かめ方: 次の3つが起きる
+    - Linux のコンテナで流した `test-claude-auto-fix-dispatch.sh` と `test-claude-auto-fix-sweep.sh` の場合が、足した場合も含めて、すべて通る
+    - 置き場所の2つのスクリプトに、`claude-auto-fix-target.yaml` を `--ref main` で起動する箇所と、そう書いた説明の行が残っていない
+    - 置き場所のすべての `.sh` を一度に渡した shellcheck の指摘が0件である
+  - 受入基準とテストの対応: 次の2つである
+    - 要件1の受入基準1から受入基準5のうち、対象ごとの実行を専用のブランチで起動することは、`test-claude-auto-fix-dispatch.sh` の「実行が --ref claude-auto-fix/run で起動される」で確かめる
+    - 要件2の受入基準4のうち、Claude の変更の PR の赤で起動する実行も専用のブランチで起動することは、`test-claude-auto-fix-sweep.sh` の「赤の検査で起動する実行が --ref claude-auto-fix/run で起動される」で確かめる
+  - _要件: 1.1, 1.2, 1.3, 1.4, 1.5, 2.4_
+  - _対象の部品: claude-auto-fix-dispatch.sh, claude-auto-fix-sweep.sh_
+  - _依存: 9.1_
+
+- [ ] 9.4 2つのワークフローのテストを、専用のブランチとキャッシュと run-branch ジョブに合わせて直し、場合を足す
+
+  Claude は、置き場所の `test-claude-auto-fix-workflows.sh` に、設計の「テストの方針」の `test-claude-auto-fix-workflows.sh` の項で足した場合と直した場合を書く。このテストは、ワークフローを直すタスク 9.5 と 9.6 の完了を確かめる道具なので、Claude は、ワークフローを直す前に、このタスクで場合を直し、足す。Claude は、cooldown-generate の dependency-submission の場合の前の説明の行(976行目あたり)のうち、Claude が変えたビルドのスクリプトが main のキャッシュの範囲で動くと書いた行も直す。Claude は、タスク 9.5 で YAML の説明の行を直すのと同じく、その行を、この実行が保存したキャッシュをほかのワークフローの実行に読ませないためにキャッシュを読み書きしない、と書き直す。直す場合と足す場合は、次の5つのまとまりである。
+  - 振り分けのワークフローの秘密の値の場合: 前からある2つの場合は、claude-auto-fix.yaml に `secrets.BOT_GITHUB_TOKEN` が現れることを禁じているので、Claude は、2つの場合を次の形に直す。対象ごとのワークフローの秘密の値の場合は、claude-auto-fix-target.yaml の秘密の値が変わらないので、Claude は変えない。
+    - 「secrets.BOT_GITHUB_TOKEN が現れない」を、「secrets.BOT_GITHUB_TOKEN は run-branch ジョブの claude-auto-fix-run-branch.sh を呼ぶ手順にだけ現れる」に直す。この場合は、`secrets.BOT_GITHUB_TOKEN` がその手順に1回以上現れることと、ワークフローの全体に現れる回数がその手順に現れる回数と同じであることを調べる
+    - 「秘密の値は GITHUB_TOKEN だけである」を、「秘密の値は GITHUB_TOKEN と BOT_GITHUB_TOKEN のほかに無い」に直す
+  - 振り分けのワークフローのジョブの場合: Claude は、前からある「ジョブは dispatch と sweep である」を、「ジョブは run-branch と dispatch と sweep である」に直し、次の3つの場合を足す。
+    - 「dispatch ジョブと sweep ジョブが needs: [run-branch] を持つ」
+    - 「run-branch ジョブが if を持たず、権限が contents: read だけで、checkout が persist-credentials: false で、テストを流す手順に秘密の値が無く、5分で打ち切られる」。この場合は、run-branch ジョブに `if` が無いことを調べて、設計の「claude-auto-fix.yaml」の節の、run-branch ジョブがどのきっかけでも動くことを確かめる
+    - 「run-branch ジョブが、テストを流す手順のあとに claude-auto-fix-run-branch.sh を呼び、テストを流す手順に if と continue-on-error が無い」。これは、設計の「claude-auto-fix.yaml」の節の、テストが失敗したときに run-branch ジョブがスクリプトを呼ばずに止まることを確かめる
+  - 対象ごとのワークフローのジョブの場合: 前からある3つの場合は、ref-check ジョブが無く、report ジョブと cleanup ジョブの `if` が `always()` だけであることを求めているので、Claude は、3つの場合を次の形に直す。
+    - 「ジョブは prepare から cleanup までの11である」を、「ジョブは ref-check と、prepare から cleanup までの12である」に直す
+    - 「report は always() で動く」を、「report の if が always() と github.ref == 'refs/heads/claude-auto-fix/run' を && でつないだ形である」に直す
+    - 「cleanup は report のあとに always() で動く」を、「cleanup は report のあとに、always() と github.ref == 'refs/heads/claude-auto-fix/run' を && でつないだ if で動く」に直す
+  - 専用のブランチの場合: Claude は、次の4つの場合を足す。
+    - 「ref-check ジョブの if が github.ref != 'refs/heads/claude-auto-fix/run' で、権限を持たず、1分で打ち切られる」
+    - 「ほかのすべてのジョブの if が github.ref == 'refs/heads/claude-auto-fix/run' を含む」
+    - 「ref-check ジョブの手順が、専用のブランチで起動されていないことと claude-auto-fix.yaml を起動することを書いた ::error:: の行を出して0以外で終わる」。この場合は、ref-check ジョブの `run` の中身を取り出して bash で動かし、出力の行と終わりの値の両方を調べる
+    - 「YAML に書いたブランチの名前が lib-claude-auto-fix.sh の CAF_RUN_BRANCH と同じである」
+  - キャッシュの場合: Claude は、対象ごとのワークフロー `claude-auto-fix-target.yaml` が設計の claude-auto-fix-target.yaml の節の「キャッシュ」のとおりであることを、ジョブと手順ごとに分けた次の11の場合で確かめる。
+    - 「verify ジョブの setup-go のすべての手順に cache: false が渡される」
+    - 「verify ジョブの golangci-lint-action に skip-cache: true が渡される」
+    - 「cooldown-generate ジョブの dependency-submission に cache-disabled: true が渡される」
+    - 「cooldown-submit ジョブの dependency-submission に cache-disabled: true が渡される」
+    - 「setup-java のすべての手順と pnpm/action-setup にキャッシュの入力が無い」
+    - 「どのジョブにも actions/cache の手順が無い」
+    - 「どのジョブにも type=gha が無い」
+    - 「CodeQL の init に CODEQL_OVERLAY_DATABASE_MODE: none が渡される」
+    - 「CodeQL の analyze に CODEQL_OVERLAY_DATABASE_MODE: none が渡される」
+    - 「CodeQL の init に trap-caching: false が渡される」
+    - 「CodeQL の init に dependency-caching が無い」
+  - 完了の確かめ方: `yq` を入れた Linux のコンテナで、次の4つが起きる
+    - 今の置き場所の2つのワークフローで、前からある場合のうち、このタスクで直さない場合がすべて通る
+    - このタスクで直した場合と足した場合のうち、ワークフローを直す前には成り立たない次の16の場合が失敗する
+      - 振り分けのワークフローの秘密の値の場合のうち「secrets.BOT_GITHUB_TOKEN は run-branch ジョブの claude-auto-fix-run-branch.sh を呼ぶ手順にだけ現れる」の1つ
+      - 振り分けのワークフローのジョブの場合の4つ
+      - 対象ごとのワークフローのジョブの場合の3つ
+      - 専用のブランチの場合の4つ
+      - キャッシュの場合のうち、cooldown-submit ジョブの `cache-disabled: true` の1つと、CodeQL の `CODEQL_OVERLAY_DATABASE_MODE` の2つと、`trap-caching: false` の1つを合わせた4つ
+    - 「秘密の値は GITHUB_TOKEN と BOT_GITHUB_TOKEN のほかに無い」と、キャッシュの場合のほかの7つは、今のワークフローがすでに満たすので通る
+    - 直した場合と足した場合の名前が、ワークフローを直すタスク 9.5 と 9.6 の「受入基準とテストの対応」に書いた名前と同じである
+  - 受入基準とテストの対応: このタスクは確認の道具を作るタスクである。このテストで確かめる受入基準は、タスク 9.5 と 9.6 の「受入基準とテストの対応」に書く
+  - _要件: 1.6, 3.3_
+  - _依存: 9.1_
+
+- [ ] 9.5 対象ごとのワークフローに ref-check ジョブを足し、専用のブランチの実行だけが対象を扱い、キャッシュを読まず保存しないようにする (並行可)
+
+  Claude は、置き場所の `claude-auto-fix-target.yaml` を、専用のブランチの実行だけが対象を扱い、キャッシュを読まず保存しない形に直す。作業は次の4つである。
+  - ref-check ジョブ: Claude は、設計の「claude-auto-fix-target.yaml」の部品の節の「動くブランチ」のとおりに ref-check ジョブを足す。
+  - ジョブの if: Claude は、ほかのすべてのジョブの `if` に専用のブランチの条件を足す。report ジョブと cleanup ジョブでは、Claude は、`always()` と並べてこの条件を書く。
+  - キャッシュ: Claude は、同じ節の「キャッシュ」のとおりに、cooldown-submit ジョブの `gradle/actions/dependency-submission` に `cache-disabled: true` を足し、CodeQL の `init` と `analyze` の手順に環境変数 `CODEQL_OVERLAY_DATABASE_MODE: none` を渡し、`init` に入力 `trap-caching: false` を渡す。
+  - 説明の行: Claude は、cooldown-generate ジョブの説明の行のうち、専用のブランチにしたあとは事実と違う2つの行も直す。1つ目は、2つの環境変数を何も渡さないとスナップショットが main に結び付くと書いた行(694行目あたりから696行目あたり)である。Claude は、この行を、設計の cooldown-generate の項のとおりに、何も渡さないと専用のブランチ `claude-auto-fix/run` のコミットとブランチに結び付くと直す。2つ目は、dependency-submission の手順の、Claude が変えたビルドのスクリプトが main のキャッシュの範囲で動くと書いた行(730行目あたり)である。Claude は、この行を、設計の「キャッシュ」のとおりに、この実行が保存したキャッシュをほかのワークフローの実行に読ませないためにキャッシュを読み書きしないと直す。
+  - 完了の確かめ方: 次の3つが起きる
+    - 置き場所の `claude-auto-fix-target.yaml` で、`test-claude-auto-fix-workflows.sh` の対象ごとのワークフローの場合がすべて通り、actionlint が指摘を出さない
+    - 置き場所の `claude-auto-fix-target.yaml` に、スナップショットが main に結び付くと書いた説明の行と、main のキャッシュの範囲で動くと書いた説明の行が残っていない
+    - 実装のメモの「ワークフローの壊し方の確認」のとおりに、本物のファイルに次の17の壊し方を1つずつ当てた YAML で、テストが失敗する
+      - ref-check ジョブの `if` を消した YAML
+      - ref-check ジョブに `contents: read` の権限を足した YAML
+      - ref-check ジョブの打ち切りを消した YAML
+      - ref-check ジョブの手順から `::error::` の行を消した YAML
+      - ref-check ジョブの手順から、0以外で終える行を消した YAML
+      - edit ジョブの `if` から専用のブランチの条件を消した YAML
+      - report ジョブの `if` を `always()` だけにした YAML
+      - cleanup ジョブの `if` を `always()` だけにした YAML
+      - ジョブの `if` に書いたブランチの名前を `claude-auto-fix/other` にした YAML
+      - cooldown-submit ジョブの `cache-disabled: true` を消した YAML
+      - verify ジョブの `actions/setup-java` に `cache: gradle` を足した YAML
+      - verify ジョブに `actions/cache` の手順を足した YAML
+      - CodeQL の `init` の手順から `CODEQL_OVERLAY_DATABASE_MODE: none` を消した YAML
+      - CodeQL の `analyze` の手順から `CODEQL_OVERLAY_DATABASE_MODE: none` を消した YAML
+      - CodeQL の `init` から `trap-caching: false` を消した YAML
+      - verify ジョブの setup-go の1つから `cache: false` を消した YAML
+      - CodeQL の `init` に `dependency-caching: true` を足した YAML
+  - 受入基準とテストの対応: 次の2つである
+    - 要件1の受入基準6のうち、専用のブランチのほかで起動された実行で Claude を動かさず、Issue とコメントも書かないことは、テストの「ref-check ジョブの if が github.ref != 'refs/heads/claude-auto-fix/run' で、権限を持たず、1分で打ち切られる」「ほかのすべてのジョブの if が github.ref == 'refs/heads/claude-auto-fix/run' を含む」「ref-check ジョブの手順が、専用のブランチで起動されていないことと claude-auto-fix.yaml を起動することを書いた ::error:: の行を出して0以外で終わる」「YAML に書いたブランチの名前が lib-claude-auto-fix.sh の CAF_RUN_BRANCH と同じである」「ジョブは ref-check と、prepare から cleanup までの12である」「report の if が always() と github.ref == 'refs/heads/claude-auto-fix/run' を && でつないだ形である」「cleanup は report のあとに、always() と github.ref == 'refs/heads/claude-auto-fix/run' を && でつないだ if で動く」で確かめる
+    - requirements.md の「決めた方式」の、対象ごとの実行が作るキャッシュを main のワークフローに読ませないことと、要件3の受入基準3のうち、前の実行が Claude の変えたコードで書いたキャッシュを次の実行が読まないことは、テストの「verify ジョブの setup-go のすべての手順に cache: false が渡される」「verify ジョブの golangci-lint-action に skip-cache: true が渡される」「cooldown-generate ジョブの dependency-submission に cache-disabled: true が渡される」「cooldown-submit ジョブの dependency-submission に cache-disabled: true が渡される」「setup-java のすべての手順と pnpm/action-setup にキャッシュの入力が無い」「どのジョブにも actions/cache の手順が無い」「どのジョブにも type=gha が無い」「CodeQL の init に CODEQL_OVERLAY_DATABASE_MODE: none が渡される」「CodeQL の analyze に CODEQL_OVERLAY_DATABASE_MODE: none が渡される」「CodeQL の init に trap-caching: false が渡される」「CodeQL の init に dependency-caching が無い」で確かめる
+  - _要件: 1.6, 3.3_
+  - _対象の部品: claude-auto-fix-target.yaml_
+  - _依存: 9.4_
+
+- [ ] 9.6 振り分けのワークフローに run-branch ジョブを足し、dispatch ジョブと sweep ジョブをそのあとに動かす (並行可)
+
+  Claude は、置き場所の `claude-auto-fix.yaml` に、設計の「claude-auto-fix.yaml」の部品の節のとおりに run-branch ジョブを足し、dispatch ジョブと sweep ジョブに `needs: [run-branch]` を足す。Claude は、run-branch ジョブに `if` を付けない。run-branch ジョブは、どのきっかけでも動く。dispatch ジョブと sweep ジョブは、それぞれの `if` のとおりに、run-branch ジョブが通ったあとに動く。run-branch ジョブは、main のコミットを `persist-credentials: false` で checkout し、秘密の値の無い手順で `test-claude-auto-fix-run-branch.sh` と `test-lib-claude-auto-fix.sh` を流してから、`secrets.BOT_GITHUB_TOKEN` を `GH_TOKEN` で渡した手順で `claude-auto-fix-run-branch.sh` を呼ぶ。
+  - 完了の確かめ方: 次の2つが起きる
+    - 置き場所の `claude-auto-fix.yaml` で、`test-claude-auto-fix-workflows.sh` の振り分けのワークフローの場合がすべて通り、actionlint が指摘を出さない
+    - 実装のメモの「ワークフローの壊し方の確認」のとおりに、本物のファイルに次の10の壊し方を1つずつ当てた YAML で、テストが失敗する
+      - run-branch ジョブに `if: github.event_name == 'schedule'` を足した YAML
+      - dispatch ジョブから `needs: [run-branch]` を消した YAML
+      - sweep ジョブから `needs: [run-branch]` を消した YAML
+      - run-branch ジョブに `contents: write` を足した YAML
+      - run-branch ジョブの checkout から `persist-credentials: false` を消した YAML
+      - run-branch ジョブのテストを流す手順に `secrets.BOT_GITHUB_TOKEN` を渡した YAML
+      - run-branch ジョブで、`claude-auto-fix-run-branch.sh` を呼ぶ手順を、テストを流す手順の前に移した YAML
+      - run-branch ジョブのテストを流す手順に `continue-on-error: true` を足した YAML
+      - dispatch ジョブに `secrets.BOT_GITHUB_TOKEN` を渡した YAML
+      - run-branch ジョブの打ち切りを消した YAML
+  - 受入基準とテストの対応: 次の2つである
+    - 要件1の受入基準1から受入基準5と要件2の受入基準4のうち、run-branch ジョブが通ったあとにだけ対象ごとの実行を起動することは、テストの「dispatch ジョブと sweep ジョブが needs: [run-branch] を持つ」と、「run-branch ジョブが if を持たず、権限が contents: read だけで、checkout が persist-credentials: false で、テストを流す手順に秘密の値が無く、5分で打ち切られる」のうち if を持たないことと、「ジョブは run-branch と dispatch と sweep である」「run-branch ジョブが、テストを流す手順のあとに claude-auto-fix-run-branch.sh を呼び、テストを流す手順に if と continue-on-error が無い」で確かめる
+    - 要件3の受入基準3のうち、bot の PAT を Claude が変えたコードに渡さないことは、テストの「secrets.BOT_GITHUB_TOKEN は run-branch ジョブの claude-auto-fix-run-branch.sh を呼ぶ手順にだけ現れる」「秘密の値は GITHUB_TOKEN と BOT_GITHUB_TOKEN のほかに無い」と、「run-branch ジョブが if を持たず、権限が contents: read だけで、checkout が persist-credentials: false で、テストを流す手順に秘密の値が無く、5分で打ち切られる」のうち if のほかのことで確かめる
+  - _要件: 1.1, 1.2, 1.3, 1.4, 1.5, 2.4, 3.3_
+  - _対象の部品: claude-auto-fix.yaml_
+  - _依存: 9.2, 9.4_
+
+- [ ] 9.7 README と基盤構築手順に、専用のブランチのことを書き足す
+
+  Claude は、設計の「ファイルの構成」の節のとおりに、`README.md` のワークフローの一覧の表の claude-auto-fix-target.yaml の行の起動の欄に、専用のブランチ `claude-auto-fix/run` で起動することを書き、claude-auto-fix.yaml の行の中身の欄に、専用のブランチを main の最新のコミットに合わせることを書く。Claude は、`doc/開発フロー/基盤構築手順.md` の 3-1 の表の `BOT_GITHUB_TOKEN` の行の失効したときの欄に、claude-auto-fix.yaml が専用のブランチを合わせられなくなり、対象ごとの実行を起動できなくなることを書き足す。Claude は、この2つのファイルを本来の場所に書く。
+  - 完了の確かめ方: 次の2つが起きる
+    - README の2つの行に、設計に書いた2つのことが書いてある。行には、実装のメモの「README のワークフローの表の行を書くとき」のとおりに、ワークフローが何をするかと何をしないかだけが書いてある
+    - 基盤構築手順の 3-1 の表の `BOT_GITHUB_TOKEN` の行に、対象ごとの実行を起動できなくなることが書いてある
+  - 受入基準とテストの対応: 要件1の受入基準5のうち、所有者が手で動かすワークフローが claude-auto-fix.yaml であることは、このタスクの完了の確かめ方で README の行を読んで確かめる
+  - _要件: 1.5_
+
+- [ ] 10. 所有者が置いたファイルで全体を確かめ直し、出荷し、マージのあとに本物の実行を確かめる
+- [ ] 10.1 所有者にもう一度ファイルを置いてもらい、置いた場所ですべてのテストと検査を流す
+
+  Claude は、タスク 8.1 と同じ形で、置き場所の `dot-github/` のファイルを本来の場所に写すコマンドを1つ所有者に示し、そのコマンドでファイルを置くよう所有者に頼む。所有者が置いたら、Claude は、置いたファイルが置き場所のファイルと同じかを `cmp` で確かめ、本来の場所で、この spec で作るか変えた `.github/scripts/tests/` のテストのすべてと、shellcheck と、actionlint と、版の書き場所の検査を流す。Claude は、専用のブランチとキャッシュの扱いを足すまとまり 9 のタスクで、prepare ジョブの Trivy を呼ぶ処理と verify-image ジョブの判定の手順を変えない。そのため、Claude は、タスク 8.1 で arm64 の CPU の形で流した確認を流し直さない。
+  - 完了の確かめ方: 次の4つが起きる
+    - 所有者が置いたファイルが、置き場所のファイルとすべて同じである
+    - Linux のコンテナで流した、この spec で作るか変えたテストが、`test-claude-auto-fix-run-branch.sh` も含めて、すべて通る
+    - 実装のメモの「静的解析の道具」のとおりに流した shellcheck と actionlint の指摘が0件である。Claude は、shellcheck に、本来の場所のすべての `.sh` を一度に渡す
+    - 本来の場所で流した `check-ci-tool-placement.sh` が指摘を出さずに0で終わる
+  - 受入基準とテストの対応: ほかの受入基準は、各タスクの受入基準とテストの対応のとおりである。このタスクでは、それらのテストを、所有者が置いた本来の場所でまとめて流し直す
+  - _要件: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 3.1, 3.2, 3.3, 3.4, 3.5, 4.1, 4.2, 4.3, 4.4, 4.5, 5.1, 5.2, 6.1, 6.2, 6.3, 6.4_
+
+- [ ] 10.2 実装の PR の本文に、鍵の初めての登録と、マージのあとの確認の手順を書いて出荷する
+
+  Claude は、`/ship` で、開いている実装の PR #909 に変更を push し、PR の本文を直す。Claude は、PR の本文の「マージのあとにすること」に、今のリポジトリに初めて鍵を登録する手順と、設計の「テストの方針」の「マージのあとの確認」の手順を書く。Claude は、PR の本文に、設計の「安全」の節の「CodeQL の判定」のとおりに、CodeQL の規則 `actions/cache-poisoning/poisonable-step` が専用のブランチにしたあとも cooldown-generate ジョブの手順を警告として出し続けることと、警告を却下するかは所有者が決めることを書く。Claude は、この警告を却下しない。この PR は `.github/` を変えるので、所有者が承認するまでマージされない。
+  - 完了の確かめ方: 次の4つが起きる
     - 実装の PR の本文に、`Spec: .kiro/specs/claude-auto-fix-unresolved-alerts` と `Refs: #725` と、「マージのあとにすること」の2つの手順が書いてある
     - 初めて鍵を登録する手順は、所有者が `claude setup-token` で作った鍵を `gh secret set CLAUDE_CODE_OAUTH_TOKEN` で登録し、成功したときに `gh secret list` に名前が出ることまで書いてある
+    - 実装の PR の本文に、CodeQL の規則が警告を出し続けることと、却下するかを所有者が決めることが書いてある
     - 実装の PR の必須の検査のうち、所有者の承認を待つ検査のほかが緑である
   - 受入基準とテストの対応: 要件7の受入基準3(この仕組みを入れる PR の本文に、初めて鍵を登録する手順を書く)は、このタスクの完了の確かめ方で PR の本文を読んで確かめる。要件2の受入基準3のうち、この仕組みを入れる PR 自身も必須の検査と所有者の承認を通ることは、実装の PR の検査の結果で確かめる
   - _要件: 2.3, 7.3_
 
-- [ ] 8.3 マージと鍵の登録のあとに、本物の実行を1回動かして確かめる
+- [ ] 10.3 マージと鍵の登録のあとに、専用のブランチを確かめ、本物の実行を1回動かして確かめる
 
-  Claude は、実装の PR がマージされ、所有者が鍵を登録したあとに、設計の「テストの方針」の「マージのあとの確認」のとおりに、`claude-auto-fix-target.yaml` を開いている対象の1つで手で起動する。Claude は、実行の結果の成果物の `outcome` と、PR ができたときはその PR の作り手が bot であることと auto-merge の予約と、ジョブごとの権限が実行の記録のとおりであることを読み、読んだ結果を Issue #725 にコメントで書く。開いている対象が1つも無いときは、Claude は、起動せずに、対象が無いことを所有者に報告し、このタスクを未完了のまま残す。次に対象が出たときに、Claude はこのタスクを進める。
-  - 完了の確かめ方: 次の3つが起きる
-    - Issue #725 に、実行の URL と、成果物の `outcome` の結果と、ジョブごとの権限を読んだ結果を書いたコメントがある
+  Claude は、実装の PR がマージされ、所有者が鍵を登録したあとに、設計の「テストの方針」の「マージのあとの確認」のとおりに確かめる。Claude は、まず、`gh workflow run claude-auto-fix.yaml --ref main` で claude-auto-fix.yaml を手で1回起動し、1時間ごとの定期実行を待たない。Claude は、その実行の run-branch ジョブが通り、専用のブランチ `claude-auto-fix/run` ができ、そのブランチが main のコミットを指していることを読み、読んだ結果を Issue #725 にコメントで書く。Claude は、この1つ目のコメントを、開いている対象が無いときも書く。
+
+  次に、Claude は、本物の対象ごとの実行を1回読む。同じ実行の dispatch ジョブが、開いている対象の対象ごとの実行を起動したときは、Claude は、同じ対象で重ねて起動せず、その実行を読む。Claude が手で `gh workflow run` を打って起動した実行は、振り分けのスクリプトが重複を防ぐために行う読み取りを通らない。そのため、Claude が同じ対象で重ねて起動すると、同じ対象の実行が2つ動くか、2つの実行のうち1つが同じ同時実行の組で待たされる。dispatch ジョブが対象ごとの実行を1つも起動せず、開いている対象があるときにだけ、Claude は、`claude-auto-fix-target.yaml` を、その対象の1つで `--ref claude-auto-fix/run` を付けて手で起動する。どちらの実行でも、設計の「マージのあとの確認」で確かめることは同じである。Claude は、実行の結果の成果物の `outcome` と、PR ができたときはその PR の作り手が bot であることと auto-merge の予約と、ジョブごとの権限が実行の記録のとおりであることを読み、読んだ結果を Issue #725 にコメントで書く。Claude は、実装のメモの「実際の実行でしか確かめられない2つの動き」も、この実行の記録で読む。開いている対象が1つも無いときは、Claude は、対象ごとの実行を起動せずに、対象が無いことを所有者に報告し、このタスクを未完了のまま残す。次に対象が出たときに、Claude はこのタスクを進める。
+  - 完了の確かめ方: 次の4つが起きる
+    - Issue #725 に、手で起動した claude-auto-fix.yaml の実行の URL と、専用のブランチが指すコミットと、そのコミットが main のコミットであることを書いたコメントがある
+    - 同じコメントか次のコメントに、対象ごとの実行の URL と、成果物の `outcome` の結果と、ジョブごとの権限を読んだ結果が書いてある
     - 結果が `pr` のときは、その PR の作り手が bot で、auto-merge の予約が付いていることも書いてある
     - 結果が設計と違うときは、Claude は、違いを所有者に報告して止まる
-  - 受入基準とテストの対応: 要件2の受入基準3と要件3の受入基準3のうち、本物の鍵と bot の PAT での権限の分け方は、この実行の記録で確かめる
+  - 受入基準とテストの対応: 要件2の受入基準3と要件3の受入基準3のうち、本物の鍵と bot の PAT での権限の分け方と、専用のブランチを bot の PAT で合わせられることは、この実行の記録で確かめる
   - _要件: 2.3, 3.3_
 
 ## 完了条件(全タスク共通)
@@ -455,8 +629,8 @@ Claude は、どのタスクでも、タスクの箇条書きの欄を書いた�
 - テストを流す環境: `.github/scripts/` のテストは `jq` を使い、この PC の Git Bash には `jq` が無い。そのため、この spec の `.github/scripts/tests/` のテストでは、`/kiro-impl` が言う「実装する PC のシェル」を、Git Bash ではなく Linux のコンテナとする。Claude は、テストを、`.github/CLAUDE.md` の形の alpine のコンテナで流す。Claude は、`.github/CLAUDE.md` の `apk add` の `bash` `jq` `coreutils` に、`git` `curl` `gnupg` を足して入れる。テストが GitHub Actions の環境変数で動きを変えるかを確かめるときは、Claude は、`.github/CLAUDE.md` の、GitHub Actions の環境変数を渡す形で流す。ワークフローのテストと、ci.yaml の `detect-changes` ジョブを読む確認のスクリプトのテストのときは、`yq` も入れる。Claude は、リポジトリの写しを scratchpad に作り、置き場所のファイルを重ねてから、その写しをコンテナに読ませる。ただし、タスク 1.1 で本物の配布元から CLI を入れて版を確かめる手順は、glibc を使う Linux のコンテナで流す
 - 静的解析の道具: actionlint は、guardrails.yaml と同じ `rhysd/actionlint:1.7.12` のイメージで流す。shellcheck は、`.github/CLAUDE.md` と同じ `koalaman/shellcheck:v0.11.0` のイメージで流す
 - この spec は `frontend/` `backend/` `terraform/` を変えないので、大きなまとまりの最後のタスクで流す verify のスキルは無い。代わりに、Claude は、シェルのスクリプトを作るか変えたタスクごとに、`.github/CLAUDE.md` のとおり、置き場所とリポジトリの写しの中のすべての `.sh` を一度に shellcheck に渡し、指摘が0件であることをタスクの完了の確かめ方に加える。変えたファイルだけを渡すと、shellcheck が `. "$LIB"` で読み込む先のファイルをたどらず、CI だけが警告を出すためである。
-- 実物での確認のために Claude が所有者に頼むことは、本物の鍵が要る CLI の確認のタスク 1.2 のコマンド、Gradle のスナップショットの確認のタスク 1.4 の push、ファイルを置くタスク 8.1 のコマンドの3つである。Claude は、1回の返事に依頼を1つだけ書く
-- 所有者に push を頼むとき: このリポジトリへの push は、bot のアカウント DogisRiki-bot の gh の設定でしか通らない。タスク 1.4 で確認のブランチを所有者の個人のアカウントで push したときは、push が 403 で断られた。Claude は、所有者に push か GitHub の操作を頼むコマンドの先頭で、`$env:GH_CONFIG_DIR = "$env:USERPROFILE\.gh-bot"` を設定する。タスク 8.1 のコマンドでも、Claude は同じく設定する
+- 実物での確認のために Claude が所有者に頼むことは、本物の鍵が要る CLI の確認のタスク 1.2 のコマンド、Gradle のスナップショットの確認のタスク 1.4 の push、ファイルを置くタスク 8.1 と 10.1 のコマンドの4つである。Claude は、1回の返事に依頼を1つだけ書く
+- 所有者に push を頼むとき: このリポジトリへの push は、bot のアカウント DogisRiki-bot の gh の設定でしか通らない。タスク 1.4 で確認のブランチを所有者の個人のアカウントで push したときは、push が 403 で断られた。Claude は、所有者に push か GitHub の操作を頼むコマンドの先頭で、`$env:GH_CONFIG_DIR = "$env:USERPROFILE\.gh-bot"` を設定する。タスク 8.1 と 10.1 のコマンドでも、Claude は同じく設定する
 - `lib-claude-auto-fix.sh` の目印の関数(タスク 2.1): `marker_line` と `latest_marker` は `<欄>=<値>` の形の目印だけを扱う。PR の本文の `<!-- claude-auto-fix-detail <base64 の JSON> -->` は値だけの形なので、PR を作るタスクで別に書いて読む。`latest_marker` は `created_at` が同じ項目を渡された順で並べるので、呼び出す側は Issue の本文を先に、コメントをその後ろに並べて渡す
 - ガードの種類の渡し方(タスク 2.3): `claude-auto-fix-guard.sh <base> <head>` は、対象の種類を環境変数 `CAF_KIND` で受け取る。`CAF_KIND` が無いか知らない種類のときは、ガードは調べずに失敗する。種類が `codeql` のときに見つけた行を出さないことを、呼び出す側が種類を渡し忘れても破らないためである。確認のスクリプトの `apply` の形と出荷のスクリプトは、ガードを呼ぶときに `CAF_KIND` を渡し、今のフォルダを調べるリポジトリの最上位にする
 - Go の版を書くファイルの見分け方(タスク 2.4): `go_release_is_target` は、名前が `Dockerfile.<何か>` のファイルをすべて Go の版を書くファイルとみなす。`Dockerfile.md` のような説明のファイルも当たるので、`cooldown_needed` は、そのファイルだけを変えた変更でも dependency-cooldown の判定が要るとする。テストで「判定が要らない」場合のファイルに、この形の名前を使わない
@@ -474,31 +648,57 @@ Claude は、どのタスクでも、タスクの箇条書きの欄を書いた�
 - reason の渡し方(タスク 4.5): `confirm` は、対象ごとの実行の reason を環境変数 `CAF_REASON` で受け取り、`red-check` のときは対象を調べずに `ok` を出す。5つの引数の形には reason の欄が無いためである。verify ジョブを書くタスクでは、`confirm` を呼ぶ手順に `CAF_REASON` を渡す。渡し忘れたときは対象を調べるので、Claude の変更の PR の赤を直した実行が `unfixed` で止まる
 - Dockerfile の組み立て(タスク 4.5): `check` は、ci.yaml の docker-smoke と同じ文脈で `docker build` を流すが、terraform の Dockerfile に `github_token` の secret を渡さない。verify ジョブは秘密の値を持たないためである。terraform の Dockerfile の secret の mount は必須ではないので組み立ては進むが、ログインしない問い合わせの回数の上限に当たると tflint の準備が失敗し、`unfixed` になることがある
 - frontend の対象の確認(タスク 4.5): `frontend-vuln-fix.sh vulnerable` は、lockfile が無いときも「範囲に入る版が無い」と同じ1で終わる。そのため、`confirm` は、`frontend/pnpm-lock.yaml` が無いときを `unfixed` にする
-- ship の起点の main(タスク 4.6): `claude-auto-fix-ship.sh` は、新しい PR のコミットの親にする main のコミットを、環境変数 `CAF_MAIN_SHA` で受け取る。9つの引数の形に main_sha の欄が無いためである。red-check のとき以外は必須で、起点のコミットの祖先でなければ失敗する。ワークフローのタスク 6.2 は、prepare ジョブの出力の `main_sha` を ship の手順に `CAF_MAIN_SHA` として渡す
+- ship の起点の main(タスク 4.6): `claude-auto-fix-ship.sh` は、新しい PR のコミットの親にする main のコミットを、環境変数 `CAF_MAIN_SHA` で受け取る。9つの引数の形に main_sha の欄が無いためである。`CAF_MAIN_SHA` は、reason が red-check のとき以外は必須である。`claude-auto-fix-ship.sh` は、`CAF_MAIN_SHA` のコミットが起点のコミットの祖先でなければ失敗する。ワークフローのタスク 6.2 は、prepare ジョブの出力の `main_sha` を ship の手順に `CAF_MAIN_SHA` として渡す
 - detail の目印の読み方(タスク 4.6): ship は、`<!-- claude-auto-fix-detail … -->` の目印を、detail が空でないとき(種類が npm・maven・go のとき)だけ本文に書く。dispatch で本文から detail を読む関数(タスク 5.x)は、目印が無ければ detail を空として扱い、行の始めから始まる最初の目印だけを読む。本文の後ろの変えたファイルの一覧には、Claude が作ったファイルの名前が入るためである
 - ship ジョブの checkout(タスク 4.6): ship ジョブが `target/` を取り出す `actions/checkout` には `persist-credentials: false` を付ける。既定のままだと GITHUB_TOKEN が http.extraheader に残り、`gh auth setup-git` の資格情報より先に使われて、push が bot の PAT にならないためである
 - 知らせの Issue の起票(タスク 4.7): `claude-auto-fix-report.sh` は、知らせの Issue と鍵の Issue を、`lib-ledger-issue.sh` の `ledger_find_or_create` を使わずに、`gh issue create` で起票し、`ledger_assign_owner` で所有者を担当者にする。`ledger_find_or_create` は、閉じた Issue でも題名が同じなら使い続けるため、「開いていなければ起票する」決まりを守れないからである。コメントは `ledger_comment` と `lib-notice-comment.sh` の `notice_post` で付ける。タスクの本文と design の「lib-ledger-issue.sh で探し、起票し」との食い違いとして、PR の本文に書く
 - report の起点のコミット(タスク 4.7): `claude-auto-fix-report.sh record` は、結果のファイルの `head_sha` を、環境変数 `CAF_HEAD_SHA`(40桁の16進)から読む。10の引数の形に欄が無いためである。無ければ null を書く。ワークフローのタスク 6.2 は、prepare ジョブの出力の起点のコミットを report の手順に `CAF_HEAD_SHA` として渡す
 - Issue の一覧の渡し方(タスク 4.7): 開いている Issue の一覧とコメントの一覧は、jq に引数(`--argjson`)で渡さず、標準入力かファイル(`--slurpfile`)で渡す。Linux の1つの引数の長さの上限は 128KiB で、知らせの Issue が20件ほど開くと超えるためである
-- 3日続けて動けなかった知らせ(タスク 4.8): `claude-auto-fix-report.sh notify` は、同じ key の知らせの Issue が状態によらず1つでも開いていれば、新しく起票しない。数える3回には、実行の途中の今の実行の結果を、今の UTC の日時で足す。`recent_outcomes` は終わった実行しか返さないためである。題名は、種類が codeql でも `Claude が3日続けて動けなかった CodeQL の警告 #<番号>` にする。design の「claude-auto-fix-report.sh」の節の codeql の題名 `Claude が直せなかった …` を使うと、動けなかった知らせが直せなかった知らせに見えるためである。design の文面との食い違いとして、PR の本文に書く。種類が codeql のときは、理由を決まった文だけで書き、理由の種類を書かない(要件5.1)。種類が container のときも Issue を起票し、対象の URL にラベル container-vuln の Issue の URL を書く
+- 3日続けて動けなかった知らせ(タスク 4.8): `claude-auto-fix-report.sh notify` は、同じ key の知らせの Issue が状態によらず1つでも開いていれば、新しく起票しない。数える3回には、実行の途中の今の実行の結果を、今の UTC の日時で足す。`recent_outcomes` は終わった実行しか返さないためである。題名は、種類が codeql でも `Claude が3日続けて動けなかった CodeQL の警告 #<番号>` にする。design の「claude-auto-fix-report.sh」の節の codeql の題名 `Claude が直せなかった …` を使うと、動けなかった知らせが直せなかった知らせに見えるためである。design の文面との食い違いとして、PR の本文に書く。種類が codeql のときは、`claude-auto-fix-report.sh notify` は、理由を決まった文だけで書き、理由の種類を書かない。CodeQL の警告の知らせを決まった文と警告の URL で書くとした要件5.1 を守るためである。種類が container のときも Issue を起票し、対象の URL にラベル container-vuln の Issue の URL を書く
 - 結果を出さずに止まった実行(タスク 4.8): `claude-auto-fix-report.sh record` は、結果が空のとき、環境変数 `JOB_RESULTS`(ジョブの名前から結論への JSON)を読み、design の「失敗したとき」の表の順で最初に失敗したか取り消されたジョブから結果を決める。止まったジョブが1つも無いときは `unavailable` と理由の種類 `no-outcome` を書く。結果のファイルの無い、取り消されていない実行があると `recent_outcomes` が失敗するため、結果のファイルを必ず書く。ワークフローのタスク 6.2 は、report の手順に `JOB_RESULTS` を渡す
-- 振り分けのきっかけの形(タスク 5.1): `claude-auto-fix-dispatch.sh trigger` は、入力 `pr` を渡さない。種類 dependabot の key が PR の番号で、red-check はきっかけの対象ではないためである。vuln-fix の成果物は、きっかけの実行の名前に加えて、きっかけの種類が schedule か workflow_dispatch であること、このリポジトリのブランチの実行であること、ワークフローのファイルが `frontend-vuln-fix.yaml` か `backend-vuln-fix.yaml` であることを確かめてから読む(要件1.6)。design の「claude-auto-fix-dispatch.sh」の節に無い確認として、PR の本文に書く。成果物に形の違う行が1行でもあれば、その成果物の組を1つも起動しない。Go の標準ライブラリの組が成果物に複数あっても、最も新しい版と OSV の ID のすべてで1つの対象にする。同じ回の中で起動した表示名を覚え、同じ対象を2回起動しない
-- 実行の出どころ(タスク 5.2): `lib-claude-auto-fix.sh` の `recent_outcomes` と、`claude-auto-fix-dispatch.sh` の対象ごとの実行の一覧は、このリポジトリの main から、`claude-auto-fix-target.yaml` のファイルで手で起動された実行だけを数える(jq の定義 `own_run`)。fork の PR が同じワークフローに別のきっかけを足すと、同じ一覧に、好きな表示名と結果のファイルを持つ実行を残せるためである(要件1.6)。design の「claude-auto-fix-dispatch.sh」の節に無い確認として、PR の本文に書く。後始末のスクリプト(タスク 5.3)と、ワークフローのきっかけ(タスク 6.x)でも、対象ごとの実行の一覧を読むときは同じ定義を使う
-- manual と retry の決めごと(タスク 5.2、PR の本文に書く): 鍵の Issue が開いていて、結果が key の対象が直近4日に無いときに4つの集め方から1つを選ぶときは、unfixed の Issue がある対象と、1度扱ったコンテナの Issue を外す。外さないと、prepare が飛ばす対象を選び、鍵を確かめられないまま鍵の Issue が開いたまま残るためである。design の「manual と同じ4つの集め方」との食い違いとして書く。そのほかの決めごとは次のとおりである。赤の検査を直す実行の動かし直しは、番号とブランチが合う開いた Claude の変更の PR の今の head で起動し、決まりの1を掛けない。赤の検査の名前が無ければ起動しない。集め直さない retry では決まりの2を掛けない。鍵の Issue が開いている間は、対象ごとの実行が動いているか今日すでにあれば、retry は何も起動しない。入力 reason は結果のファイルの reason にし、空なら retry にする。鍵の Issue の題名と目印は `lib-claude-auto-fix.sh` に移した
-- 後始末のスクリプトの決めごと(タスク 5.3、PR の本文に書く): 必須の検査のうち head のコミットで動いていない検査は、まだ動いている検査にも赤にも数えない。パスの絞り込みで動かない検査があるためである。approval_gated の検査は、まだ動いているかの判定からも赤からも除く。dependency-cooldown は72時間待つことがあるためである。dependency-review の赤は checks に入れて渡す。渡した dependency-review の赤は、対象ごとの実行が fixable_red_checks で絞る。`Claude-Auto-Fix-Check: X` はコミットのメッセージのどの行でも1行まるごと一致すれば数える。3回目の赤では、後始末のスクリプトは、PR を閉じ、ブランチを消し、そのあとで notify unfixed を呼ぶ。この順は設計の順で、知らせの重なりを避けるための順である。マージされたコンテナの PR は、更新の新しい順に最大10ページ読む。目印の無い PR と、目印から作ったブランチ名が PR のブランチと違う PR は、扱わずに理由を書いて進む
+- 振り分けのきっかけの形(タスク 5.1): `claude-auto-fix-dispatch.sh trigger` は、入力 `pr` を渡さない。種類 dependabot の key が PR の番号で、red-check はきっかけの対象ではないためである。`claude-auto-fix-dispatch.sh trigger` は、vuln-fix の成果物を、きっかけの実行の名前に加えて、きっかけの種類が schedule か workflow_dispatch であること、このリポジトリのブランチの実行であること、ワークフローのファイルが `frontend-vuln-fix.yaml` か `backend-vuln-fix.yaml` であることを確かめてから読む。この確認は、仕組みが Claude を動かすときを決めた要件1の受入基準6を守るためである。design の「claude-auto-fix-dispatch.sh」の節に無い確認として、PR の本文に書く。成果物に形の違う行が1行でもあれば、その成果物の組を1つも起動しない。Go の標準ライブラリの組が成果物に複数あっても、最も新しい版と OSV の ID のすべてで1つの対象にする。同じ回の中で起動した表示名を覚え、同じ対象を2回起動しない
+- 実行の出どころ(タスク 5.2): `lib-claude-auto-fix.sh` の `recent_outcomes` と、`claude-auto-fix-dispatch.sh` の対象ごとの実行の一覧は、このリポジトリの `claude-auto-fix-target.yaml` のファイルで、専用のブランチ `claude-auto-fix/run`(定数 `CAF_RUN_BRANCH`)で手で起動された実行だけを、jq の定義 `own_run` で数える。タスク 5.2 では、`own_run` は main で起動された実行を数えていた。Claude は、タスク 9.1 で、`own_run` を専用のブランチの実行を数える形に直す。fork の PR が同じワークフローに別のきっかけを足すと、同じ一覧に、好きな表示名と結果のファイルを持つ実行を残せるためである。この決まりは、仕組みが Claude を動かすときを決めた要件1の受入基準6を守る。design の「claude-auto-fix-dispatch.sh」の節に無い確認として、PR の本文に書く。後始末のスクリプト(タスク 5.3)と、ワークフローのきっかけ(タスク 6.x)でも、対象ごとの実行の一覧を読むときは同じ定義を使う
+- manual と retry の決めごと(タスク 5.2、PR の本文に書く): 決めごとは次の6つである。
+  - 鍵の Issue が開いていて、結果が key の対象が直近4日に無いときに4つの集め方から1つを選ぶときは、unfixed の Issue がある対象と、1度扱ったコンテナの Issue を外す。外さないと、prepare が飛ばす対象を選び、鍵を確かめられないまま鍵の Issue が開いたまま残るためである。design の「manual と同じ4つの集め方」との食い違いとして書く
+  - 赤の検査を直す実行の動かし直しは、番号とブランチが合う開いた Claude の変更の PR の今の head で起動し、design の「claude-auto-fix-dispatch.sh」の節の絞り込みの決まりの1つ目(同じ key の Claude の変更の PR が開いていれば起動しない)を掛けない。赤の検査の名前が無ければ起動しない
+  - 集め直さない retry では、design の「claude-auto-fix-dispatch.sh」の節の絞り込みの決まりの2つ目(状態が unfixed の知らせの Issue が開いているか、ラベル `container-vuln` の Issue に直せなかったことを書いたコメントがある対象を起動しない)を掛けない
+  - 鍵の Issue が開いている間は、対象ごとの実行が動いているか今日すでにあれば、retry は何も起動しない
+  - 入力 reason は結果のファイルの reason にし、空なら retry にする
+  - 鍵の Issue の題名と目印は `lib-claude-auto-fix.sh` に移した
+- 後始末のスクリプトの決めごと(タスク 5.3、PR の本文に書く): 決めごとは次の7つである。
+  - 必須の検査のうち head のコミットで動いていない検査は、まだ動いている検査にも赤にも数えない。パスの絞り込みで動かない検査があるためである
+  - approval_gated の検査は、まだ動いているかの判定からも赤からも除く。dependency-cooldown は72時間待つことがあるためである
+  - dependency-review の赤は checks に入れて渡す。渡した dependency-review の赤は、対象ごとの実行が fixable_red_checks で絞る
+  - `Claude-Auto-Fix-Check: X` はコミットのメッセージのどの行でも1行まるごと一致すれば数える
+  - 3回目の赤では、後始末のスクリプトは、PR を閉じ、ブランチを消し、そのあとで notify unfixed を呼ぶ。この順は設計の順で、知らせの重なりを避けるための順である
+  - マージされたコンテナの PR は、更新の新しい順に最大10ページ読む
+  - 目印の無い PR と、目印から作ったブランチ名が PR のブランチと違う PR は、扱わずに理由を書いて進む
 - 後始末のスクリプトで、検証のときに見直すこと(タスク 5.3 の審査で出た、直さなくてよいとされた指摘): 3回目の赤でブランチを消すのに失敗すると、PR は閉じたまま notify unfixed を呼ばない。head のコミットの日時が未来の日時だと、後始末のスクリプトは、同じ head の実行を見落として毎時間起動しうる。後始末のスクリプトが head のコミットの日時と今の時刻の早いほうを使えば、この起動は防げる
 - ワークフローのテストとの約束(タスク 6.1、6.2 から 6.4 で守る): 手順の id と、手順の出力の名前は、`test-claude-auto-fix-workflows.sh` の頭の説明の一覧のとおりにする。cooldown-push は出力 `sha` と `branch` を出し、judge_npm judge_go judge_ci_tool はスクリプトの終わり方を出力 `rc` に書き、cleanup の手順の id は `cleanup` にする。テストは base final materials alert notify scan_check cleanup と judge の手順を、使うコマンドを差し替えたフォルダで実際に動かすので、手順の中で別のスクリプトを呼ぶと失敗する。正しい形の見本のワークフローは、会話の作業用フォルダの `wf61/target.yaml` と `wf61/dispatch.yaml` にある。見本のワークフローが消えていれば、Claude は、テストの頭の説明から作り直す
 - ワークフローを作るときに決めること(タスク 6.1 の審査で分かった、PR の本文に書く): red-check の実行は空の base.patch を当てるので、base の手順は `git apply --allow-empty` を使うか、空なら当てない。design の red-check の run-name は head の SHA の先頭12文字で終わるが、対象ごとのワークフローの入力は6つで、後始末のスクリプト(タスク 5.3)は `pr` しか渡さないため、run-name に head の SHA を入れられない。タスク 6.2 で所有者に決めてもらう。Claude は、cooldown-submit の権限を `contents: write` だけにした。cooldown-submit が成果物を読むようにするときは、Claude は、`actions: read` を足し、テストも直す。verify ジョブは、種類によらず `security-events: read` の権限を持つ。ジョブの権限は入力で変えられないためである
 - ワークフローのテストの書き方(タスク 6.1 の debug で分かった): YAML の中の文字を探すだけの確認は、正しい名前を違う場所に書いたワークフローや、違うスクリプトを呼ぶワークフローを通してしまう。手順は差し替えたコマンドを置いたフォルダで実際に動かし、差し替えたコマンドに自分の名前と引数と環境変数を記録させて確かめる。shellcheck の検査を外す書き込みは使わず、単語の分割は `read -r a b <<<"$c"` に、一重引用符の中の `$` は perl の `\x24` に直す。yq の `sub` は一致をすべて置き換え、置き換えの文字列の `$名前` を一致の組として読むので、`$` の文字は `$$` と書く。busybox の `grep -o` は1行の中の2つ目からの一致を出さないので、数えるときは perl を使う。jq の `//` は false も無い値とみなすので、false を残したいときは使わない
-- 対象ごとのワークフローの決めごと(タスク 6.2、PR の本文に書く): red-check の run-name に head の SHA を入れるため、Claude は、7つ目の入力 `head` を足す。入力 `head` の既定は空である。後始末のスクリプトは、`head=${sha:0:12}` を渡す。ジョブはそれぞれ別の機械で動くため、base.patch と Claude の差分と final.patch は、成果物で渡す。成果物は1日で消える。受け取るジョブは、SHA-256 を前のジョブの出力と比べる。verify と ship は main_sha に base.patch をコミットしたものを起点にする。verify.sh apply と ship.sh が、起点がコミットであることを求めるためである。report の notify の引数は、ジョブの env で渡す。record の OUTCOME は、最も後ろで結果を出したジョブの outcome にし、edit と verify の ok は渡さない。edit と verify の ok は途中の結果であるためである
+- 対象ごとのワークフローの決めごと(タスク 6.2、PR の本文に書く): 決めごとは次の5つである。
+  - red-check の run-name に head の SHA を入れるため、Claude は、7つ目の入力 `head` を足す。入力 `head` の既定は空である。後始末のスクリプトは、`head=${sha:0:12}` を渡す
+  - ジョブはそれぞれ別の機械で動くため、base.patch と Claude の差分と final.patch は、成果物で渡す。成果物は1日で消える。受け取るジョブは、SHA-256 を前のジョブの出力と比べる
+  - verify と ship は main_sha に base.patch をコミットしたものを起点にする。verify.sh apply と ship.sh が、起点がコミットであることを求めるためである
+  - report の notify の引数は、ジョブの env で渡す
+  - record の OUTCOME は、最も後ろで結果を出したジョブの outcome にし、edit と verify の ok は渡さない。edit と verify の ok は途中の結果であるためである
 - ship の if(タスク 6.2 の審査で分かった): ship は `!cancelled()` で verify-image の暗黙の success() を外したので、`needs.verify.result == 'success'` も読む。verify の check の手順が ok を出したあとに CodeQL か confirm の手順が失敗すると、出力 outcome は ok のまま残るためである。タスク 6.3 の cooldown-push の if にも同じ項が要る。actionlint.yaml の先頭の説明には、6.3 で cooldown-judge ジョブを足す
 - ワークフローのテストの読み方(タスク 6.2): テストの `step_env` は `${{ }}` を外した形を返すので、式を `subst_expr` で評価するときは、jq で env の生の値を読む
 - テストを流さずに呼ぶスクリプト(タスク 6.2 の審査の気づき、6.3 で直す): prepare と verify-image は `check-trivy-version.sh` を、そのテスト `test-check-trivy-version.sh` を流さずに呼んでいる(今の container-scan.yaml と同じ形)。design の「各ジョブは、スクリプトを呼ぶ前に、そのスクリプトのテストを流す」に合わせ、6.3 で同じファイルを直すときに、呼ぶ前にテストを流す手順を足す
-- cooldown のジョブの決めごと(タスク 6.3、PR の本文に書く): cooldown-push は、一時のブランチに同じ名前のブランチが残っていても置き換えるため、`--force` を付けて push する。一時のブランチは、cooldown-judge の最後の手順が `always()` で GITHUB_TOKEN を使って消す。cooldown-generate は、dependency-review の generate ジョブと同じく、Java を入れてからスナップショットを作り、空のスナップショットを送らないことを確かめる。cooldown-generate の dependency-submission は `cache-disabled: true` でキャッシュを読み書きしない。Claude が変えたビルドのスクリプトが main のキャッシュの範囲で動くためである。cooldown-judge は、cooldown-submit が通っていなければ、判定の手順を動かしたうえでジョブを失敗にする。ship の if は、cooldown-judge の出力 result が ship であることに加えて、cooldown-judge ジョブが通ったことも読む。対象ごとのワークフローは、cooldown-judge のジョブが通ったときだけ、report の OUTCOME に blocked を渡す。同じスラグになる2つの key は、1つの一時のブランチを使う。取り消された実行は、一時のブランチを残す。Claude は、この2つを、分かっている限りのこととして PR の本文に書く
-- ワークフローの壊し方の確認(タスク 6.3 で分かった): 偽の正しいワークフローの文字に合わせて書いた壊し方は、本物のファイルでは yq の整形だけになり、壊せていないことがある。6.3 からは本物のファイルに壊し方を当て、yq で整形しただけの写しと比べて、壊し方がワークフローを変えたことを先に確かめる
+- cooldown のジョブの決めごと(タスク 6.3、PR の本文に書く): 決めごとは次の8つである。
+  - cooldown-push は、一時のブランチに同じ名前のブランチが残っていても置き換えるため、`--force` を付けて push する
+  - 一時のブランチは、cooldown-judge の最後の手順が `always()` で GITHUB_TOKEN を使って消す
+  - cooldown-generate は、dependency-review の generate ジョブと同じく、Java を入れてからスナップショットを作り、空のスナップショットを送らないことを確かめる
+  - cooldown-generate の dependency-submission は `cache-disabled: true` でキャッシュを読み書きしない。Claude が変えたビルドのスクリプトが main のキャッシュの範囲で動くためである
+  - cooldown-judge は、cooldown-submit が通っていなければ、判定の手順を動かしたうえでジョブを失敗にする
+  - ship の if は、cooldown-judge の出力 result が ship であることに加えて、cooldown-judge ジョブが通ったことも読む
+  - 対象ごとのワークフローは、cooldown-judge のジョブが通ったときだけ、report の OUTCOME に blocked を渡す
+  - 同じスラグになる2つの key は、1つの一時のブランチを使う。取り消された実行は、一時のブランチを残す。Claude は、この2つを、分かっている限りのこととして PR の本文に書く
+- ワークフローの壊し方の確認(タスク 6.3 で分かった): 偽の正しいワークフローの文字に合わせて書いた壊し方は、本物のファイルでは yq の整形だけになり、壊せていないことがある。Claude は、タスク 6.3 からは、本物のファイルに壊し方を当て、yq で整形しただけの写しと比べて、壊し方がワークフローを変えたことを先に確かめる
 - 一時のブランチの push の権限(タスク 6.3 の審査で分かった、所有者が 2026-11-21 に決めた): GITHUB_TOKEN は `.github/workflows/` のファイルを変えるコミットを push できず、権限の欄に `workflows: write` を書くこともできない。そのため、直す前の design のとおりに cooldown-push ジョブが GITHUB_TOKEN で一時のブランチを push すると、ワークフローのファイルの CI の道具の版を変える変更と、ワークフローのファイルを変える Dependabot の PR の対象では、cooldown-push ジョブが毎回失敗する。所有者は、cooldown-push の push の手順にだけ bot の PAT を渡すよう、design と tasks を直すことにした
 - 振り分けのワークフローのきっかけの渡し方(タスク 6.4): dispatch の手順は、きっかけの名前とワークフローの名前を env で受け、run の中に `${{ }}` を書かない。きっかけのワークフローの名前を通して、手順に命令を差し込まれないためである。知らないきっかけでは、スクリプトを呼ばずに失敗する
-- 実際の実行でしか確かめられない2つの動き(タスク 6.3 の審査で分かった、タスク 8.3 で見る): cooldown-push の `gh auth setup-git` が、環境変数 `GH_TOKEN` だけで git の認証の手段になること。cooldown-judge が GITHUB_TOKEN で、`.github/workflows/` を変えるコミットを持つ一時のブランチを消せること
+- 実際の実行でしか確かめられない2つの動き(タスク 6.3 の審査で分かった、タスク 10.3 で見る): cooldown-push の `gh auth setup-git` が、環境変数 `GH_TOKEN` だけで git の認証の手段になること。cooldown-judge が GITHUB_TOKEN で、`.github/workflows/` を変えるコミットを持つ一時のブランチを消せること
 - 置き場所のスクリプトのテストを流すとき(タスク 7 の審査で分かった): 置き場所の `lib-claude-auto-fix.sh` は、本体の `.github/scripts/` にだけある `lib-go-release.sh` を読み込む。テストは、本体の `.github/` を写した上に置き場所の `dot-github/` を重ねた入れ物で流す
-- README のワークフローの表の行を書くとき(タスク 6.5 の審査で分かった): 行には、ワークフローが何をするかと何をしないかだけを書く。対象の選び方や例外を「〜なら」「〜だけ」「1日に1回まで」の形で書き写すと、spec の別の例外で偽になり、差し戻しが続く。「〜だけ」で書くときは、spec が保証する場合に範囲を限る
-- 失敗を覚えておく変数に書く関数の呼び方(実装の全体の確かめで分かった): dispatch の `err` は、シェルの変数 `FAILED` に1を入れる。`$(...)` の中で `err` を呼ぶ関数を動かすと、子のシェルで1を入れるだけになり、失敗で終わらない。結果を返す関数は、出力ではなく変数に結果を入れ、`if` か `||` の中で直に呼ぶ
+- README のワークフローの表の行を書くとき(タスク 6.5 の審査で分かった): 行には、ワークフローが何をするかと何をしないかだけを書く。Claude が対象の選び方や例外を「〜なら」「〜だけ」「1日に1回まで」の形で README の行に書き写すと、README の行の文は、spec の別の例外に当たる場面で偽になり、差し戻しが続く。「〜だけ」で書くときは、Claude は、spec が保証する場合に範囲を限る
+- 失敗を覚えておく変数に書く関数の呼び方(実装の全体を確認したときに分かった): dispatch の `err` は、シェルの変数 `FAILED` に1を入れる。`$(...)` の中で `err` を呼ぶ関数を動かすと、`err` は子のシェルの `FAILED` に1を入れるだけになり、dispatch のスクリプトは失敗で終わらない。結果を返す関数は、結果を出力ではなく変数に入れる。Claude は、その関数を `if` か `||` の中で直に呼ぶ

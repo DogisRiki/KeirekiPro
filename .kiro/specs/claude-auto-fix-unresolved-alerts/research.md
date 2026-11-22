@@ -91,6 +91,11 @@
 - design.md 部品の節 claude-auto-fix-target.yaml の cooldown-judge「判定の4つ目は、環境変数 PNPM_WORKSPACE_FILE(既定は frontend/pnpm-workspace.yaml)の除外の欄を読む」: .github/scripts/check-dependency-cooldown.sh 81行、600-613行(2026-11-14 に開いた)
 - design.md 部品の節 claude-auto-fix-target.yaml の cooldown-generate「今の dependency-review.yaml と dependency-graph.yaml は GITHUB_DEPENDENCY_GRAPH_SHA と GITHUB_DEPENDENCY_GRAPH_REF を使っていない」: .github/workflows/dependency-review.yaml 72-83行、103-111行、.github/workflows/dependency-graph.yaml(2026-11-14 に開いた)
 - design.md テストの方針 test-claude-auto-fix-workflows.sh「手元のテストは alpine のコンテナに apk add で道具を入れて流す」: .github/CLAUDE.md 23行、62行。`.github/` の中に yq を使うスクリプトは無い(2026-11-14 に grep で確かめた)
+- design.md 全体の構成「専用のブランチ `claude-auto-fix/run` への push では、どのワークフローも動かない」: push で動くワークフローは ci.yaml 8-9行、codeql.yaml 31-32行、container-scan-scheduled.yaml 76-77行、dependency-graph.yaml 35-36行、sync-labels.yaml 32-33行、update-pr-branches.yaml 44-45行の6つで、どれも `branches: [main]` である。`create:` と `delete:` と `branches-ignore` を持つワークフローは無い(2026-11-22 に .github/workflows/ を grep で確かめた)
+- design.md 全体の構成「専用のブランチには ruleset が掛かっていない」: リポジトリの ruleset は id 2986186 の「main」だけで、対象は `~DEFAULT_BRANCH`、bypass_actors は null である。`claude-auto-fix` で始まるブランチは、この spec の作業のブランチのほかに無い(2026-11-22 に `gh api` で確かめた)。`contents: write` を持つジョブは、置き場の claude-auto-fix.yaml 91行、claude-auto-fix-target.yaml 750行と768行のほかに、canary.yaml 14行(schedule と workflow_dispatch だけ)、dependabot-auto-merge.yaml 55行(auto-merge ジョブは 89-91行で base のコミットを checkout、recheck ジョブは 198行で schedule と workflow_dispatch だけ)、dependency-graph.yaml 96行(push は main だけ)、dependency-review.yaml 103行(submit ジョブは checkout しない)である(2026-11-22 に .github/workflows/ を grep で確かめた)
+- design.md claude-auto-fix-target.yaml の節「キャッシュ」: 置き場の claude-auto-fix-target.yaml の 375行と408行の `cache: false`、417行の `skip-cache: true`、732行の `cache-disabled: true`。CodeQL の `init` は471行、`analyze` は490行(2026-11-22 に開いた)
+- design.md claude-auto-fix-dispatch.sh と claude-auto-fix-sweep.sh の節「`--ref claude-auto-fix/run` で起動する」: 置き場の claude-auto-fix-dispatch.sh 60行と281行、claude-auto-fix-sweep.sh 243行が、今は `--ref main` で起動している。lib-claude-auto-fix.sh 270行の `_CAF_JQ_OWN_RUN` が、今は `.head_branch? == "main"` で実行を選んでいる(2026-11-22 に開いた)
+- design.md ファイルの構成「README の claude-auto-fix-target.yaml の行と、基盤構築手順の `BOT_GITHUB_TOKEN` の行」: README.md 129-130行、doc/開発フロー/基盤構築手順.md 22行(PAT の scopes は `repo`、`read:org`、`workflow`)と76行(2026-11-22 に開いた)
 
 ## 外部の文書で確かめたこと
 
@@ -100,6 +105,10 @@
 - pnpm は、`minimumReleaseAge` の決まりで入れられる版が無いときに `ERR_PNPM_NO_MATURE_MATCHING_VERSION` を出す。https://github.com/pnpm/pnpm/pull/10618 。`package.json` に版を固定したときのエラーの文は確かめていない
 - GitHub のホストランナー ubuntu-24.04 のイメージ 20261111.370.1 には yq 4.54.3 が入っている。https://github.com/actions/runner-images/blob/main/images/ubuntu/Ubuntu2404-Readme.md(2026-11-14 に読んだ)
 - claude-code-action は、`prompt` を渡すと、コメントでの呼び出しを待たずに動く。schedule と workflow_dispatch で動かす例がある。https://github.com/anthropics/claude-code-action/blob/main/docs/solutions.md の「Scheduled Repository Maintenance」
+- 実行が読めるキャッシュは、実行のブランチが保存したキャッシュと、既定のブランチが保存したキャッシュである。https://docs.github.com/en/actions/reference/workflows-and-actions/dependency-caching#restrictions-for-accessing-a-cache
+- codeql-action v4.39.3(コミット 33d7b85d)は、環境変数 `CODEQL_OVERLAY_DATABASE_MODE` が `none` のとき、オーバーレイのデータベースのキャッシュを使わない。値が無いときは、PR の解析ではキャッシュを読み(`Overlay`)、既定のブランチの解析ではキャッシュを保存する(`OverlayBase`)。`src/config-utils.ts` 706-860行(とくに741-755行と830-842行)。`dependency-caching` の入力は既定で使わない(`src/caching-utils.ts`)。既定のブランチかどうかの判定は `src/git-utils.ts` 419-439行
+- codeql-action v4.39.3(コミット 33d7b85d)は、入力 `trap-caching` が無いとき、GitHub が用意したランナーで、オーバーレイのデータベースのモードが `None` なら、TRAP のキャッシュを使う。`src/config-utils.ts` 950-967行(`isTrapCachingEnabled`)と1303-1312行。TRAP のキャッシュは、`init` でキャッシュから読み(`src/trap-caching.ts` 43-99行の `downloadTrapCaches`。キーの前の部分が合うキャッシュも読む)、解析のあとで保存する(同 126-162行の `uploadTrapCaches`)。入力の説明は `init/action.yml` 154-160行(2026-11-22 に `gh api` で開いた)
+- CodeQL の規則 `actions/cache-poisoning/poisonable-step` は、`workflow_dispatch` の実行を、既定のブランチの実行とみなして判定する。github/codeql の `actions/ql/lib/codeql/actions/security/ControlChecks.qll`、`CachePoisoningQuery.qll`、`PoisonableSteps.qll`、`UntrustedCheckoutQuery.qll` と、`actions/ql/src/Security/CWE-349/CachePoisoningViaPoisonableStep.ql`。規則は起動の `--ref` を読まない
 
 ## 件数
 
@@ -160,6 +169,17 @@
   - `workflow_run` は、名前を書いたワークフローの実行が終わると、既定のブランチのワークフローで動く
   - ジョブの出力は、同じ実行のあとのジョブに渡る。秘密の値を含む出力は渡らない
 - **Implications**: 振り分けのワークフローは、GITHUB_TOKEN で対象ごとのワークフローを `workflow_dispatch` で起こす。PR の作成と push は bot の PAT で行い、PR の CI を動かす
+
+### 対象ごとの実行のキャッシュ
+
+- **Context**: PR #909 の CodeQL の検査で、規則 `actions/cache-poisoning/poisonable-step` が、cooldown-generate ジョブの2つの手順を重さが高の警告にした。対象ごとの実行は Claude が変えたコードを動かすので、その実行が保存したキャッシュを、ほかのワークフローの実行が読むと、Claude が変えたコードがほかの実行に入りうる
+- **Sources Consulted**: 上の「外部の文書で確かめたこと」のキャッシュの文書と、codeql-action と github/codeql のファイル
+- **Findings**:
+  - 実行が読めるキャッシュは、実行のブランチと既定のブランチのキャッシュだけである。main で動く実行が保存したキャッシュは、すべてのブランチの実行が読む
+  - 対象ごとの実行を main で動かすと、その実行が保存したキャッシュは main のキャッシュになる。専用のブランチで動かすと、そのキャッシュを読めるのは専用のブランチの実行だけになる
+  - 置き場の claude-auto-fix-target.yaml は、setup-go と golangci-lint と dependency-submission のキャッシュを止めている。CodeQL の init はオーバーレイのキャッシュを既定のブランチで保存するので、環境変数で止める
+  - CodeQL の規則は起動の `--ref` を読まないので、専用のブランチで動かしても警告は残る
+- **Implications**: 対象ごとの実行を専用のブランチ `claude-auto-fix/run` で動かし、どのジョブもキャッシュを読まず保存しない。警告は、マージのあとに所有者が却下する
 
 ## Architecture Pattern Evaluation
 
@@ -255,12 +275,27 @@
 - 振り分けのワークフローに同時実行の組を付けない。同じ対象の実行は対象ごとのワークフローの同時実行の組で1つずつにし、重複は、開いている PR と動いている実行を読んで防ぐ
 - コンテナの脆弱性を自動で扱うのは、仕組みがまだ1度も扱っていない Issue だけにする。扱ったあとは所有者の手での起動で扱う
 
+### Decision: 対象ごとの実行を専用のブランチで動かし、キャッシュを使わない
+
+- **Context**: PR #909 の CodeQL の検査が、cooldown-generate ジョブの手順をキャッシュの汚染の警告にした(2026-11-22)。所有者は、専用のブランチで動かす案を選んだ
+- **Alternatives Considered**:
+  1. 実行ごとに別のブランチを作って動かし、終わったら消す — ブランチの作成と後始末が実行の数だけ要り、後始末に失敗するとブランチが残る
+  2. main で動かしたまま、実行のコミットが main の祖先かを確かめる — ワークフローのファイルは起動の ref から読まれるので、main で動かす限り確かめても何も変わらない。キャッシュの範囲も main のままである
+  3. 専用のブランチを GITHUB_TOKEN で main に合わせる — GitHub は、`.github/workflows/` を変えるコミットへの参照の更新を GITHUB_TOKEN で許さない
+  4. 1つの専用のブランチを bot の PAT で main の最新のコミットに合わせてから起動し、どのジョブもキャッシュを使わない
+- **Selected Approach**: 4つ目。claude-auto-fix.yaml の run-branch ジョブが、`claude-auto-fix-run-branch.sh` で専用のブランチを main の最新のコミットに強制で合わせ、dispatch と sweep が `--ref claude-auto-fix/run` で起動する。claude-auto-fix-target.yaml は、ほかの ref の実行を ref-check ジョブで止める
+- **Rationale**: 専用のブランチのキャッシュは、ほかのブランチの実行が読めない。ブランチは常に main と同じコミットを指すので、動くスクリプトとアクションは main のものと同じである。専用のブランチへの push で動くワークフローは無い
+- **Trade-offs**: run-branch ジョブに bot の PAT を渡す。PAT を持つジョブは main を checkout し、main のスクリプトだけを動かす。CodeQL の警告は残るので、所有者が却下する
+- **Follow-up**: マージのあとの確認で、専用のブランチが main のコミットを指すことを読む
+
 ## Risks & Mitigations
 
 - CodeQL の警告を直す実行の途中で、材料と変更が成果物として読める時間がある — 成果物の保存を1日にし、実行の最後のジョブで成果物を消す。標準出力に材料と変更と検査の出力を出さない
 - 差分比較の API が一時のブランチのコミットで差を返さなくなる(2026-11-14 には返った) — 予測で判定できないときは赤とみなし、3日続けば Issue で知らせる
 - 予測が判定できない状態が続く — 3日続いたら、動けなかったときと同じ Issue を起票する
 - 契約の使える量を自動の処理で使うことが、利用の決まりの「普通の使い方」を超えるおそれ — 1回の実行の往復の数を60、同じ対象を自動のきっかけで動かすのを UTC の1日に1回、同じ必須の検査の赤での直し直しを3回に限る
+- CodeQL の規則 `actions/cache-poisoning/poisonable-step` が、専用のブランチで動かしたあとも cooldown-generate ジョブの手順を警告にし続ける — 規則は起動の `--ref` を読まないためである。警告の却下は所有者が行い、Claude は却下しない。出力の名前を変えて規則の見分け方を外すことはしない
+- 専用のブランチの合わせ込みが、同時に動いた2つの実行で前後する — 強制で合わせるので、戻っても1つ前の main のコミットまでで、次の実行で最新に戻る
 - Claude が読み込みの道具で自分の環境(鍵)を読み、変更に書き込むおそれ — 作業のフォルダの外の読み書きを断る2つの設定と拒否の決まりで、/proc と /sys とランナーの一時フォルダを読ませず、変更に鍵の値か `sk-ant-` で始まる文字列があれば変更を捨てる
 
 ## References
@@ -282,6 +317,9 @@
 - [Gradle の依存グラフのプラグイン](https://github.com/gradle/github-dependency-graph-gradle-plugin)
 - [gradle/actions の dependency-submission](https://github.com/gradle/actions/blob/main/docs/dependency-submission.md)
 - [依存の差分比較の API](https://docs.github.com/en/rest/dependency-graph/dependency-review)
+- [キャッシュを読める範囲](https://docs.github.com/en/actions/reference/workflows-and-actions/dependency-caching#restrictions-for-accessing-a-cache)
+- [codeql-action v4.39.3](https://github.com/github/codeql-action/tree/33d7b85da1a04171e211befe2c739303b9a4c066) — `src/config-utils.ts` のオーバーレイのデータベースの決め方
+- [CodeQL のキャッシュの汚染の規則](https://github.com/github/codeql/tree/main/actions/ql/src/Security/CWE-349)
 
 ## pnpm が72時間の待ちで止まったときのエラーの文
 

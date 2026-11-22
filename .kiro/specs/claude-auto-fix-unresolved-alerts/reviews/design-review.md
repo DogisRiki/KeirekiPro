@@ -1043,3 +1043,191 @@
 なし
 
 - 往復: 2回で収束 / 未解決: 0件
+
+## サイクル8 往復1(2026-11-22)
+
+### 審査の範囲
+
+範囲: 差分
+
+- design.md 作るもの(18行)、設計を見直すきっかけ(69-72行)、全体の構成の図と文(105行、125-128行、146行、148行)、ファイルの構成(163-165行、179行、193-194行)、処理の流れ(207-208行)、部品 claude-auto-fix.yaml(251-264行)、claude-auto-fix-run-branch.sh(266-285行)、claude-auto-fix-dispatch.sh の役割(291行)、claude-auto-fix-sweep.sh の赤の検査の扱い(332行)、claude-auto-fix-target.yaml の「動くブランチ」「キャッシュ」(354-365行)と verify・cooldown-generate・report・cleanup(382行、401行、412行、416行、429行)、claude-auto-fix-ship.sh(581行)、lib-claude-auto-fix.sh(646行)、テストの方針(751-752行、764行、776行、812-815行、833行)、安全(840行、843-844行): 差分の行そのもの
+- design.md プロジェクトの決まり(84行、88行): 88行が差分の行。84行の「`workflow_dispatch` は、main にあるワークフローでしか起動できない」が、専用のブランチでの起動と食い違わないかを見るため。ワークフローのファイルが main にあれば、ほかのブランチを `--ref` に渡して起動できるので、食い違わない
+- design.md claude-auto-fix-dispatch.sh の `retry` と絞り込みの決まり(297-316行)、claude-auto-fix-report.sh の `unavailable` と `blocked`(599行): 646行が、結果のファイルを読む関数と、待っている実行・動いている実行・その日の実行の数え方を、実行のブランチで絞ると決めたので、これらを使う箇所と合うかを見るため。合っている
+- design.md claude-auto-fix-target.yaml の「失敗したとき」の表(420-429行)と、cooldown-push・ship の `if`: 357行が「ほかのすべてのジョブの `if` は専用のブランチの条件を含む」と決めたので、今あるジョブの条件と両立するかを見るため。両立する
+- design.md 失敗したときの扱い(740行)と claude-auto-fix.yaml の「失敗したとき」(264行): run-branch ジョブが失敗したときの扱いが、節どうしで合うかを見るため(申告1)
+- requirements.md 元の要望と、要件1の5、1の6、3の3、6の1: 差分の節が「対応する要件」と、テストの括弧に挙げた受入基準のため。語 `専用のブランチ` `claude-auto-fix/run` で requirements.md を検索した(1件も無い。D8-1-3)
+- research.md 94-98行、108-110行、172-181行、277-288行: 差分の、今あるものと外部の機能についての文を、いつ何で確かめたかを見るため
+- reviews/requirements-review.md と requirements-response.md: 語 `design` で検索した。差分に関わる、後ろの段階で書くと記録された食い違いは無い
+- そのほかの節は、差分の語が出てこないので、読み直していない
+
+### 実ファイルで確かめた文
+
+- claude-auto-fix-run-branch.sh(277行)「push で動くワークフローは、どれも `branches: [main]` で絞ってある」: .github/workflows/ の `push:` を持つ6つのワークフロー(ci.yaml 8-9行、codeql.yaml 31-32行、container-scan-scheduled.yaml 76-77行、dependency-graph.yaml 35-36行、sync-labels.yaml 32-33行、update-pr-branches.yaml 44-45行)。`create:` `delete:` `branches-ignore:` を持つワークフローは無い / 合っていた
+- claude-auto-fix.yaml の権限(253行)「bot の PAT は `workflow` の範囲を持つ」: doc/開発フロー/基盤構築手順.md 22行(scopes: `repo`、`read:org`、`workflow`) / 合っていた
+- ファイルの構成(194行)「基盤構築手順の 3-1 の表に `BOT_GITHUB_TOKEN` の行と、失効したときの欄がある」: doc/開発フロー/基盤構築手順.md 73-76行 / 合っていた
+- ファイルの構成(193行)「README のワークフローの一覧の表に、claude-auto-fix.yaml と claude-auto-fix-target.yaml の行があり、起動の欄と中身の欄がある」: README.md 129-130行 / 合っていた
+- 「キャッシュ」(362行)「`actions/setup-go` は `cache: false`、`golangci-lint-action` は `skip-cache: true`、`gradle/actions/dependency-submission` は `cache-disabled: true`」: .github/workflows/claude-auto-fix-target.yaml 372-375行、405-408行、413-417行、722-732行(今のファイルに、すでにこの3つの入力がある) / 合っていた
+- 「キャッシュ」(363行)「`actions/setup-java` と `pnpm/action-setup` には、キャッシュの入力を渡さない」: 同じファイルの 366行、422-425行、463-466行、715行。今のファイルは、どちらにもキャッシュの入力を渡していない / 合っていた
+- 「キャッシュ」(364行)「`actions/cache` を使わない。`docker buildx build` に `type=gha` のキャッシュを渡さない」: 同じファイルに `actions/cache` は無い。137-138行と589-590行の `docker buildx build` は `--output type=docker` だけを渡す。.github/actions/ の下のアクション(verified-node、verified-trivy、verified-claude)には、`uses:` も `cache` の語も無い / 合っていた
+- 「キャッシュ」(365行)「CodeQL のアクションは v4.39.3」: .github/workflows/claude-auto-fix-target.yaml 471行、490行と、.github/workflows/codeql.yaml 105行、122行(どちらもコミット 33d7b85d、v4.39.3) / 合っていた。`CODEQL_OVERLAY_DATABASE_MODE` の効き方は codeql-action の側の動きで、リポジトリの実ファイルでは確かめられない。research.md 109行に、確かめたコミットとファイルと行がある
+- claude-auto-fix-dispatch.sh(291行)と sweep(332行)と lib(646行)の、今のスクリプトからの変更: .github/scripts/claude-auto-fix-dispatch.sh 281行と claude-auto-fix-sweep.sh 243行は、今は `--ref main` で起動し、lib-claude-auto-fix.sh 270行の `own_run` は、今は `.head_branch? == "main"` で実行を選ぶ。待っている実行と結果のファイルの読み方が1つの定義 `own_run` を通るので、646行の「この決まりで実行を選ぶ」は1か所の変更で作れる / 合っていた
+- claude-auto-fix.yaml(251-264行)の、今のワークフローからの変更: .github/workflows/claude-auto-fix.yaml 40-46行、86-89行。dispatch ジョブと sweep ジョブの `if` は `always()` などの関数を使っていないので、`needs: [run-branch]` を足せば、run-branch ジョブが失敗したときに2つのジョブは動かない / 合っていた
+- 全体の構成(146行)「専用のブランチに書き込めるのは、main と同じく、書き込みの権限を持つ所有者と bot だけである」: ruleset の中身は GitHub の側の設定で、リポジトリの実ファイルでは確かめられない。research.md 95行は、ruleset が main だけを対象にすると書く。この記録と 146行の「main と同じく」は合わない(D8-1-2)
+
+### 受入基準ごとの確かめ方
+
+| 受入基準 | 確かめる道具 | 動かす場所 | 動かすのに要るもの | design の箇所 |
+|---|---|---|---|---|
+| 1.1 から 1.4(きっかけごとに、対象ごとの実行が起動される) | test-claude-auto-fix-dispatch.sh(実行が `--ref claude-auto-fix/run` で起動される)、test-claude-auto-fix-workflows.sh(dispatch ジョブと sweep ジョブが `needs: [run-branch]` を持つ) | CI は dispatch ジョブのランナー `ubuntu-24.04`、手元は alpine のコンテナ | 偽の `gh`、yq | 764行、813行、291行 |
+| 1.5(所有者が手で仕組みを動かす) | test-claude-auto-fix-run-branch.sh(ブランチがあるときは `PATCH`、無いときは `POST`、失敗で0以外、main の参照を変えない)、test-claude-auto-fix-workflows.sh(ref-check ジョブの `if`) | 同じ | 偽の `gh`(404 か 422 を返す場合を含む)、yq | 752行、814行、258行、356-358行 |
+| 1.6(仕組みが起動した実行だけを数える) | test-lib-claude-auto-fix.sh(結果のファイルを読む関数が、実行のブランチが `claude-auto-fix/run` の実行だけを読む) | 同じ | 偽の `gh` の実行の一覧(ブランチが `main` の実行と、ほかのワークフローの実行を含む) | 751行、646行 |
+| 2.4(Claude の変更の PR の赤で Claude を動かす) | test-claude-auto-fix-sweep.sh(赤の検査で起動する実行が `--ref claude-auto-fix/run` で起動される) | 同じ | 偽の `gh` | 776行、332行 |
+| 3.3(Claude に GitHub の中身を変える権限を渡さない) | test-claude-auto-fix-workflows.sh(`secrets.BOT_GITHUB_TOKEN` が、ship ジョブと cooldown-push ジョブの push の手順と、run-branch ジョブのスクリプトを呼ぶ手順にだけ現れる) | 同じ | yq | 812行、253行 |
+| 6.1(動けなかった対象を次の日に動かし直す) | test-lib-claude-auto-fix.sh(上の 1.6 と同じ場合)。専用のブランチのほかで起動された実行は、結果のファイルを書かないので数えない | 同じ | 同じ | 751行、429行、646行 |
+| Issue の決めた方式の4つ目(対象ごとの実行のキャッシュを main のワークフローが読まない。requirements.md に受入基準が無い。D8-1-3) | test-claude-auto-fix-workflows.sh(ref-check ジョブとほかのジョブの `if`、YAML のブランチの名前が `CAF_RUN_BRANCH` と同じ、「キャッシュ」の節の入力と環境変数)。実際のブランチの動きは、マージのあとの確認で読む | CI と手元は上と同じ。マージのあとの確認は GitHub の上 | yq。マージのあとの確認には、所有者が登録した鍵と bot の PAT | 814-815行、833行、354-365行 |
+
+### 申告
+
+**1. run-branch ジョブが失敗したら、dispatch ジョブも sweep ジョブも動かさず、Issue も起票しない** — design.md claude-auto-fix.yaml の「失敗したとき」(264行)
+
+- Issue の記載: なし。Issue は、専用のブランチで起動することだけを決めている
+- 決めたこと: run-branch ジョブが失敗した実行では、対象ごとの実行を起動しない。sweep ジョブの、対象が消えた PR と知らせの Issue を閉じる処理と、マージのあとのコメントも動かない。次の1時間ごとの実行でやり直す。失敗を所有者に知らせる Issue は作らない
+- 他にありえた選択肢: sweep ジョブのうち、実行を起動しない処理(PR と Issue を閉じる、コメントを付ける)は、run-branch ジョブが失敗しても動かす。run-branch ジョブの失敗が続いたら Issue で知らせる
+- 外れていた場合: bot の PAT が切れたときと、だれかが専用のブランチを対象にする ruleset を足したときは、run-branch ジョブが毎回失敗する。その間、仕組みは Claude を1度も動かさず、結果のファイルも書かないので、要件6の1の「3日続けて動けなかったら Issue を起票する」は働かない。失敗は Actions の実行の記録にだけ残る。直す前の設計では、bot の PAT が切れても対象ごとの実行は動き、ship ジョブの失敗が `unavailable` として数えられて、3日で Issue が起票された。4日を超えて止まると、`unavailable` と `blocked` で終わっていた対象の結果のファイルが直近4日から外れ、次のきっかけ(vuln-fix は毎日、週次監査は週1回)まで動かし直されない。bot の PAT が切れたことは、基盤構築手順 76行のとおり、ほかの仕組みが止まることで所有者に分かる
+
+**2. CodeQL の警告は残り、所有者が却下する** — design.md 安全の「CodeQL の判定」(844行)、research.md 296行
+
+- Issue の記載: なし。Issue は、キャッシュを main のワークフローが読まないようにすることを目的に書いている
+- 決めたこと: 専用のブランチで動かしても、CodeQL の規則 `actions/cache-poisoning/poisonable-step` は cooldown-generate ジョブの手順を警告にし続ける。警告は所有者が却下する
+- 他にありえた選択肢: 規則が警告にしない形にジョブを組み直す(たとえば、Gradle のスナップショットを作る手順を、`workflow_dispatch` で動かないワークフローに移す)
+- 外れていた場合: この spec の仕組みを入れる PR は、所有者が警告を却下するまで CodeQL の検査が通らない。あとで cooldown-generate ジョブの手順を変えると、警告が新しく出て、所有者がもう一度却下することになる
+
+**3. 1時間ごとに動くジョブに bot の PAT を渡し、ブランチを強制で合わせる** — design.md claude-auto-fix.yaml の権限(253行)、claude-auto-fix-run-branch.sh(273-274行)
+
+- Issue の記載: なし
+- 決めたこと: run-branch ジョブは、bot の PAT で、専用のブランチを `force=true` で main の最新のコミットに合わせる。直す前の振り分けのワークフローは、GITHUB_TOKEN だけを使っていた
+- 他にありえた選択肢: research.md 280-284行の3つの案(実行ごとに別のブランチを作る、main で動かして祖先かを確かめる、GITHUB_TOKEN で合わせる)
+- 外れていた場合: bot の PAT を使うジョブが1つ増え、PAT が切れると仕組みの全体が止まる(申告1)。専用のブランチには ruleset が掛かっていないので、書き込みの権限を持つ者は、このブランチを main に無いコミットに動かせる。run-branch ジョブは起動の前に毎回 main に戻すが、戻してから起動するまでの間は戻らない
+
+**4. 対象ごとのワークフローは、どのジョブでもキャッシュを使わない** — design.md claude-auto-fix-target.yaml の「キャッシュ」(360-365行)
+
+- Issue の記載: あり。「その実行が作るキャッシュを、main のワークフローが読まないようにするため」。キャッシュを使わないことまでは書いていない
+- 決めたこと: 専用のブランチで動かすのに加えて、どのジョブもキャッシュを読まず保存しない
+- 他にありえた選択肢: 専用のブランチの中でだけキャッシュを使う
+- 外れていた場合: 実行のたびに、Go と Gradle の部品を取り直すので、verify ジョブと cooldown-generate ジョブが長くなる。打ち切りの時間(verify は120分、cooldown のジョブは20分)は変えていない
+
+### 指摘
+
+| ID | レベル | 該当箇所 | 内容 | 直し方の案 |
+|---|---|---|---|---|
+| D8-1-1 | 低 | design.md claude-auto-fix-target.yaml の「キャッシュ」(360行、365行)、テストの方針(815行) | 360行は「どのジョブも、GitHub Actions のキャッシュを読まず、保存しない」と書き、365行は、CodeQL について、オーバーレイのデータベースと `dependency-caching` の2つを止めると書く。research.md 109行が確かめたのも、この2つである。codeql-action の `init` には、この2つのほかに、TRAP のキャッシュ(入力 `trap-caching`)がある。審査役の覚えでは、GitHub のホストランナーでは既定で使われ、`init` が既定のブランチのキャッシュを読み、保存は既定のブランチの解析のときだけ行う。覚えのとおりなら、専用のブランチの実行は、main の CodeQL の実行が保存した TRAP のキャッシュを読むので、360行の「読まず」と合わない。保存はしないので、「前の実行が Claude の変えたコードで書いたキャッシュを、次の実行が読まない」という目的は保たれる。審査役は外部のファイルを開けないので、v4.39.3 での動きは確かめていない | メインセッションが、codeql-action のコミット 33d7b85d の `init/action.yml` と `src/trap-caching.ts` を開いて確かめる。覚えのとおりなら、365行に、`init` に `trap-caching: false` を渡すことを足し、815行のテストの場合にも足す。確かめた結果を research.md に書く |
+| D8-1-2 | 低 | design.md 全体の構成(146行) | 146行は「専用のブランチに書き込めるのは、main と同じく、書き込みの権限を持つ所有者と bot だけである」と書く。research.md 95行は、ruleset が main だけを対象にすると書く。main は ruleset で守られ、専用のブランチは守られていないので、「main と同じく」は合わない。また、`contents: write` を持つジョブの GITHUB_TOKEN も、ワークフローのファイルを変えない範囲で、専用のブランチを動かせる(この設計では sweep、cooldown-submit、cooldown-judge)。どのジョブも Claude が変えたコードを動かさないので、作るものは変わらない | 146行の文を、「専用のブランチには ruleset が掛かっていない。このブランチを動かせるのは、書き込みの権限を持つ所有者と bot と、`contents: write` を持つジョブである。そのジョブは、どれも Claude が変えたコードを動かさない」のように書き直す |
+
+### 前の段階への指摘
+
+| ID | 対象 | レベル | 作るもの | 該当箇所 | 内容 | 直し方の案 |
+|---|---|---|---|---|---|---|
+| D8-1-3 | requirements | 中 | 変わらない | requirements.md 元の要望の「決めた方式」(30-34行) | Issue #725 の本文の「決めた方式」には、4つ目の項目「仕組みは、Claude と、Claude が変えたコードを動かすワークフローの実行を、main とは別の専用のブランチで起動する。その実行が作るキャッシュを、main のワークフローが読まないようにするためである。(AIの提案を了承)」がある。requirements.md の元の要望は3つ目の項目までで、この項目が無い。requirements.md には、`専用のブランチ` の語が1つも無い。そのため、design.md の専用のブランチの部品(claude-auto-fix-run-branch.sh の「対応する要件: 1.1, 1.2, 1.3, 1.4, 1.5, 3.3」など)は、この決めた方式を、requirements.md のどこにも結び付けられない。tasks の審査と PR の審査は Issue の本文を基準に読むので、あとの工程で、requirements.md が Issue の本文より古いことが見つかる。design.md は、この決めた方式のとおりに作ると決めているので、requirements.md を直しても作るものは変わらない | requirements.md の元の要望の「決めた方式」に、Issue の本文の4つ目の項目をそのまま写す。あわせて、範囲の「この spec が前提にしていること」に、対象ごとの実行を main とは別の専用のブランチで起動することを1行で足すと、design.md の節から指せる |
+
+- 往復: 1回目 / 高0 中1 低2
+
+## サイクル8 往復2(2026-11-22)
+
+### 審査の範囲
+
+範囲: 差分
+
+- design.md 設計を見直すきっかけ(71行)、プロジェクトの決まり(77-83行)、全体の構成(151-155行)、claude-auto-fix-dispatch.sh(309行)、claude-auto-fix-target.yaml の「キャッシュ」(375行)と cooldown-push(406行)、claude-auto-fix-verify.sh の pnpm の項、claude-auto-fix-ship.sh の push の前のガード、テストの方針(825行): 差分の行そのもの
+- design.md プロジェクトの決まり(84-95行): 83行が「次の6つ」「ほかの5つは、確かめた」と数を書いたので、下の箇条の数と、まだ確かめていない箇条が1つであることを見るため。箇条は6つで、まだ確かめていないのは88行の1つである。合っている
+- design.md claude-auto-fix-dispatch.sh(310-315行)、verify の pnpm の項、ship のガードの項: 見出しの文が書いた数(6つ、3つ、4つ)と、下の箇条の数を見るため。合っている
+- design.md 全体の構成(157行): ship の節から消した文「ワークフローのコミットは、専用のブランチのコミットで、main の最新のコミットと同じである」が、ほかの箇所に残っているかを見るため。157行に同じ文がある
+- design.md claude-auto-fix.yaml の権限(262行)、claude-auto-fix-target.yaml のジョブごとの権限(378-426行)、claude-auto-fix-report.sh(615行): 155行が `contents: write` を持つジョブを3つ挙げたので、語 `contents: write` で design.md を検索し、ジョブごとの権限と合うかを見るため。この仕組みの2つのワークフローの中では、sweep(262行)、cooldown-submit(412行)、cooldown-judge(414行)の3つで、合っている
+- .github/workflows/ の全部のワークフロー: 155行の「このブランチが指すコミットを変えられるのは」の文が、リポジトリの全体について書いているので、語 `contents: write` で検索した(D8-2-1)
+- design.md claude-auto-fix-target.yaml の「キャッシュ」(369-374行)と verify ジョブの手順5(399行): 375行が CodeQL の `init` に入力を足したので、同じ `init` に渡すほかの入力と環境変数と食い違わないかを見るため。食い違わない
+- research.md 95行、109-110行: 差分の、今あるものと外部の機能についての文を、いつ何で確かめたかを見るため
+- requirements.md 元の要望(30-35行)と、範囲(41-61行): 承認を残した直しの差分の行と、その行が範囲の「前提にしていること」と食い違わないかを見るため
+- reviews/requirements-review.md と requirements-response.md: 語 `design` で検索した。差分に関わる、後ろの段階で書くと記録された食い違いは無い(往復1と同じ)
+- そのほかの節は、差分の語が出てこないので、読み直していない
+
+### 実ファイルで確かめた文
+
+- 全体の構成(155行)「専用のブランチには ruleset が掛かっていない。リポジトリの ruleset は main だけを対象にしている」: ruleset は GitHub の側の設定で、リポジトリの実ファイルでは確かめられない。research.md 95行に、ruleset の id と対象と、確かめた日と手段がある / research.md の記録と合っていた
+- 全体の構成(155行)「このブランチが指すコミットを変えられるのは、書き込みの権限を持つ所有者と bot と、`contents: write` を持つジョブである。`contents: write` を持つジョブは、sweep ジョブと cooldown-submit ジョブと cooldown-judge ジョブで、どれも Claude が変えたコードを動かさない」: .github/workflows/claude-auto-fix.yaml 91行(sweep)、claude-auto-fix-target.yaml 750行(cooldown-submit)と768行(cooldown-judge)は合っていた。ただし、`contents: write` を持つジョブは、ほかに4つのワークフローにある。canary.yaml 13-14行(ワークフローの全体)、dependabot-auto-merge.yaml 54-55行(ワークフローの全体。auto-merge ジョブと recheck ジョブ)、dependency-graph.yaml 95-96行(submit ジョブ)、dependency-review.yaml 102-103行(submit ジョブ) / 食い違っていた(D8-2-1)
+- 「キャッシュ」(375行)「CodeQL のアクションは v4.39.3」: .github/workflows/claude-auto-fix-target.yaml 471行と490行(コミット 33d7b85d、v4.39.3) / 合っていた
+- 「キャッシュ」(375行)「GitHub が用意したランナーで、診断のデータベースのキャッシュを使わないときは、既定で TRAP のキャッシュを使う。`init` でキャッシュから読み、解析のあとでキャッシュに保存する」: codeql-action の側の動きで、リポジトリの実ファイルでは確かめられない。research.md 110行に、確かめたコミットとファイルと行と日がある / research.md の記録と合っていた
+- 「キャッシュ」(375行)とテストの方針(825行)「`init` に `trap-caching: false` を渡す」: 今の .github/workflows/claude-auto-fix-target.yaml と test-claude-auto-fix-workflows.sh には、`trap-caching` も `CODEQL_OVERLAY_DATABASE_MODE` もまだ無い(.github/ を2つの語で検索した)。どちらも、これから作ると決めた文で、今あるものについての文ではない / 食い違いは無い
+- cooldown-push(406行)「ガード `claude-auto-fix-guard.sh`」: 名前は、ship の節とファイルの構成の節の名前と同じである / 合っていた
+- プロジェクトの決まり(82行)と品質チェックの設定の5つの箇条: 文を箇条に分けただけで、今あるものについての文の中身は変わっていない / 合っていた
+
+### 受入基準ごとの確かめ方
+
+| 受入基準 | 確かめる道具 | 動かす場所 | 動かすのに要るもの | design の箇所 |
+|---|---|---|---|---|
+| 3.3(Claude に GitHub の中身を変える権限を渡さない) | test-claude-auto-fix-workflows.sh(ジョブごとの権限が「ジョブごとの権限と動き」と同じ、edit ジョブに書き込みの権限が無い) | CI は dispatch ジョブのランナー `ubuntu-24.04`、手元は alpine のコンテナ | yq | 821行、826行、155行、262行、412行、414行 |
+| Issue の決めた方式の4つ目(対象ごとの実行のキャッシュを main のワークフローが読まない。requirements.md 35行) | test-claude-auto-fix-workflows.sh(「キャッシュ」の節の入力と環境変数。CodeQL の `init` に `trap-caching: false` が渡されることを含む) | 同じ | yq | 825行、369-375行 |
+
+### 申告
+
+この往復の差分に、新しく申告する決定は無い。`init` に `trap-caching: false` を渡すことは、往復1の申告4(どのジョブでもキャッシュを使わない)の中に入る。
+
+### 指摘
+
+| ID | レベル | 該当箇所 | 内容 | 直し方の案 |
+|---|---|---|---|---|
+| D8-2-1 | 中 | design.md 全体の構成(155行) | 155行は、専用のブランチが指すコミットを変えられるものを「書き込みの権限を持つ所有者と bot と、`contents: write` を持つジョブ」と書き、続けて「`contents: write` を持つジョブは、sweep ジョブと cooldown-submit ジョブと cooldown-judge ジョブで」と3つだけを挙げる。リポジトリには、`contents: write` を持つジョブが、ほかに4つのワークフローにある。canary.yaml 13-14行(create-canaries ジョブ)、dependabot-auto-merge.yaml 54-55行(auto-merge ジョブと recheck ジョブ)、dependency-graph.yaml 95-96行(submit ジョブ)、dependency-review.yaml 102-103行(submit ジョブ)である。GITHUB_TOKEN の権限はリポジトリの全体に効くので、この4つのワークフローのジョブも、専用のブランチを動かせる。155行の一覧は、今あるワークフローと合わない。審査役が4つのワークフローを開いたかぎり、どのジョブも Claude が変えたコードを動かさない。dependency-review.yaml の submit ジョブは、Claude の変更の PR でも動くが、checkout しない(106-107行)。dependabot-auto-merge.yaml の auto-merge ジョブは、Dependabot の PR だけで動き、base のコミットを checkout する(65-68行、89-91行)。recheck ジョブは、定期実行と手での起動だけで動く(198行)。canary.yaml と dependency-graph.yaml は、PR のきっかけで動かない。そのため、作るものは変わらない。事実の誤りなので、低にしない | 155行の3つ目の文を、次のように書き直す。「`contents: write` を持つジョブは、この仕組みの中では、振り分けのワークフローの sweep ジョブと、対象ごとのワークフローの cooldown-submit ジョブと cooldown-judge ジョブである。この仕組みの外では、canary.yaml、dependabot-auto-merge.yaml、dependency-graph.yaml の submit ジョブ、dependency-review.yaml の submit ジョブが持つ。どのジョブも、Claude が変えたコードを動かさない」。research.md 95行に、`contents: write` を持つワークフローと、確かめた行を足す |
+
+### 前の段階への指摘
+
+なし
+
+### 承認を残して直した前の段階の審査
+
+- 直しの番号 1: D8-1-3: 埋まった / 作るもの: 変わらない
+
+- 往復: 2回目 / 高0 中1 低0
+
+## サイクル8 往復3(2026-11-22)
+
+### 審査の範囲
+
+範囲: 差分
+
+- design.md 全体の構成(155-160行)、claude-auto-fix.yaml の「失敗したとき」、claude-auto-fix-run-branch.sh の `force=true` の箇条、claude-auto-fix-target.yaml の「いつ動くか」と「キャッシュ」の CodeQL の2つの箇条、claude-auto-fix-verify.sh の「呼び出し方」(571行)、claude-auto-fix-ship.sh の「呼び出し方」(599行)、claude-auto-fix-report.sh の種類が `codeql` の箇条(615行): 差分の行そのもの
+- .github/workflows/ の全部のワークフロー: 157-158行が `contents: write` を持つジョブをリポジトリの全体について挙げたので、語 `contents: write` と `write-all` で .github/ を検索し、挙げたジョブに漏れが無いかを見るため。あわせて、33個のワークフローのすべてに最上位の `permissions:` があることを検索で確かめた。`permissions:` を書かずに既定の権限で動くワークフローは無い
+- design.md claude-auto-fix.yaml の権限(265行)、claude-auto-fix-target.yaml のジョブごとの権限(415行、417行、424行)、claude-auto-fix-report.sh(618行): 157行が挙げたこの仕組みの3つのジョブが、ジョブごとの権限と合うかを見るため。合っている
+- design.md claude-auto-fix-target.yaml の verify ジョブの手順(397-403行)と ship ジョブ(424行): 571行と599行が「このジョブ」を「verify ジョブ」「ship ジョブ」に書き換えたので、`claude-auto-fix-verify.sh` と `claude-auto-fix-ship.sh` を呼ぶジョブがそれぞれ1つだけかを、2つのスクリプトの名前で design.md を検索して見るため。`claude-auto-fix-verify.sh` を呼ぶのは verify ジョブだけ、`claude-auto-fix-ship.sh` を呼ぶのは ship ジョブだけで、合っている
+- requirements.md 要件5の受入基準1(126行): 615行が、この受入基準が書かないと決めているものを書き直したので、受入基準の文と合うかを見るため。合っている
+- research.md 95行: 差分の、今あるワークフローについての文を、いつ何で確かめたかを見るため
+- reviews/requirements-review.md と requirements-response.md: 語 `design` での検索は往復1と往復2で済ませた。この往復の差分に、新しく関わる語は無い
+- そのほかの節は、差分の語が出てこないので、読み直していない
+
+### 実ファイルで確かめた文
+
+- 全体の構成(157行)「この仕組みのジョブ: sweep ジョブと、cooldown-submit ジョブと cooldown-judge ジョブ」: .github/workflows/claude-auto-fix.yaml 91行、claude-auto-fix-target.yaml 750行と768行 / 合っていた
+- 全体の構成(158行)「この仕組みの外のジョブ: canary.yaml の create-canaries ジョブ、dependabot-auto-merge.yaml の auto-merge ジョブと recheck ジョブ、dependency-graph.yaml の submit ジョブ、dependency-review.yaml の submit ジョブ」: .github/workflows/canary.yaml 13-14行と23行、dependabot-auto-merge.yaml 54-55行と59行と196行、dependency-graph.yaml 91-96行、dependency-review.yaml 93-103行。.github/ を `contents: write` と `write-all` で検索した結果、ワークフローは、この4つと、この仕組みの2つだけである / 合っていた
+- 全体の構成(158行)「dependency-review.yaml の submit ジョブは、Claude の変更の PR でも動くが、checkout しない」: .github/workflows/dependency-review.yaml 31-33行(main への PR で動く)、101行(同じリポジトリの PR に限る)、105-111行(手順は `download-and-submit` の1つだけ) / 合っていた
+- 全体の構成(158行)「dependabot-auto-merge.yaml の auto-merge ジョブは、Dependabot の PR でだけ動き、PR の base のコミットを checkout する」: .github/workflows/dependabot-auto-merge.yaml 65-68行、87-92行 / 合っていた
+- 全体の構成(158行)「recheck ジョブは、定期実行と手での起動でだけ動く」: .github/workflows/dependabot-auto-merge.yaml 198行 / 合っていた
+- 全体の構成(158行)「canary.yaml と dependency-graph.yaml は、PR では動かない」: .github/workflows/canary.yaml 7-11行(`schedule` と `workflow_dispatch`)、dependency-graph.yaml 34-36行(main への `push`) / 合っていた
+- そのほかの差分の行(claude-auto-fix.yaml の「失敗したとき」、run-branch の `force=true` の箇条、「いつ動くか」、「キャッシュ」の CodeQL の2つの箇条、verify と ship の「呼び出し方」、report の種類が `codeql` の箇条): 主語と目的語を補い、文を分けただけで、今あるものについての文の中身は、往復1と往復2で確かめた文と変わっていない / 合っていた
+
+### 受入基準ごとの確かめ方
+
+| 受入基準 | 確かめる道具 | 動かす場所 | 動かすのに要るもの | design の箇所 |
+|---|---|---|---|---|
+| 3.3(Claude に GitHub の中身を変える権限を渡さない) | test-claude-auto-fix-workflows.sh(ジョブごとの権限が「ジョブごとの権限と動き」と同じ)。この往復の差分は、この仕組みの外のジョブの一覧を足しただけで、確かめる道具と要るものは往復2と変わらない | CI は dispatch ジョブのランナー `ubuntu-24.04`、手元は alpine のコンテナ | yq | 155-158行、265行、415行、417行 |
+| 5.1(CodeQL の警告の知らせに、Claude が書いた文と警告の中身を入れない) | test-claude-auto-fix-report.sh。この往復の差分は、615行の理由の文を2つに分けただけで、作るものと確かめ方は変わらない | 同じ | 偽の `gh` | 615行 |
+
+### 申告
+
+この往復の差分に、新しく申告する決定は無い。
+
+### 指摘
+
+なし
+
+### 前の段階への指摘
+
+なし
+
+- 往復: 3回で収束 / 未解決: 0件
