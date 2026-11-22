@@ -25,6 +25,7 @@
 #   verified の要素があれば、その CI の版の変更を、公開からの時間を調べずに通す。
 #   開発環境の版の変更と、記録に無い道具の変更は、例外にしない。目印の行のどれか1つでも
 #   形が違えば、例外を1つも当てない。
+#   COOLDOWN_MODE=predict のときは、PR の本文を読まず、例外を1つも当てない(下の「PR を作る前の判定」)。
 #   このスクリプトは、PR の作者とブランチの名前を読まない。更新の PR と、手で版を
 #   書き換えた PR を、同じく調べるためである。
 #
@@ -41,8 +42,15 @@
 # 公開日時の問い合わせが失敗したときは、その変更を止める。通る日時を過ぎてから
 # ジョブを Re-run すれば、同じ版で通る。
 #
+# PR を作る前の判定(COOLDOWN_MODE=predict。claude-auto-fix-target.yaml の cooldown-judge ジョブから実行):
+#   PR がまだ無いので、PR_NUMBER を求めず、PR の本文の記録の目印の行を読まない。そのため、
+#   変わった CI の版を、すべて公開からの時間で調べる。claude-auto-fix の仕組みは、Claude の変更の
+#   PR の本文に記録の目印の行を書かないので、PR の検査でも例外は当たらず、2つの判定は同じ結果になる。
+#   終わり方と CI_TOOL_CHANGED_FILE に書くものは、COOLDOWN_MODE が無いときと同じである。
+#
 # テスト: .github/scripts/tests/test-check-ci-tool-release-age.sh
-# 環境変数: GH_TOKEN GITHUB_REPOSITORY PR_NUMBER CI_TOOL_CHANGED_FILE
+# 環境変数: GH_TOKEN GITHUB_REPOSITORY PR_NUMBER(COOLDOWN_MODE が predict のときのほかは必須) CI_TOOL_CHANGED_FILE
+#   COOLDOWN_MODE(既定は空。空か predict のほかの値なら 2 で終わる)
 #   GITHUB_STEP_SUMMARY(無ければ標準出力にだけ書く)
 # 使い方: check-ci-tool-release-age.sh <base> <head>(今のフォルダを head の根とする)
 # =====================================================================
@@ -52,6 +60,7 @@ BASE_SHA="${1:-}"
 HEAD_SHA="${2:-}"
 REPO="${GITHUB_REPOSITORY:-}"
 PR="${PR_NUMBER:-}"
+MODE="${COOLDOWN_MODE:-}"
 CHANGED="${CI_TOOL_CHANGED_FILE:-}"
 SUMMARY="${GITHUB_STEP_SUMMARY:-/dev/null}"
 MARKER="ci-tool-cooldown-exception"
@@ -66,7 +75,12 @@ usage() {
 [[ "$BASE_SHA" =~ ^[0-9a-f]{7,40}$ ]] || usage "base の形が違います: ${BASE_SHA}"
 [[ "$HEAD_SHA" =~ ^[0-9a-f]{7,40}$ ]] || usage "head の形が違います: ${HEAD_SHA}"
 [[ "$REPO" =~ ^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$ ]] || usage "GITHUB_REPOSITORY の形が違います: ${REPO}"
-[[ "$PR" =~ ^[0-9]+$ ]] || usage "PR_NUMBER の形が違います: ${PR}"
+case "$MODE" in
+"" | predict) ;;
+*) usage "COOLDOWN_MODE が知らない値です: ${MODE}" ;;
+esac
+# PR を作る前の判定では PR が無いので、PR の番号を求めない。PR の番号は PR の本文を読むのにだけ使う
+[ "$MODE" = predict ] || [[ "$PR" =~ ^[0-9]+$ ]] || usage "PR_NUMBER の形が違います: ${PR}"
 [ -n "$CHANGED" ] || usage "CI_TOOL_CHANGED_FILE がありません"
 : >"$CHANGED" || usage "CI_TOOL_CHANGED_FILE に書けません: ${CHANGED}"
 
@@ -155,8 +169,9 @@ awk -F '\t' '$2 == "ci" { print $1 "\t" $3 }' "$TMP/changes" >"$CHANGED"
 
 # --- 記録の目印の行から、例外にする CI の版を読む ---------------------------
 # 例外にする版を「道具<TAB>版」で $TMP/allowed に書く
+# PR を作る前の判定(COOLDOWN_MODE=predict)では、PR の本文を読まず、例外を1つも当てない
 : >"$TMP/allowed"
-if grep -q $'\tci\t' "$TMP/changes"; then
+if [ "$MODE" != predict ] && grep -q $'\tci\t' "$TMP/changes"; then
     if ! gh api "repos/${REPO}/pulls/${PR}" >"$TMP/pr.json" 2>"$TMP/err"; then
         echo "::warning::PR #${PR} の本文を読めなかったため、記録の例外を当てずに調べます"
     else

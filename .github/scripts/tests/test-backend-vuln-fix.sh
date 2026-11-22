@@ -2,15 +2,19 @@
 # =====================================================================
 # backend-vuln-fix.sh の自動テスト
 #
-# PR を作る run は gh・git・Gradle・Maven Central につながるので、ここでは流さない。
 # run が使う判断の部品(警告の絞り込みとまとめ方、依存の木の読み方、脆弱な版の見つけ方、
 # 72時間の判断、libs.versions.toml の書き換え)を、サブコマンドで1つずつ呼んで確かめる。
+# PR を作る run は、gh・git・curl・gradlew を偽物に替えて流し、PR を作れなかった組を
+# vuln-fix の結果のファイル(VULN_FIX_UNRESOLVED)に書くことと、Claude の変更のブランチが
+# ある組で PR を作らないことを確かめる。
 #
 # Go の仕事の go_run は、本物の git(手元の bare のリポジトリを origin にする)と、
 # make・go・gh・docker の代わりのスクリプトで、PR を作るまでを流して確かめる。
+# 外から呼ぶ tree vulncheck go_bump digest も、同じ代わりのスクリプトで呼んで確かめる。
 #
 # 場合の名前を KP_TEST_CASE に入れると、その場合だけを流す(例: KP_TEST_CASE=go_stdlib_pr)。
-# 名前は plan resolved decide pin usage go_plan go_module_pr go_stdlib_pr go_not_called go_unfixed。
+# 名前は plan resolved decide pin run_unresolved run_claude usage go_plan go_module_pr go_stdlib_pr
+# go_not_called go_unfixed go_unresolved go_claude callable。
 # =====================================================================
 set -uo pipefail
 
@@ -173,6 +177,133 @@ expect_eq "名前は小文字と - だけにし、数字で始まる区切りを
 expect_eq "後から足した行は印のすぐ下に入る" "$(sed -n '/^\[libraries\]/,$p' "$WORK/w.toml" | grep -A1 '^# backend' | sed -n 2p | cut -d ' ' -f 1)" vuln-fix-com-example-x-lib2
 fi
 
+# --- run(Java 版の PR を作る処理)-----------------------------------------
+# gh・git・curl と backend/gradlew を偽物に替え、環境変数で成功と失敗を選んで run を流す。
+# 偽の gradlew は、libs.versions.toml に vuln-fix- の行があれば直した版の依存の木を出す
+RUN_BIN=$WORK/run-bin
+mkdir -p "$RUN_BIN"
+cat >"$RUN_BIN/gh" <<'EOF'
+#!/usr/bin/env bash
+echo "gh $*" >>"$FAKE_LOG"
+case "$1 $2" in
+    "api "*) cat "$FAKE_ALERTS" ;;
+    "pr list") ;;
+    "auth setup-git") ;;
+    "pr create") [ -z "${FAKE_PR_FAIL:-}" ] || exit 1 ;;
+    *) exit 99 ;;
+esac
+EOF
+cat >"$RUN_BIN/git" <<'EOF'
+#!/usr/bin/env bash
+echo "git $*" >>"$FAKE_LOG"
+case "$1" in
+    ls-remote) for b in ${FAKE_REMOTE_BRANCHES:-}; do [ "$b" != "$5" ] || exit 0; done; exit 2 ;;
+    diff) exit "${FAKE_DIFF_QUIET:-1}" ;;
+    push) [ -z "${FAKE_PUSH_FAIL:-}" ] || exit 1 ;;
+    config | switch | add | commit) ;;
+    *) exit 99 ;;
+esac
+EOF
+cat >"$RUN_BIN/curl" <<'EOF'
+#!/usr/bin/env bash
+echo "curl $*" >>"$FAKE_LOG"
+[ -z "${FAKE_CURL_FAIL:-}" ] || exit 22
+printf 'HTTP/2 200\r\nLast-Modified: Wed, 01 Jan 2020 00:00:00 GMT\r\n\r\n'
+EOF
+chmod +x "$RUN_BIN/gh" "$RUN_BIN/git" "$RUN_BIN/curl"
+cat >"$WORK/run-gradlew" <<'EOF'
+#!/usr/bin/env bash
+echo "gradlew $*" >>"$FAKE_LOG"
+pinned=0
+! grep -q '^vuln-fix-com-example-lib = "1.0.1"$' gradle/libs.versions.toml || pinned=1
+if [ "${FAKE_TREE_FAIL:-}" = base ] || { [ "${FAKE_TREE_FAIL:-}" = after ] && [ "$pinned" = 1 ]; }; then
+    echo '+--- com.example:lib:1.0.0 FAILED'; exit 0; fi
+echo 'productionRuntimeClasspath'
+if [ "$pinned" = 1 ] && [ -z "${FAKE_KEEP_VULN:-}" ]; then echo '+--- com.example:lib:1.0.0 -> 1.0.1'
+else echo '+--- com.example:lib:1.0.0'; fi
+echo '\--- com.example:other:2.0.0'
+EOF
+run_alert() { # number name range patched
+    printf '{"number":%s,"state":"open","html_url":"https://example.test/%s",
+      "dependency":{"package":{"ecosystem":"maven","name":"%s"},"relationship":"transitive","scope":"runtime","manifest_path":"backend/build.gradle"},
+      "security_advisory":{"severity":"medium"},
+      "security_vulnerability":{"vulnerable_version_range":"%s","first_patched_version":{"identifier":"%s"}}}' "$1" "$1" "$2" "$3" "$4"
+}
+{ printf '[['; run_alert 1 com.example:lib '< 1.0.1' 1.0.1; printf ']]'; } >"$WORK/run-alerts.json"
+{ printf '[['; run_alert 1 com.example:lib '< 1.0.1' 1.0.1; printf ','; run_alert 2 com.example:other '< 2.0.1' 2.0.1; printf ']]'; } >"$WORK/run-alerts2.json"
+cat >"$WORK/run-catalog.toml" <<'EOF'
+[versions]
+# backend-vuln-fix.yaml は、この下に vuln-fix- の行を足す
+
+[libraries]
+# backend-vuln-fix.yaml は、この下に vuln-fix- の行を足す
+EOF
+
+# run_case <場合の名前> [<環境変数>=<値> ...]。終わり方を RC に、場合のフォルダを RD に入れる
+run_case() {
+    RD="$WORK/run-$1"; shift
+    rm -rf "$RD"; mkdir -p "$RD/backend/gradle"
+    cp "$WORK/run-catalog.toml" "$RD/backend/gradle/libs.versions.toml"
+    cp "$WORK/run-gradlew" "$RD/backend/gradlew" && chmod +x "$RD/backend/gradlew"
+    printf 'stale\n' >"$RD/unresolved.jsonl"
+    (cd "$RD" && env PATH="$RUN_BIN:$PATH" GITHUB_REPOSITORY=owner/repo GH_TOKEN=dummy \
+        FAKE_LOG="$RD/calls.log" FAKE_ALERTS="$WORK/run-alerts.json" \
+        VULN_FIX_UNRESOLVED="$RD/unresolved.jsonl" "$@" bash "$SCRIPT" run >"$RD/out.txt" 2>&1)
+    RC=$?
+    touch "$RD/calls.log"
+}
+# expect_unresolved <場合の名前> <種類> <組の JSON> <止まった理由>。1行だけが書かれ、種類・組・理由が合うかを確かめる
+expect_unresolved() {
+    expect_eq "$1: 1 で終わる" "$RC" 1
+    expect_eq "$1: 結果のファイルに1行だけが書かれる" "$(wc -l <"$RD/unresolved.jsonl" | tr -d ' ')" 1
+    expect_eq "$1: 種類" "$(jq -r .kind "$RD/unresolved.jsonl" 2>/dev/null)" "$2"
+    expect_eq "$1: 組は計画の組と同じ" "$(jq -cS .group "$RD/unresolved.jsonl" 2>/dev/null)" "$3"
+    expect_eq "$1: 理由" "$(jq -r .reason "$RD/unresolved.jsonl" 2>/dev/null)" "$4"
+}
+
+if want run_unresolved; then
+echo "run: PR を作れなかった組を結果のファイルに書く"
+run_group=$(bash "$SCRIPT" plan "$WORK/run-alerts.json" "$WORK/run-catalog.toml" | jq -cS '.[0]')
+run_case curl FAKE_CURL_FAIL=1
+expect_unresolved "公開日時を読めない" maven "$run_group" "公開日時を読めなかった"
+run_case keep FAKE_KEEP_VULN=1
+expect_unresolved "上げても脆弱な版が残る" maven "$run_group" "警告が消える版に上げられなかった"
+run_case after FAKE_TREE_FAIL=after
+expect_unresolved "上げたあとの依存を解決できない" maven "$run_group" "警告が消える版に上げられなかった"
+run_case push FAKE_PUSH_FAIL=1
+expect_unresolved "push が失敗する" maven "$run_group" "ブランチを push できなかった"
+run_case pr FAKE_PR_FAIL=1
+expect_unresolved "PR を作れない" maven "$run_group" "PR を作れなかった"
+
+run_case base FAKE_TREE_FAIL=base FAKE_ALERTS="$WORK/run-alerts2.json"
+expect_eq "main の依存を解決できない: 1 で終わる" "$RC" 1
+expect_eq "main の依存を解決できない: 計画したすべての組を書く" "$(jq -sc '[.[].group.name]' "$RD/unresolved.jsonl" 2>/dev/null)" '["com.example:lib","com.example:other"]'
+expect_eq "main の依存を解決できない: 種類と理由" "$(jq -sc '[.[] | [.kind, .reason]] | unique' "$RD/unresolved.jsonl" 2>/dev/null)" '[["maven","main の依存を解決できなかった"]]'
+expect_eq "main の依存を解決できない: 組は計画の組と同じ" "$(jq -cS -s '[.[].group]' "$RD/unresolved.jsonl" 2>/dev/null)" \
+    "$(bash "$SCRIPT" plan "$WORK/run-alerts2.json" "$WORK/run-catalog.toml" | jq -cS '.')"
+
+run_case ok
+expect_eq "PR を作れた: 0 で終わる" "$RC" 0
+expect_eq "PR を作れた: PR を1つ作る" "$(grep -c '^gh pr create' "$RD/calls.log")" 1
+if [ -f "$RD/unresolved.jsonl" ] && [ ! -s "$RD/unresolved.jsonl" ]; then ok "PR を作れた: 結果のファイルは空で残る(前の中身を消す)"
+else ng "PR を作れた: 結果のファイルが空でない: [$(cat "$RD/unresolved.jsonl" 2>/dev/null)]"; fi
+
+run_case noenv FAKE_CURL_FAIL=1 VULN_FIX_UNRESOLVED=
+expect_eq "VULN_FIX_UNRESOLVED が無い: 1 で終わる(書かずに今と同じに動く)" "$RC" 1
+expect_eq "VULN_FIX_UNRESOLVED が無い: ファイルを書き換えない" "$(cat "$RD/unresolved.jsonl")" stale
+fi
+
+if want run_claude; then
+echo "run: Claude の変更のブランチがある組で PR を作らない"
+run_case claude FAKE_REMOTE_BRANCHES=fix/claude-auto-fix-backend-vuln-fix-com-example-lib-1-0-1
+expect_eq "Claude の変更のブランチがある: 0 で終わる" "$RC" 0
+expect_eq "Claude の変更のブランチがある: PR を作らない" "$(grep -c '^gh pr create' "$RD/calls.log")" 0
+expect_eq "Claude の変更のブランチがある: 版の一覧を書き換えない" "$(grep -c '^vuln-fix-' "$RD/backend/gradle/libs.versions.toml")" 0
+expect_eq "Claude の変更のブランチがある: 結果のファイルに書かない" "$(wc -c <"$RD/unresolved.jsonl" | tr -d ' ')" 0
+run_case chore FAKE_REMOTE_BRANCHES=chore/backend-vuln-fix-com-example-lib-1-0-1
+expect_eq "同じ組の vuln-fix のブランチがある: PR を作らない" "$RC:$(grep -c '^gh pr create' "$RD/calls.log")" 0:0
+fi
+
 # --- 使い方 -------------------------------------------------------------
 if want usage; then
 echo "使い方"
@@ -227,7 +358,7 @@ DIGEST_OLD="sha256:$(printf 'a%.0s' $(seq 64))"
 DIGEST_NEW="sha256:$(printf 'b%.0s' $(seq 64))"
 go_setup() { # 作業の名前
     local d=$WORK/$1 f
-    GO_REPO=$d/repo GO_ORIGIN=$d/origin.git GO_LOG=$d/log GO_FIX=$d/fix GO_STUB=$d/bin
+    GO_REPO=$d/repo GO_ORIGIN=$d/origin.git GO_LOG=$d/log GO_FIX=$d/fix GO_STUB=$d/bin GO_UNRESOLVED=$d/unresolved.jsonl
     mkdir -p "$GO_REPO/backend" "$GO_FIX" "$GO_STUB" && : >"$GO_LOG"
     git init -q --bare "$GO_ORIGIN"
     printf 'module example.test/backend\n\ngo 1.27.0\n\ntoolchain go1.27.3\n\nrequire golang.org/x/net v0.37.0\n' >"$GO_REPO/backend/go.mod"
@@ -257,7 +388,7 @@ case "$1" in
         cat "$GO_FIX/always.json"
         if grep -qx 'toolchain go1.27.3' go.mod; then cat "$GO_FIX/stdlib.json"; fi
         if grep -q 'golang.org/x/net v0.37.0' go.mod; then cat "$GO_FIX/net.json"; fi ;;
-    get) [ -n "${STUB_GET_NOOP:-}${STUB_KEEP_VULN:-}" ] || sed -i "s#golang.org/x/net v0.37.0#golang.org/x/net ${2#*@}#" go.mod ;;
+    get) [ -z "${STUB_GET_FAIL:-}" ] || exit 1; [ -n "${STUB_GET_NOOP:-}${STUB_KEEP_VULN:-}" ] || sed -i "s#golang.org/x/net v0.37.0#golang.org/x/net ${2#*@}#" go.mod ;;
     mod) [ -n "${STUB_GET_NOOP:-}" ] || echo "golang.org/x/net ${STUB_TIDY:-new} h1:new" >go.sum ;;
 esac
 EOF
@@ -265,17 +396,19 @@ EOF
 #!/usr/bin/env bash
 echo "gh $*" >>"$GO_LOG"
 if [ "$1 $2" = "pr list" ]; then printf '%s\n' "${STUB_OPEN_TITLES:-}"; fi
+if [ "$1 $2" = "pr create" ] && [ -n "${STUB_PR_FAIL:-}" ]; then exit 1; fi
 EOF
     cat >"$GO_STUB/docker" <<'EOF'
 #!/usr/bin/env bash
 echo "docker $*" >>"$GO_LOG"
+[ -z "${STUB_DOCKER_FAIL:-}" ] || exit 1
 printf '{"schemaVersion":2,"mediaType":"application/vnd.oci.image.index.v1+json","digest":"%s","size":1}\n' "$DIGEST_NEW"
 EOF
     chmod +x "$GO_STUB"/*
 }
 go_run() { # go_run を流し、出力を $GO_OUT、終了コードを $GO_RC に入れる
     GO_OUT=$(cd "$GO_REPO" && env PATH="$GO_STUB:$PATH" GO_LOG="$GO_LOG" GO_FIX="$GO_FIX" DIGEST_NEW="$DIGEST_NEW" \
-        bash "$SCRIPT" go_run 2>&1)
+        VULN_FIX_UNRESOLVED="$GO_UNRESOLVED" bash "$SCRIPT" go_run 2>&1)
     GO_RC=$?
 }
 branches() { git --git-dir="$GO_ORIGIN" for-each-ref --format='%(refname:short)' refs/heads | tr '\n' ' '; }
@@ -359,6 +492,87 @@ go_setup go-nofix
 { finding GO-2026-0030 golang.org/x/crypto v0.40.0 none golang.org/x/crypto/ssh Dial; } >"$GO_FIX/net.json"
 go_run
 expect_eq "直した版の無い脆弱性だけなら、警告を出して 0 で終える" "$GO_RC:$(prs):$(grep -c 'GO-2026-0030' <<<"$GO_OUT")" 0:0:1
+fi
+
+unresolved_lines() { if [ -f "$GO_UNRESOLVED" ]; then wc -l <"$GO_UNRESOLVED" | tr -d ' '; else echo none; fi; }
+unresolved_of() { jq -r "$1" "$GO_UNRESOLVED" 2>/dev/null; }
+
+if want go_unresolved; then
+echo "go_run: PR を作れなかった組を結果のファイルに書く"
+std_group='{"osv":["GO-2026-0001","GO-2026-0002"],"version":"1.27.4"}'
+mod_group='{"module":"golang.org/x/net","osv":["GO-2026-0010"],"version":"v0.38.0"}'
+std_findings() {
+    finding GO-2026-0001 stdlib v1.27.3 v1.27.4 net/http Serve
+    finding GO-2026-0002 stdlib v1.27.3 v1.27.4 crypto/tls Conn.Read
+}
+go_setup go-unresolved-bump
+std_findings >"$GO_FIX/stdlib.json"
+STUB_DOCKER_FAIL=1 go_run
+expect_eq "Go の版を上げられない: 1 で終わり、1行だけ書く" "$GO_RC:$(unresolved_lines)" 1:1
+expect_eq "Go の版を上げられない: 種類と理由" "$(unresolved_of '[.kind, .reason] | join(":")')" "go-stdlib:Go の版を上げられなかった"
+expect_eq "Go の標準ライブラリの組を1行にまとめる(組は go_plan の stdlib)" "$(jq -cS .group "$GO_UNRESOLVED" 2>/dev/null)" "$std_group"
+go_setup go-unresolved-std-ship
+std_findings >"$GO_FIX/stdlib.json"
+STUB_PR_FAIL=1 go_run
+expect_eq "Go を上げた変更を PR にできない: 1 で終わり、1行だけ書く" "$GO_RC:$(unresolved_lines)" 1:1
+expect_eq "Go を上げた変更を PR にできない: 種類と理由" "$(unresolved_of '[.kind, .reason] | join(":")')" "go-stdlib:Go を上げた変更を PR にできなかった"
+expect_eq "Go を上げた変更を PR にできない: 組" "$(jq -cS .group "$GO_UNRESOLVED" 2>/dev/null)" "$std_group"
+go_setup go-unresolved-get
+finding GO-2026-0010 golang.org/x/net v0.37.0 v0.38.0 golang.org/x/net/http2 Server.ServeConn >"$GO_FIX/net.json"
+STUB_GET_FAIL=1 go_run
+expect_eq "go get が失敗する: 1 で終わり、1行だけ書く" "$GO_RC:$(unresolved_lines)" 1:1
+expect_eq "go get が失敗する: 種類と理由" "$(unresolved_of '[.kind, .reason] | join(":")')" "go-module:go get か go mod tidy が失敗した"
+expect_eq "go get が失敗する: 組は go_plan の modules の組" "$(jq -cS .group "$GO_UNRESOLVED" 2>/dev/null)" "$mod_group"
+go_setup go-unresolved-mod-ship
+finding GO-2026-0010 golang.org/x/net v0.37.0 v0.38.0 golang.org/x/net/http2 Server.ServeConn >"$GO_FIX/net.json"
+STUB_GET_NOOP=1 go_run
+expect_eq "部品を上げた変更を PR にできない: 1 で終わり、1行だけ書く" "$GO_RC:$(unresolved_lines)" 1:1
+expect_eq "部品を上げた変更を PR にできない: 種類と理由" "$(unresolved_of '[.kind, .reason] | join(":")')" "go-module:部品を上げた変更を PR にできなかった"
+expect_eq "部品を上げた変更を PR にできない: 組" "$(jq -cS .group "$GO_UNRESOLVED" 2>/dev/null)" "$mod_group"
+go_setup go-unresolved-ok
+finding GO-2026-0010 golang.org/x/net v0.37.0 v0.38.0 golang.org/x/net/http2 Server.ServeConn >"$GO_FIX/net.json"
+std_findings >"$GO_FIX/stdlib.json"
+printf 'stale\n' >"$GO_UNRESOLVED"
+go_run
+expect_eq "PR を作れた: 0 で終わり、結果のファイルを空にする" "$GO_RC:$(prs):$(unresolved_lines)" 0:2:0
+go_setup go-unresolved-noread
+go_run # make vuln が失敗したのに、呼ばれる箇所のある脆弱性を読めない(組を読む前に止まる)
+expect_eq "組を読む前に止まれば、1 で終わり、書かない" "$GO_RC:$(unresolved_lines)" 1:0
+fi
+
+if want go_claude; then
+echo "go_run: Claude の変更のブランチがある組で PR を作らない"
+go_setup go-claude
+finding GO-2026-0010 golang.org/x/net v0.37.0 v0.38.0 golang.org/x/net/http2 Server.ServeConn >"$GO_FIX/net.json"
+finding GO-2026-0001 stdlib v1.27.3 v1.27.4 net/http Serve >"$GO_FIX/stdlib.json"
+git --git-dir="$GO_ORIGIN" branch fix/claude-auto-fix-backend-vuln-fix-go-stdlib-1-27-4 main
+git --git-dir="$GO_ORIGIN" branch fix/claude-auto-fix-backend-vuln-fix-go-golang-org-x-net-v0-38-0 main
+go_run
+expect_eq "Claude の変更のブランチがある: 0 で終わる" "$GO_RC" 0
+expect_eq "Claude の変更のブランチがある: PR もブランチも作らない" "$(prs):$(branches)" \
+    '0:fix/claude-auto-fix-backend-vuln-fix-go-golang-org-x-net-v0-38-0 fix/claude-auto-fix-backend-vuln-fix-go-stdlib-1-27-4 main '
+expect_eq "Claude の変更のブランチがある: go get も digest の読み取りもしない" "$(grep -c -e '^go get' -e '^docker ' "$GO_LOG")" 0
+expect_eq "Claude の変更のブランチがある: 結果のファイルに書かない" "$(unresolved_lines)" 0
+fi
+
+if want callable; then
+echo "tree vulncheck go_bump digest を引数で呼べる"
+go_setup callable
+out=$(cd "$GO_REPO" && env PATH="$GO_STUB:$PATH" GO_LOG="$GO_LOG" DIGEST_NEW="$DIGEST_NEW" bash "$SCRIPT" digest golang:1.27.4-trixie)
+expect_eq "digest: イメージの digest を出す" "$?:$out" "0:$DIGEST_NEW"
+(cd "$GO_REPO" && env PATH="$GO_STUB:$PATH" GO_LOG="$GO_LOG" DIGEST_NEW="$DIGEST_NEW" bash "$SCRIPT" go_bump 1.27.4)
+expect_eq "go_bump: 0 で終わり、toolchain の行を上げる" "$?:$(grep '^toolchain' "$GO_REPO/backend/go.mod")" "0:toolchain go1.27.4"
+expect_eq "go_bump: Dockerfile の golang のイメージを上げる" "$(grep -c "^FROM golang:1.27.4-trixie@${DIGEST_NEW}" "$GO_REPO/docker/backend-go/Dockerfile.prod")" 1
+finding GO-2026-0010 golang.org/x/net v0.37.0 v0.38.0 golang.org/x/net/http2 Server.ServeConn >"$GO_FIX/net.json"
+(cd "$GO_REPO" && env PATH="$GO_STUB:$PATH" GO_LOG="$GO_LOG" GO_FIX="$GO_FIX" bash "$SCRIPT" vulncheck "$WORK/callable-vuln.json")
+expect_eq "vulncheck: 0 で終わり、govulncheck の JSON を書く" "$?:$(bash "$SCRIPT" go_plan "$WORK/callable-vuln.json" | jq -r '.modules[0].module')" "0:golang.org/x/net"
+mkdir -p "$WORK/callable-tree/backend/gradle"
+cp "$WORK/run-catalog.toml" "$WORK/callable-tree/backend/gradle/libs.versions.toml"
+cp "$WORK/run-gradlew" "$WORK/callable-tree/backend/gradlew" && chmod +x "$WORK/callable-tree/backend/gradlew"
+(cd "$WORK/callable-tree" && FAKE_LOG="$WORK/callable-tree/log" bash "$SCRIPT" tree "$WORK/callable-tree.txt")
+expect_eq "tree: 0 で終わり、依存の木を書く" "$?:$(bash "$SCRIPT" resolved "$WORK/callable-tree.txt" | tr '\n' '|')" "0:com.example:lib 1.0.0|com.example:other 2.0.0|"
+(cd "$WORK/callable-tree" && FAKE_LOG="$WORK/callable-tree/log" FAKE_TREE_FAIL=base bash "$SCRIPT" tree "$WORK/callable-tree.txt")
+expect_eq "tree: 解決に失敗した部品があれば 0 以外で終わる" "$?" 1
 fi
 
 if [ "$RAN" -eq 0 ]; then

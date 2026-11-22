@@ -38,7 +38,9 @@
 #
 # テスト: .github/scripts/tests/test-check-dependency-cooldown.sh
 # 使い方: check-dependency-cooldown.sh <base_sha> <head_sha>
-#   環境変数 GH_TOKEN(必須) / GITHUB_REPOSITORY(必須) / GITHUB_REPOSITORY_OWNER(必須) / PR_NUMBER(必須)
+#   環境変数 GH_TOKEN(必須) / GITHUB_REPOSITORY(必須) / GITHUB_REPOSITORY_OWNER(必須)
+#   PR_NUMBER(COOLDOWN_MODE が predict のときのほかは必須)
+#   COOLDOWN_MODE(既定は空。空か predict のほかの値なら1で終わる。predict の形は下にある)
 #   OWNER_APPROVED(既定 false。true のときだけ所有者の承認があるとみなす)
 #   COOLDOWN_HOURS(既定72) / NOW_EPOCH(テスト用の時刻固定)
 #   MAVEN_CENTRAL_BASE / PLUGIN_PORTAL_BASE / NPM_REGISTRY_BASE / GOMOD_INDEX_BASE(テスト用の配布元差し替え)
@@ -56,6 +58,14 @@
 # 記録のコメントがあるのは、前の head で72時間待たずに入れる版を記録した PR である。
 # 止めたときは、GITHUB_STEP_SUMMARY に止めた部品の表(部品、版、公開日時、止めた理由、入るようになる時刻)を書き、
 # 止めた部品ごとに ::error:: の行を標準出力に出す。/ship は、この行から止めた部品と時刻を読む。
+#
+# PR を作る前の判定(COOLDOWN_MODE=predict。claude-auto-fix-target.yaml の cooldown-judge ジョブから実行):
+#   PR の検査がこの変更をどちらに扱うかを、PR を作る前に同じ判定で見込む。PR_NUMBER を求めず、
+#   上の流れの 1 から 4 だけを行い、記録のコメントを読みも書きもせず、所有者の承認も確かめない。
+#   終わり方は次の3つである。
+#     0: 公開から72時間経っていない版が無い
+#     3: PR の検査であれば、記録のコメントを書いて所有者の承認を求める見込み(1 から 4 をすべて通った)
+#     1: PR の検査であれば、記録のコメントを書かずに赤にする見込みか、判定できない
 # =====================================================================
 set -euo pipefail
 
@@ -63,12 +73,25 @@ BASE_SHA="${1:?base sha required}"
 HEAD_SHA="${2:?head sha required}"
 REPO="${GITHUB_REPOSITORY:?GITHUB_REPOSITORY required}"
 OWNER="${GITHUB_REPOSITORY_OWNER:?GITHUB_REPOSITORY_OWNER required}"
-PR_NUMBER="${PR_NUMBER:?PR_NUMBER required}"
-: "${GH_TOKEN:?GH_TOKEN required}"
-if [[ ! "$PR_NUMBER" =~ ^[1-9][0-9]*$ ]]; then
-    echo "::error::PR_NUMBER が PR の番号の形ではありません: '${PR_NUMBER}'" >&2
+COOLDOWN_MODE="${COOLDOWN_MODE:-}"
+case "$COOLDOWN_MODE" in
+"" | predict) ;;
+*)
+    echo "::error::COOLDOWN_MODE が知らない値です: '${COOLDOWN_MODE}'" >&2
     exit 1
+    ;;
+esac
+# PR を作る前の判定では PR が無いので、PR の番号を求めない。PR の番号は記録のコメントにだけ使う
+if [ "$COOLDOWN_MODE" = predict ]; then
+    PR_NUMBER=""
+else
+    PR_NUMBER="${PR_NUMBER:?PR_NUMBER required}"
+    if [[ ! "$PR_NUMBER" =~ ^[1-9][0-9]*$ ]]; then
+        echo "::error::PR_NUMBER が PR の番号の形ではありません: '${PR_NUMBER}'" >&2
+        exit 1
+    fi
 fi
+: "${GH_TOKEN:?GH_TOKEN required}"
 
 OWNER_APPROVED="${OWNER_APPROVED:-false}"
 COOLDOWN_HOURS="${COOLDOWN_HOURS:-72}"
@@ -426,6 +449,10 @@ fi
 
 if [ ! -s "$TMP/young.tsv" ]; then
     echo "追加されたパッケージはすべて公開から ${COOLDOWN_HOURS} 時間を経過しています。"
+    # PR を作る前の判定では、記録のコメントの有無も所有者の承認も読まない
+    if [ "$COOLDOWN_MODE" = predict ]; then
+        exit 0
+    fi
     if ! rec=$(bash "$SCRIPT_DIR/record-cooldown-exception.sh" exists "$PR_NUMBER" </dev/null); then
         record_failed "記録のコメントを読めなかった"
     fi
@@ -612,6 +639,12 @@ if [ "$(jq length "$TMP/npm-young.json")" -gt 0 ]; then
     fi
 fi
 stop_if_blocked
+
+# PR を作る前の判定では、記録のコメントを書かず、所有者の承認も確かめずに、3で終える
+if [ "$COOLDOWN_MODE" = predict ]; then
+    echo "PR の検査であれば、記録のコメントを書いて所有者の承認を求める見込みです。"
+    exit 3
+fi
 
 # 5. 記録のコメントを書く。同じ head の記録が既にあれば、record-cooldown-exception.sh が重ねない
 jq -R -s -c --slurpfile alerts "$TMP/alerts.json" --argjson pr "$PR_NUMBER" --arg head "$HEAD_SHA" \

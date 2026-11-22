@@ -262,20 +262,26 @@ reset_all() {
 }
 
 # 使い方: run <compare.jsonの内容> <times.tsvの内容> [gh失敗] [警告base64] [ヘッダ取得失敗]
+# 本体の COOLDOWN_MODE には、テストの変数 STUB_MODE があるときだけ、その値を渡す。
+# テストの変数 STUB_NO_PR が yes のときは、本体に PR_NUMBER を渡さない
 run() {
+    local mode_env=() pr_env=("PR_NUMBER=${STUB_PR:-12}")
+    [ -z "${STUB_MODE+set}" ] || mode_env=("COOLDOWN_MODE=$STUB_MODE")
+    [ "${STUB_NO_PR:-}" != yes ] || pr_env=()
     printf '%s' "$1" >"$WORK/compare.json"
     printf '%s' "$2" >"$WORK/times.tsv"
     : >"$WORK/calls.log"
     : >"$WORK/gh_calls.log"
     : >"$WORK/summary.md"
-    PATH="$WORK/bin:$PATH" \
+    env -u COOLDOWN_MODE -u PR_NUMBER ${mode_env[@]+"${mode_env[@]}"} ${pr_env[@]+"${pr_env[@]}"} \
+        PATH="$WORK/bin:$PATH" \
         STUB_COMPARE="$WORK/compare.json" STUB_TIMES="$WORK/times.tsv" \
         STUB_CALLS="$WORK/calls.log" STUB_GH_CALLS="$WORK/gh_calls.log" \
         STUB_NPM_DIR="$WORK/npm" STUB_GH_FAIL="${3:-}" STUB_WARN_B64="${4:-}" \
         STUB_HDR_FAIL="${5:-}" STUB_ALERTS_DIR="$WORK/alerts" \
         STUB_COMMENTS="$WORK/comments.json" STUB_OSV_MAL="$WORK/osv_mal.tsv" \
         GITHUB_REPOSITORY="owner/repo" GITHUB_REPOSITORY_OWNER="owner" GH_TOKEN="dummy" \
-        PR_NUMBER="${STUB_PR:-12}" OWNER_APPROVED="${OWNER_APPROVED:-}" NOW_EPOCH="$NOW" \
+        OWNER_APPROVED="${OWNER_APPROVED:-}" NOW_EPOCH="$NOW" \
         MAVEN_CENTRAL_BASE="https://central.invalid/maven2" \
         PLUGIN_PORTAL_BASE="https://portal.invalid/m2" \
         NPM_REGISTRY_BASE="https://npm.invalid" \
@@ -1091,6 +1097,97 @@ if want gomod_malicious; then
     check_summary "| github.com/evil/dep | 1.0.0 | 2026-01-06 23:00 UTC より前 | 悪意のある部品として公表されている(MAL-2026-3 Malicious code in package (MAL-2026-3) https://advisories.invalid/MAL-2026-3) | 入らない |" \
         "gomod の部品が悪意のある部品なら赤になる(索引の読んだ範囲に無い部品は、読み始めた時刻より前に公開したと出る)"
     check_records 0 "gomod の部品が悪意のある部品なら赤になる(記録を書かない)"
+fi
+
+# --- PR を作る前の判定(COOLDOWN_MODE=predict) ---------------------------------------
+# 記録のコメントを読みも書きもせず、所有者の承認も確かめない。終わり方は、公開から72時間経っていない
+# 版が無ければ0、PR の検査であれば承認を求める見込みなら3、赤にする見込みか判定できなければ1
+
+if want predict_eligible; then
+    setup_eligible_axios
+    STUB_MODE=predict check 3 "承認を求める見込みなら3で終わる" "[$COMPARE_AXIOS]" ""
+    check_records 0 "predict で記録のコメントを書かない"
+    check_gh_match "issues/" 0 "predict で記録のコメントを書かない(PR のコメントを読みも書きもしない)"
+    check_no_summary "所有者の承認待ち" "predict では所有者の承認を確かめない(承認待ちを書かない)"
+    check_calls "https://osv.invalid/v1/querybatch" "承認を求める見込みなら3で終わる(悪意のある部品の一覧に照らす)"
+    check_gh_match "attestation verify" 1 "承認を求める見込みなら3で終わる(署名した者を比べる)"
+
+    STUB_MODE=predict OWNER_APPROVED=true check 3 "predict では所有者の承認を確かめない(承認があっても3で終わる)" \
+        "[$COMPARE_AXIOS]" ""
+
+    record_comment "$OLD_HEAD"
+    STUB_MODE=predict check 3 "predict では前の head の記録のコメントを読まない(記録があっても3で終わる)" "[$COMPARE_AXIOS]" ""
+    check_records 1 "predict では前の head の記録のコメントを読まない(記録を足さない)"
+    check_gh_match "issues/" 0 "predict では前の head の記録のコメントを読まない(PR のコメントを読まない)"
+fi
+
+if want predict_no_pr; then
+    setup_eligible_axios
+    STUB_NO_PR=yes STUB_MODE=predict check 3 "PR_NUMBER が無くても predict で動く" "[$COMPARE_AXIOS]" ""
+    check_gh_match "issues/" 0 "PR_NUMBER が無くても predict で動く(PR のコメントを読まない)"
+
+    STUB_NO_PR=yes check 1 "COOLDOWN_MODE が無ければ、今と同じく PR_NUMBER が無いと赤になる" "[$COMPARE_AXIOS]" ""
+    check_gh_match "compare" 0 "COOLDOWN_MODE が無ければ、今と同じく PR_NUMBER が無いと赤になる(依存の差分を読む前に止まる)"
+fi
+
+if want predict_mature; then
+    npm_pkg axios 1.12.0 "$ISO_OLD"
+    STUB_MODE=predict check 0 "72時間経っていない版が無ければ0で終わる" \
+        "[$(entry removed npm axios 1.11.0),$(entry added npm axios 1.12.0),$(entry added maven org.example:lib 1.0.0)]" \
+        "org/example/lib/1.0.0/lib-1.0.0.pom	200	404	$LM_OLD
+"
+    check_gh_match "issues/" 0 "72時間経っていない版が無ければ0で終わる(記録のコメントの有無を読まない)"
+    check_no_call_to "osv.invalid" "72時間経っていない版が無ければ0で終わる(OSV に問い合わせない)"
+
+    record_comment "$OLD_HEAD"
+    STUB_MODE=predict check 0 "72時間経っていない版が無ければ、前の head の記録のコメントがあっても0で終わる" \
+        "[$(entry added maven org.example:lib 1.0.0)]" \
+        "org/example/lib/1.0.0/lib-1.0.0.pom	200	404	$LM_OLD
+"
+    STUB_MODE=predict check 0 "追加された部品が無ければ0で終わる" "[]" ""
+fi
+
+if want predict_blocked; then
+    setup_eligible_axios
+    provenance axios 1.12.1 999999999
+    STUB_MODE=predict check 1 "署名した者が前の版と違えば1で終わる" "[$COMPARE_AXIOS]" ""
+    check_summary "$(axios_cells "署名した者が前の版と違う(")" "署名した者が前の版と違えば1で終わる(止めた理由が報告に出る)"
+    check_records 0 "署名した者が前の版と違えば1で終わる(記録を書かない)"
+
+    setup_eligible_axios
+    pnpm_exclude 'axios' 'axios@1.12.0'
+    STUB_MODE=predict check 1 "pnpm の除外の欄に無い版なら1で終わる" "[$COMPARE_AXIOS]" ""
+    check_summary "$(axios_row "除外の欄に、この版の要素が無い(足す1行: \`  - 'axios@1.12.1'\`)")" \
+        "pnpm の除外の欄に無い版なら1で終わる(足す1行が報告に出る)"
+    check_records 0 "pnpm の除外の欄に無い版なら1で終わる(記録を書かない)"
+
+    setup_eligible_axios
+    alert npm axios 1.12.2
+    STUB_MODE=predict check 1 "警告の最初の修正版でない版なら1で終わる" "[$COMPARE_AXIOS]" ""
+    check_no_call_to "osv.invalid" "警告の最初の修正版でない版なら1で終わる(OSV に問い合わせない)"
+
+    setup_eligible_axios
+    STUB_OSV_FAIL=yes STUB_MODE=predict check 1 "悪意のある部品の一覧に照らせなければ1で終わる" "[$COMPARE_AXIOS]" ""
+
+    setup_eligible_axios
+    STUB_ALERTS_FAIL=yes STUB_MODE=predict check 1 "警告の API を読めなければ1で終わる" "[$COMPARE_AXIOS]" ""
+
+    STUB_MODE=predict check 1 "公開時刻を取得できなければ1で終わる" \
+        "[$(entry added maven org.example:lib 1.0.0),$(entry added maven org.example:missing 2.0.0)]" \
+        "org/example/lib/1.0.0/lib-1.0.0.pom	200	404	$LM_OLD
+"
+    check_summary "判定不能" "公開時刻を取得できなければ1で終わる(判定不能の見出しが出る)"
+fi
+
+if want predict_mode_value; then
+    setup_eligible_axios
+    STUB_MODE=bogus check 1 "COOLDOWN_MODE が知らない値なら1で終わる" "[$COMPARE_AXIOS]" ""
+    check_gh_match "compare" 0 "COOLDOWN_MODE が知らない値なら1で終わる(依存の差分を読む前に止まる)"
+    check_records 0 "COOLDOWN_MODE が知らない値なら1で終わる(記録を書かない)"
+
+    STUB_MODE="" check 1 "COOLDOWN_MODE が空なら今と同じに動く(承認待ちで赤になる)" "[$COMPARE_AXIOS]" ""
+    check_records 1 "COOLDOWN_MODE が空なら今と同じに動く(記録のコメントを書く)"
+    check_summary "所有者の承認待ち" "COOLDOWN_MODE が空なら今と同じに動く(所有者の承認待ちが出る)"
 fi
 
 if [ "$RAN" -eq 0 ]; then

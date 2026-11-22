@@ -70,6 +70,16 @@
 #   環境変数 GH_TOKEN(必須) / GITHUB_REPOSITORY(必須)
 #     / GITHUB_REPOSITORY_OWNER(dependency-cooldown が赤の PR があるときに必須。
 #       record-cooldown-exception.sh が使う。Actions のランナーが設定する)
+#     / STUCK_JSON_OUT(任意。止まった PR の一覧を書くファイルのパス)
+#
+# STUCK_JSON_OUT があれば、終了コードが0か1のときに、止まった PR ごとに
+# {number, sha, red: [{name, conclusion}]} を並べた JSON の配列をそのファイルに書く
+# (止まった PR が無ければ [])。終了コードが2のときは書かない。ファイルを書けなければ
+# 判定不能(2)で終わる。止まったと見る決まりは STUCK_JSON_OUT が無いときと同じで、
+# 承認待ちの赤だけの PR は一覧に入らない。
+# red には、滞留と数えた赤の検査だけでなく、承認待ちに分けた赤の検査も入れる。
+# claude-auto-fix の仕組みが、赤の検査が Claude が直しても緑にならない検査だけかを、
+# PR の赤の検査の全部で決めるためである。
 # =====================================================================
 set -Eeuo pipefail
 # ガードしていないコマンドの失敗は、逸脱(1)ではなく判定不能(2)にする。
@@ -96,6 +106,7 @@ REPO="$GITHUB_REPOSITORY"
 RECORD="$(cd "$(dirname "$0")" && pwd)/record-cooldown-exception.sh"
 
 SUMMARY="${GITHUB_STEP_SUMMARY:-/dev/null}"
+STUCK_JSON_OUT="${STUCK_JSON_OUT:-}"
 
 # 判定不能の報告と終了。API障害等の外部要因は同じrunの再実行で解消しうる。
 report_undecidable() {
@@ -175,6 +186,7 @@ fi
 # --- PRごとの集計 ---------------------------------------------------------------
 stuck_report=""
 waiting_report=""
+stuck_list="[]"
 pr_count=$(jq 'length' <<<"$pulls_list")
 
 i=0
@@ -230,6 +242,9 @@ while [ "$i" -lt "$pr_count" ]; do
 
     if [ -n "$stuck_names" ]; then
         stuck_report="${stuck_report}- #${number}: ${stuck_names}"$'\n'
+        # 一覧の red には、承認待ちに分けた赤も入れる(STUCK_JSON_OUT の説明を参照)
+        stuck_list=$(jq -c --argjson number "$number" --arg sha "$sha" --argjson failures "$failures_json" \
+            '. + [{number: $number, sha: $sha, red: ($failures | map({name, conclusion}))}]' <<<"$stuck_list")
     fi
     if [ -n "$waiting_names" ]; then
         waiting_report="${waiting_report}- #${number}: ${waiting_names}"$'\n'
@@ -237,6 +252,15 @@ while [ "$i" -lt "$pr_count" ]; do
 
     i=$((i + 1))
 done
+
+# --- 止まった PR の一覧の書き出し -------------------------------------------------
+# 報告より先に書く。書けなかったときに、止まった PR の有無を報告してから
+# 判定不能で終わると、報告と終了コードが食い違うためである
+if [ -n "$STUCK_JSON_OUT" ]; then
+    if ! printf '%s\n' "$stuck_list" >"$STUCK_JSON_OUT" 2>/dev/null; then
+        report_undecidable "止まった PR の一覧を STUCK_JSON_OUT のファイル(${STUCK_JSON_OUT})に書けませんでした。"
+    fi
+fi
 
 # --- 報告 -----------------------------------------------------------------------
 # 承認待ちの一覧は判定結果にかかわらず常時出力する(approval_gated分類の

@@ -2,9 +2,11 @@
 # =====================================================================
 # frontend-vuln-fix.sh の自動テスト
 #
-# PR を作る run は gh・git・pnpm・npm のレジストリにつながるので、ここでは流さない。
 # run が使う判断の部品(警告の絞り込みとまとめ方、脆弱な版の見つけ方、72時間の判断、
 # pnpm-workspace.yaml の書き換え、frontend-test と同じ検査)を、サブコマンドで1つずつ呼んで確かめる。
+# PR を作る run は、gh・git・curl・pnpm を偽物に替えて流し、PR を作れなかった組を
+# vuln-fix の結果のファイル(VULN_FIX_UNRESOLVED)に書くことと、Claude の変更のブランチが
+# ある組で PR を作らないことを確かめる。
 # =====================================================================
 set -uo pipefail
 
@@ -212,6 +214,120 @@ expect_eq "失敗したところで止め、後ろの検査を流さない" "$(t
 if fake_test '--dir frontend run build'; then ng "組み立てが失敗したのに 0 で終わった"
 else ok "最後の組み立てが失敗しても 0 以外で終わる"; fi
 expect_eq "部品のスクリプトに GH_TOKEN を渡さない" "$(grep -c 'GH_TOKEN' "$WORK/pnpm.log")" 0
+
+# --- run(PR を作る処理)-------------------------------------------------
+# gh・git・curl・pnpm を偽物に替え、環境変数で成功と失敗を選んで run を流す
+echo "run: PR を作れなかった組の書き残しと、Claude の変更のブランチ"
+mkdir -p "$WORK/bin"
+cat >"$WORK/bin/gh" <<'EOF'
+#!/usr/bin/env bash
+echo "gh $*" >>"$FAKE_LOG"
+case "$1 $2" in
+    "api "*) cat "$FAKE_ALERTS" ;;
+    "auth setup-git") ;;
+    "pr create") [ -z "${FAKE_PR_FAIL:-}" ] || exit 1 ;;
+    *) exit 99 ;;
+esac
+EOF
+cat >"$WORK/bin/git" <<'EOF'
+#!/usr/bin/env bash
+echo "git $*" >>"$FAKE_LOG"
+case "$1" in
+    ls-remote) for b in ${FAKE_REMOTE_BRANCHES:-}; do [ "$b" != "$5" ] || exit 0; done; exit 2 ;;
+    diff) case " $* " in
+              *" --name-only "*) echo frontend/pnpm-lock.yaml ;;
+              *" HEAD~1 "*) exit 0 ;;
+              *) exit "${FAKE_DIFF_QUIET:-1}" ;;
+          esac ;;
+    push) [ -z "${FAKE_PUSH_FAIL:-}" ] || exit 1 ;;
+    config | switch | add | commit) ;;
+    *) exit 99 ;;
+esac
+EOF
+cat >"$WORK/bin/curl" <<'EOF'
+#!/usr/bin/env bash
+echo "curl $*" >>"$FAKE_LOG"
+[ -z "${FAKE_CURL_FAIL:-}" ] || exit 22
+printf '{"time":{"6.16.1":"2020-01-01T00:00:00.000Z"}}\n'
+EOF
+cat >"$WORK/bin/pnpm" <<'EOF'
+#!/usr/bin/env bash
+echo "pnpm $*" >>"$FAKE_LOG"
+case "$3 $4" in
+    "update "*) [ -z "${FAKE_UPDATE_FAIL:-}" ] || exit 1
+                [ -z "${FAKE_UPDATE_FIX:-}" ] || cp "$FAKE_LOCK_FIXED" frontend/pnpm-lock.yaml ;;
+    "install --lockfile-only") [ -z "${FAKE_INSTALL_FAIL:-}" ] || exit 1 ;;
+    *) [ -z "${FAKE_TEST_FAIL:-}" ] || exit 1 ;;
+esac
+EOF
+chmod +x "$WORK/bin/gh" "$WORK/bin/git" "$WORK/bin/curl" "$WORK/bin/pnpm"
+{ printf '[['; alert 1 qs transitive '"development"' medium frontend/pnpm-lock.yaml '< 6.16.1' 6.16.1; printf ']]'; } >"$WORK/run-alerts.json"
+printf "lockfileVersion: '9.0'\n\npackages:\n\n  qs@6.14.0:\n    resolution: {integrity: sha512-a}\n" >"$WORK/lock-old.yaml"
+printf "lockfileVersion: '9.0'\n\npackages:\n\n  qs@6.16.1:\n    resolution: {integrity: sha512-b}\n" >"$WORK/lock-fixed.yaml"
+run_group=$(bash "$SCRIPT" plan "$WORK/run-alerts.json" | jq -cS '.[0]')
+
+# run_case <場合の名前> [<環境変数>=<値> ...]。終わり方を RC に、場合のフォルダを RD に入れる
+run_case() {
+    RD="$WORK/run-$1"; shift
+    rm -rf "$RD"; mkdir -p "$RD/frontend"
+    cp "$WORK/lock-old.yaml" "$RD/frontend/pnpm-lock.yaml"
+    printf 'minimumReleaseAge: 4320\n' >"$RD/frontend/pnpm-workspace.yaml"
+    printf 'stale\n' >"$RD/unresolved.jsonl"
+    (cd "$RD" && env PATH="$WORK/bin:$PATH" GITHUB_REPOSITORY=owner/repo GH_TOKEN=dummy \
+        FAKE_LOG="$RD/calls.log" FAKE_ALERTS="$WORK/run-alerts.json" FAKE_LOCK_FIXED="$WORK/lock-fixed.yaml" \
+        VULN_FIX_UNRESOLVED="$RD/unresolved.jsonl" "$@" bash "$SCRIPT" run >"$RD/out.txt" 2>&1)
+    RC=$?
+    touch "$RD/calls.log"
+}
+
+# expect_unresolved <場合の名前> <止まった理由>。1行だけが足され、種類・組・理由が合うかを確かめる
+expect_unresolved() {
+    expect_eq "$1: 1 で終わる" "$RC" 1
+    expect_eq "$1: 結果のファイルに1行だけが足される" "$(wc -l <"$RD/unresolved.jsonl" | tr -d ' ')" 1
+    expect_eq "$1: 種類は npm" "$(jq -r .kind "$RD/unresolved.jsonl" 2>/dev/null)" npm
+    expect_eq "$1: 組は plan の出す組と同じ" "$(jq -cS .group "$RD/unresolved.jsonl" 2>/dev/null)" "$run_group"
+    expect_eq "$1: 理由" "$(jq -r .reason "$RD/unresolved.jsonl" 2>/dev/null)" "$2"
+    expect_eq "$1: PR を作らない" "$(grep -c '^gh pr create' "$RD/calls.log")" 0
+}
+
+run_case curl FAKE_CURL_FAIL=1
+expect_unresolved "公開日時を読めない" "公開日時を読めなかった"
+run_case update FAKE_UPDATE_FAIL=1
+expect_unresolved "pnpm update が失敗する" "pnpm update が失敗した"
+run_case install FAKE_INSTALL_FAIL=1
+expect_unresolved "pnpm install が失敗する" "pnpm install が失敗した"
+run_case still
+expect_unresolved "上げても脆弱な版が残る" "警告が消える版に上げられなかった"
+run_case nodiff FAKE_UPDATE_FIX=1 FAKE_DIFF_QUIET=0
+expect_unresolved "lockfile が変わらない" "警告が消える版に上げられなかった"
+run_case test FAKE_UPDATE_FIX=1 FAKE_TEST_FAIL=1
+expect_unresolved "frontend-test の検査が通らない" "frontend-test の検査が通らなかった"
+run_case push FAKE_UPDATE_FIX=1 FAKE_PUSH_FAIL=1
+expect_unresolved "push が失敗する" "ブランチを push できなかった"
+run_case pr FAKE_UPDATE_FIX=1 FAKE_PR_FAIL=1
+expect_eq "PR を作れない: 1 で終わる" "$RC" 1
+expect_eq "PR を作れない: 結果のファイルに1行だけが足される" "$(wc -l <"$RD/unresolved.jsonl" | tr -d ' ')" 1
+expect_eq "PR を作れない: 組は plan の出す組と同じ" "$(jq -cS .group "$RD/unresolved.jsonl" 2>/dev/null)" "$run_group"
+expect_eq "PR を作れない: 理由" "$(jq -r .reason "$RD/unresolved.jsonl" 2>/dev/null)" "PR を作れなかった"
+
+run_case ok FAKE_UPDATE_FIX=1
+expect_eq "PR を作れた: 0 で終わる" "$RC" 0
+expect_eq "PR を作れた: PR を1つ作る" "$(grep -c '^gh pr create' "$RD/calls.log")" 1
+if [ -f "$RD/unresolved.jsonl" ] && [ ! -s "$RD/unresolved.jsonl" ]; then ok "PR を作れた: 結果のファイルは空で残る(前の中身を消す)"
+else ng "PR を作れた: 結果のファイルが空でない: [$(cat "$RD/unresolved.jsonl" 2>/dev/null)]"; fi
+
+run_case claude FAKE_UPDATE_FIX=1 FAKE_REMOTE_BRANCHES=fix/claude-auto-fix-frontend-vuln-fix-qs-6-16-1
+expect_eq "Claude の変更のブランチがある: 0 で終わる" "$RC" 0
+expect_eq "Claude の変更のブランチがある: PR を作らない" "$(grep -c '^gh pr create' "$RD/calls.log")" 0
+expect_eq "Claude の変更のブランチがある: lockfile を直さない" "$(grep -c '^pnpm ' "$RD/calls.log")" 0
+expect_eq "Claude の変更のブランチがある: 結果のファイルに書かない" "$(wc -c <"$RD/unresolved.jsonl" | tr -d ' ')" 0
+
+run_case chore FAKE_UPDATE_FIX=1 FAKE_REMOTE_BRANCHES=chore/frontend-vuln-fix-qs-6-16-1
+expect_eq "同じ組の vuln-fix のブランチがある: PR を作らない" "$(grep -c '^gh pr create' "$RD/calls.log")" 0
+
+run_case noenv FAKE_UPDATE_FIX=1 FAKE_CURL_FAIL=1 VULN_FIX_UNRESOLVED=
+expect_eq "VULN_FIX_UNRESOLVED が無い: 1 で終わる(書かずに今と同じに動く)" "$RC" 1
+expect_eq "VULN_FIX_UNRESOLVED が無い: ファイルを書き換えない" "$(cat "$RD/unresolved.jsonl")" stale
 
 # --- 使い方 -------------------------------------------------------------
 echo "使い方"

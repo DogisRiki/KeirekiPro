@@ -1,0 +1,1062 @@
+# 1つの対象を Claude に直させ、確かめて PR にするワークフロー
+# (design.md の claude-auto-fix-target.yaml の節)
+#
+# claude-auto-fix.yaml(振り分け)が対象ごとに workflow_dispatch で起動する。所有者が手で起動してもよい。
+# 直すかどうかの判定はスクリプトが行い、このワークフローはジョブの順番と権限だけを決める。
+# 前のジョブが結果(outcome)を出して止まったときは、あとのジョブを飛ばして report ジョブに進む。
+#
+# ジョブの順番:
+#   prepare → edit → verify → verify-image(種類が container のとき)
+#     → cooldown-push → cooldown-generate → cooldown-submit → cooldown-judge(verify の出力 cooldown が true のとき)
+#     → ship → report → cleanup
+#
+# ジョブの間で受け渡す差分は、成果物で渡す。ジョブごとにランナーが違い、$RUNNER_TEMP を共有しないためである。
+#   base-patch    prepare が書いた起点の差分(claude-auto-fix-base.patch)。空のこともある
+#   claude-patch  edit が書いた Claude の変更(claude-auto-fix-claude.patch)
+#   final-patch   verify の apply が書いた最後の差分(claude-auto-fix-final.patch)
+#   trivy-results 種類が container のとき、prepare が main から作ったイメージを Trivy で調べた結果
+#   outcome       report が書いた結果のファイル。cleanup はこれだけを残す
+# 各ジョブは、受け取った差分の SHA-256 を prepare と verify の出力と比べ、違えば止まる。
+#
+# 秘密の値:
+#   CLAUDE_CODE_OAUTH_TOKEN は edit の run_claude の手順にだけ、BOT_GITHUB_TOKEN は ship の ship の手順と
+#   cooldown-push の final の手順にだけ渡す。
+#   Claude の変更を当てたコードを動かすジョブ(verify、verify-image、cooldown-generate)と Claude を動かす手順には、
+#   GITHUB_TOKEN を渡さない。checkout は、すべて persist-credentials: false にする。
+#   cooldown-push は、一時のブランチを bot の PAT で push する。GitHub は、.github/workflows/ のファイルを変えるコミットを
+#   GITHUB_TOKEN で push させないためである(cooldown-push は Claude を動かさず、Claude の変更を当てたコードも動かさない)。
+#
+# テスト: .github/scripts/tests/test-claude-auto-fix-workflows.sh
+name: Claude Auto Fix Target
+# red-check のときは、同じ PR の違う head の実行を見分けられるよう、表示名の末尾に PR の番号と head の SHA の
+# 先頭12文字を足す。head は claude-auto-fix-sweep.sh が渡す
+run-name: "claude-auto-fix ${{ inputs.kind }} ${{ inputs.key }}${{ inputs.reason == 'red-check' && format(' pr#{0}@{1}', inputs.pr, inputs.head) || '' }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      kind:
+        description: 対象の種類(codeql npm maven go-module go-stdlib container dependabot)
+        type: string
+        required: true
+      key:
+        description: 対象の key(警告の番号、部品と版の組、脆弱性の ID、PR の番号など)
+        type: string
+        required: true
+      reason:
+        description: 起動の理由(trigger manual retry red-check)
+        type: string
+        required: true
+      pr:
+        description: Claude の変更の PR か Dependabot の PR の番号
+        type: string
+        required: false
+        default: ""
+      checks:
+        description: 赤の検査の名前の JSON の配列
+        type: string
+        required: false
+        default: "[]"
+      detail:
+        description: vuln-fix の組の JSON
+        type: string
+        required: false
+        default: ""
+      head:
+        description: red-check のときの PR の head の SHA の先頭12文字(表示名にだけ使う)
+        type: string
+        required: false
+        default: ""
+
+concurrency:
+  group: claude-auto-fix-target-${{ inputs.kind }}-${{ inputs.key }}
+  cancel-in-progress: false
+
+permissions: {}
+
+env:
+  # Trivy 本体の版。container-scan.yaml と同じにする。v は付けない(check-trivy-version.sh の引数の形式)
+  TRIVY_VERSION: '0.76.2'
+
+jobs:
+  # 対象を読み直し、作業の起点の差分 base.patch と、起点のコミットの SHA を出す
+  prepare:
+    runs-on: ${{ inputs.kind == 'container' && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: read
+      # PR の head のコミットの検査の結論を読む
+      checks: read
+      security-events: read
+      vulnerability-alerts: read
+    outputs:
+      outcome: ${{ steps.prepare.outputs.outcome }}
+      cause: ${{ steps.prepare.outputs.cause }}
+      main_sha: ${{ steps.prepare.outputs.main_sha }}
+      base_sha: ${{ steps.prepare.outputs.base_sha }}
+      base_sha256: ${{ steps.prepare.outputs.base_sha256 }}
+      checks: ${{ steps.prepare.outputs.checks }}
+    steps:
+      # claude-auto-fix-prepare.sh は、作業フォルダの最上位の履歴のすべてを読む
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      # 種類が container のときは、container-scan.yaml の container-scan ジョブと同じランナーと組み立て方で、
+      # main から本番の2つのイメージを作り、Trivy で調べる
+      - name: Install verified Trivy
+        if: inputs.kind == 'container'
+        uses: ./.github/actions/verified-trivy
+        with:
+          trivy-version: ${{ env.TRIVY_VERSION }}
+
+      - name: Test Trivy version check
+        if: inputs.kind == 'container'
+        run: bash .github/scripts/tests/test-check-trivy-version.sh
+
+      - name: Verify Trivy version
+        if: inputs.kind == 'container'
+        env:
+          EXPECTED_TRIVY_VERSION: ${{ env.TRIVY_VERSION }}
+        run: bash .github/scripts/check-trivy-version.sh "$EXPECTED_TRIVY_VERSION"
+
+      - name: Set up Docker Buildx
+        if: inputs.kind == 'container'
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Build and scan production images
+        id: scan
+        if: inputs.kind == 'container'
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/trivy"
+          docker buildx build --platform linux/arm64 --file docker/backend/Dockerfile.prod --tag keirekipro-backend:claude-auto-fix --output "type=docker,dest=$RUNNER_TEMP/java.tar" ./backend
+          docker buildx build --platform linux/arm64 --file docker/backend-go/Dockerfile.prod --tag keirekipro-backend-go:claude-auto-fix --output "type=docker,dest=$RUNNER_TEMP/go.tar" ./backend
+          trivy image --input "$RUNNER_TEMP/java.tar" --format json --output "$RUNNER_TEMP/trivy/trivy-java.json"
+          trivy image --input "$RUNNER_TEMP/go.tar" --format json --output "$RUNNER_TEMP/trivy/trivy-go.json"
+
+      - name: Test prepare scripts
+        run: bash .github/scripts/tests/test-lib-claude-auto-fix.sh && bash .github/scripts/tests/test-claude-auto-fix-prepare.sh
+
+      - name: Prepare
+        id: prepare
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TRIVY_RESULTS_DIR: ${{ runner.temp }}/trivy
+          KIND: ${{ inputs.kind }}
+          KEY: ${{ inputs.key }}
+          REASON: ${{ inputs.reason }}
+          PR: ${{ inputs.pr }}
+        run: bash .github/scripts/claude-auto-fix-prepare.sh "$KIND" "$KEY" "$REASON" "$PR" >>"$GITHUB_OUTPUT"
+
+      - name: Upload Trivy results
+        id: upload_trivy
+        if: inputs.kind == 'container'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: trivy-results
+          path: ${{ runner.temp }}/trivy
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Upload base patch
+        id: upload_base
+        if: steps.prepare.outputs.outcome == ''
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: base-patch
+          path: ${{ runner.temp }}/claude-auto-fix-base.patch
+          if-no-files-found: error
+          retention-days: 1
+
+  # 材料を集め、Claude に target/ のファイルを直させる
+  edit:
+    needs: [prepare]
+    if: needs.prepare.outputs.outcome == ''
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    permissions:
+      contents: read
+      security-events: read
+      actions: read
+      pull-requests: read
+      issues: read
+      vulnerability-alerts: read
+    outputs:
+      outcome: ${{ steps.run_claude.outputs.outcome }}
+      reason: ${{ steps.run_claude.outputs.reason }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Checkout target
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: target
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Download base patch
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: base-patch
+          path: ${{ runner.temp }}
+
+      # 起点のコードを作る。red-check では base_sha(PR の head)を、そのほかでは main_sha を checkout し、
+      # base.patch を当てる。claude-auto-fix-run-claude.sh は index と作業のフォルダの差を Claude の変更として
+      # 書くので、base.patch は index にも当てる
+      - name: Rebuild base
+        id: base
+        env:
+          REASON: ${{ inputs.reason }}
+          BASE_SHA: ${{ needs.prepare.outputs.base_sha }}
+          MAIN_SHA: ${{ needs.prepare.outputs.main_sha }}
+          BASE_SHA256: ${{ needs.prepare.outputs.base_sha256 }}
+        run: |
+          set -euo pipefail
+          p="$RUNNER_TEMP/claude-auto-fix-base.patch"
+          start="$MAIN_SHA"
+          [ "$REASON" != red-check ] || start="$BASE_SHA"
+          git -C target checkout -q --detach "$start"
+          [ "$(sha256sum <"$p" | cut -d' ' -f1)" = "$BASE_SHA256" ] || { echo "::error::base.patch の SHA-256 が prepare ジョブの出力と違います"; exit 1; }
+          if [ -s "$p" ]; then git -C target apply --index "$p"; fi
+
+      - name: Download Trivy results
+        id: download_trivy
+        if: inputs.kind == 'container'
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: trivy-results
+          path: ${{ runner.temp }}/trivy
+
+      - name: Install verified Claude CLI
+        uses: ./.github/actions/verified-claude
+        with:
+          claude-version: '2.1.323'
+
+      - name: Test edit scripts
+        run: bash .github/scripts/tests/test-claude-auto-fix-materials.sh && bash .github/scripts/tests/test-claude-auto-fix-run-claude.sh
+
+      # GITHUB_TOKEN は材料を集めるこの手順にだけ渡す
+      - name: Collect materials
+        id: materials
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TRIVY_RESULTS_DIR: ${{ runner.temp }}/trivy
+          KIND: ${{ inputs.kind }}
+          KEY: ${{ inputs.key }}
+          REASON: ${{ inputs.reason }}
+          PR: ${{ inputs.pr }}
+          # 種類が dependabot のときは、実行の時点の赤の検査を prepare が読み直している
+          CHECKS: ${{ inputs.kind == 'dependabot' && needs.prepare.outputs.checks || inputs.checks }}
+          DETAIL: ${{ inputs.detail }}
+        run: bash .github/scripts/claude-auto-fix-materials.sh "$KIND" "$KEY" "$REASON" "$PR" "$CHECKS" "$DETAIL" >>"$GITHUB_OUTPUT"
+
+      # 秘密の値は Claude の鍵だけを渡す
+      - name: Run Claude
+        id: run_claude
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          MATERIALS: ${{ steps.materials.outputs.materials }}
+        run: bash .github/scripts/claude-auto-fix-run-claude.sh "$MATERIALS" "$RUNNER_TEMP/claude-auto-fix-claude.patch" >>"$GITHUB_OUTPUT"
+
+      - name: Upload Claude patch
+        id: upload_claude
+        if: steps.run_claude.outputs.outcome == 'ok'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: claude-patch
+          path: ${{ runner.temp }}/claude-auto-fix-claude.patch
+          if-no-files-found: error
+          retention-days: 1
+
+  # Claude の変更を当て、派生のファイルを作り直し、変えた領域の品質チェックと、対象が消えたかを確かめる。
+  # 秘密の値を持たず、依存のキャッシュを保存しない。GITHUB_TOKEN は、Claude の変更を当てる前の alert の手順にだけ渡す
+  verify:
+    needs: [prepare, edit]
+    if: needs.edit.outputs.outcome == 'ok'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    permissions:
+      contents: read
+      security-events: read
+    outputs:
+      outcome: ${{ steps.confirm.outputs.outcome || steps.check.outputs.outcome || steps.apply.outputs.outcome }}
+      cooldown: ${{ steps.apply.outputs.cooldown }}
+      final_sha256: ${{ steps.apply.outputs.sha256 }}
+      areas: ${{ steps.apply.outputs.areas }}
+    steps:
+      # 種類が codeql のとき、警告の規則の ID とファイルのパスと category を書く。
+      # codeql_lang の手順と、claude-auto-fix-verify.sh confirm がこのファイルを読む
+      - name: Read CodeQL alert
+        id: alert
+        if: inputs.kind == 'codeql'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          KEY: ${{ inputs.key }}
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/code-scanning/alerts/$KEY" \
+            --jq '{rule_id: .rule.id, path: .most_recent_instance.location.path, category: .most_recent_instance.category}' \
+            >"$RUNNER_TEMP/codeql-alert.json"
+
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # make mutation-diff が main との差を git で読むので、履歴のすべてを取る
+      - name: Checkout target
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: target
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Download base patch
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: base-patch
+          path: ${{ runner.temp }}
+
+      - name: Download Claude patch
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: claude-patch
+          path: ${{ runner.temp }}
+
+      # 起点のコードを作る。claude-auto-fix-verify.sh は起点のコミットに Claude の変更を当てるので、
+      # base.patch が空でなければ、当てた結果をコミットにし、そのコミットを起点として出す
+      - name: Rebuild base
+        id: base
+        env:
+          REASON: ${{ inputs.reason }}
+          BASE_SHA: ${{ needs.prepare.outputs.base_sha }}
+          MAIN_SHA: ${{ needs.prepare.outputs.main_sha }}
+          BASE_SHA256: ${{ needs.prepare.outputs.base_sha256 }}
+        run: |
+          set -euo pipefail
+          p="$RUNNER_TEMP/claude-auto-fix-base.patch"
+          start="$MAIN_SHA"
+          [ "$REASON" != red-check ] || start="$BASE_SHA"
+          git -C target checkout -q --detach "$start"
+          [ "$(sha256sum <"$p" | cut -d' ' -f1)" = "$BASE_SHA256" ] || { echo "::error::base.patch の SHA-256 が prepare ジョブの出力と違います"; exit 1; }
+          if [ -s "$p" ]; then
+            git -C target apply --index "$p"
+            git -C target -c core.hooksPath=/dev/null -c user.name=claude-auto-fix -c user.email=claude-auto-fix@users.noreply.github.com \
+              commit -q --no-verify -m "claude-auto-fix: 作業の起点"
+          fi
+          echo "start=$(git -C target rev-parse HEAD)" >>"$GITHUB_OUTPUT"
+
+      # 派生のファイルの作り直しに要る道具を入れる。版は ci.yaml の frontend-test ジョブと同じにする
+      - name: Install verified Node.js
+        id: rebuild_tools_node
+        uses: ./.github/actions/verified-node
+        with:
+          node-version: '24.22.3'
+
+      - name: Set up pnpm
+        id: rebuild_tools_pnpm
+        uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+        with:
+          package_json_file: target/frontend/package.json
+
+      - name: Set up Go
+        id: rebuild_tools_go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: target/backend/go.mod
+          cache: false
+
+      - name: Test verify script
+        run: bash .github/scripts/tests/test-lib-claude-auto-fix.sh && bash .github/scripts/tests/test-claude-auto-fix-verify.sh
+
+      - name: Apply Claude patch
+        id: apply
+        env:
+          KIND: ${{ inputs.kind }}
+          KEY: ${{ inputs.key }}
+          DETAIL: ${{ inputs.detail }}
+          START: ${{ steps.base.outputs.start }}
+        run: bash .github/scripts/claude-auto-fix-verify.sh apply "$KIND" "$KEY" "$DETAIL" "$START" >>"$GITHUB_OUTPUT"
+
+      # 最後の差分は、Claude が変えたコードを動かす check の手順の前に上げる
+      - name: Upload final patch
+        id: upload_final
+        if: steps.apply.outputs.outcome == ''
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: final-patch
+          path: ${{ runner.temp }}/claude-auto-fix-final.patch
+          if-no-files-found: error
+          retention-days: 1
+
+      # 変わった領域の道具だけを入れる。Go は作り直したあとの go.mod の版で入れ直す。
+      # 版は ci.yaml の backend-go、backend-java、backend-compat の各ジョブと同じにする
+      - name: Set up Go for changed backend
+        id: area_tools_go
+        if: steps.apply.outputs.outcome == '' && (contains(steps.apply.outputs.areas, 'backend_go') || contains(steps.apply.outputs.areas, 'backend_compat'))
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: target/backend/go.mod
+          cache: false
+
+      - name: Install golangci-lint
+        id: area_tools_golangci
+        if: steps.apply.outputs.outcome == '' && contains(steps.apply.outputs.areas, 'backend_go')
+        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
+        with:
+          version: v2.15.0
+          install-only: true
+          skip-cache: true
+
+      - name: Set up JDK 21
+        id: area_tools_java
+        if: steps.apply.outputs.outcome == '' && contains(steps.apply.outputs.areas, 'backend_java')
+        uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Install poppler-utils
+        id: area_tools_poppler
+        if: steps.apply.outputs.outcome == '' && contains(steps.apply.outputs.areas, 'backend_compat')
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends poppler-utils
+
+      - name: Check changed areas
+        id: check
+        if: steps.apply.outputs.outcome == ''
+        env:
+          KIND: ${{ inputs.kind }}
+          KEY: ${{ inputs.key }}
+          DETAIL: ${{ inputs.detail }}
+          START: ${{ steps.base.outputs.start }}
+        run: bash .github/scripts/claude-auto-fix-verify.sh check "$KIND" "$KEY" "$DETAIL" "$START" >>"$GITHUB_OUTPUT"
+
+      # 種類が codeql のとき、codeql.yaml の analyze ジョブと同じ版で、target/ のコードを診断する。
+      # 言語は警告の category(/language:<言語>)から選び、ビルドのしかたは .github/codeql/languages.tsv から読む
+      - name: Select CodeQL language
+        id: codeql_lang
+        if: steps.check.outputs.outcome == 'ok' && inputs.kind == 'codeql'
+        run: |
+          set -euo pipefail
+          category=$(jq -r '.category // ""' "$RUNNER_TEMP/codeql-alert.json")
+          lang=${category#/language:}
+          if [ -z "$lang" ] || [ "$lang" = "$category" ]; then echo "::error::警告の category から言語を読めません"; exit 1; fi
+          row=$(awk -F'\t' -v l="$lang" '!/^#/ && $2 == l { print; exit }' .github/codeql/languages.tsv)
+          [ -n "$row" ] || { echo "::error::.github/codeql/languages.tsv に言語がありません"; exit 1; }
+          {
+            echo "language=$lang"
+            echo "build_mode=$(cut -f3 <<<"$row")"
+            echo "build_command=$(cut -f4 <<<"$row")"
+          } >>"$GITHUB_OUTPUT"
+
+      - name: Set up JDK 21 for CodeQL
+        id: codeql_java
+        if: steps.check.outputs.outcome == 'ok' && inputs.kind == 'codeql' && steps.codeql_lang.outputs.language == 'java-kotlin'
+        uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Initialize CodeQL
+        id: codeql_init
+        if: steps.check.outputs.outcome == 'ok' && inputs.kind == 'codeql'
+        uses: github/codeql-action/init@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+        with:
+          languages: ${{ steps.codeql_lang.outputs.language }}
+          build-mode: ${{ steps.codeql_lang.outputs.build_mode }}
+          source-root: target
+
+      # ビルドの命令は env で受け取り、run の中では変数として読む。出力は公開の記録に出さず、
+      # claude-auto-fix-verify.sh と同じ記録のファイルに書く
+      - name: Build for CodeQL
+        id: codeql_build
+        if: steps.check.outputs.outcome == 'ok' && inputs.kind == 'codeql' && steps.codeql_lang.outputs.build_mode == 'manual'
+        working-directory: target
+        env:
+          BUILD_COMMAND: ${{ steps.codeql_lang.outputs.build_command }}
+        run: bash -c "$BUILD_COMMAND" >>"$RUNNER_TEMP/claude-auto-fix-verify.log" 2>&1
+
+      - name: Perform CodeQL analysis
+        id: codeql_analyze
+        if: steps.check.outputs.outcome == 'ok' && inputs.kind == 'codeql'
+        uses: github/codeql-action/analyze@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+        with:
+          category: /language:${{ steps.codeql_lang.outputs.language }}
+          checkout_path: ${{ github.workspace }}/target
+          upload: never
+          upload-database: false
+          output: ${{ runner.temp }}/codeql-sarif
+
+      - name: Confirm target is gone
+        id: confirm
+        if: steps.check.outputs.outcome == 'ok'
+        env:
+          KIND: ${{ inputs.kind }}
+          KEY: ${{ inputs.key }}
+          DETAIL: ${{ inputs.detail }}
+          START: ${{ steps.base.outputs.start }}
+          CAF_REASON: ${{ inputs.reason }}
+          CODEQL_SARIF_DIR: ${{ runner.temp }}/codeql-sarif
+        run: bash .github/scripts/claude-auto-fix-verify.sh confirm "$KIND" "$KEY" "$DETAIL" "$START" >>"$GITHUB_OUTPUT"
+
+  # 種類が container のとき、最後の差分を当てたコードから prepare と同じ組み立て方でイメージを作り、
+  # 入力 key の脆弱性が消えたかを確かめる。秘密の値を持たない
+  verify-image:
+    needs: [prepare, verify]
+    if: inputs.kind == 'container' && needs.verify.outputs.outcome == 'ok'
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Checkout target
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: target
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Download base patch
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: base-patch
+          path: ${{ runner.temp }}
+
+      - name: Download final patch
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: final-patch
+          path: ${{ runner.temp }}
+
+      - name: Rebuild base
+        id: base
+        env:
+          REASON: ${{ inputs.reason }}
+          BASE_SHA: ${{ needs.prepare.outputs.base_sha }}
+          MAIN_SHA: ${{ needs.prepare.outputs.main_sha }}
+          BASE_SHA256: ${{ needs.prepare.outputs.base_sha256 }}
+        run: |
+          set -euo pipefail
+          p="$RUNNER_TEMP/claude-auto-fix-base.patch"
+          start="$MAIN_SHA"
+          [ "$REASON" != red-check ] || start="$BASE_SHA"
+          git -C target checkout -q --detach "$start"
+          [ "$(sha256sum <"$p" | cut -d' ' -f1)" = "$BASE_SHA256" ] || { echo "::error::base.patch の SHA-256 が prepare ジョブの出力と違います"; exit 1; }
+          if [ -s "$p" ]; then git -C target apply "$p"; fi
+
+      - name: Apply final patch
+        id: final
+        env:
+          FINAL_SHA256: ${{ needs.verify.outputs.final_sha256 }}
+        run: |
+          set -euo pipefail
+          p="$RUNNER_TEMP/claude-auto-fix-final.patch"
+          [ "$(sha256sum <"$p" | cut -d' ' -f1)" = "$FINAL_SHA256" ] || { echo "::error::final.patch の SHA-256 が verify ジョブの出力と違います"; exit 1; }
+          git -C target apply "$p"
+
+      - name: Install verified Trivy
+        uses: ./.github/actions/verified-trivy
+        with:
+          trivy-version: ${{ env.TRIVY_VERSION }}
+
+      - name: Test Trivy version check
+        run: bash .github/scripts/tests/test-check-trivy-version.sh
+
+      - name: Verify Trivy version
+        env:
+          EXPECTED_TRIVY_VERSION: ${{ env.TRIVY_VERSION }}
+        run: bash .github/scripts/check-trivy-version.sh "$EXPECTED_TRIVY_VERSION"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Build production images
+        run: |
+          set -euo pipefail
+          docker buildx build --platform linux/arm64 --file target/docker/backend/Dockerfile.prod --tag keirekipro-backend:claude-auto-fix --output "type=docker,dest=$RUNNER_TEMP/java.tar" target/backend
+          docker buildx build --platform linux/arm64 --file target/docker/backend-go/Dockerfile.prod --tag keirekipro-backend-go:claude-auto-fix --output "type=docker,dest=$RUNNER_TEMP/go.tar" target/backend
+
+      - name: Scan images
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/scan"
+          trivy image --input "$RUNNER_TEMP/java.tar" --format json --output "$RUNNER_TEMP/scan/trivy-java.json"
+          trivy image --input "$RUNNER_TEMP/go.tar" --format json --output "$RUNNER_TEMP/scan/trivy-go.json"
+
+      - name: Test scan judge
+        run: bash .github/scripts/tests/test-check-container-scan.sh
+
+      # check-container-scan.sh の report の形は、止める脆弱性があると1で、結果を読めないと2で終わる。
+      # 入力 key の脆弱性が2つのイメージのどちらかに残るか、結果を読めないときだけ失敗にする
+      - name: Check the vulnerability is gone
+        id: scan_check
+        env:
+          KEY: ${{ inputs.key }}
+        run: |
+          set -euo pipefail
+          for n in java go; do
+            rc=0
+            bash .github/scripts/check-container-scan.sh "$RUNNER_TEMP/scan/trivy-$n.json" arm64 .github/container-scan-suppressions.json report \
+              "$RUNNER_TEMP/scan/blocking-$n.json" "$RUNNER_TEMP/scan/detected-$n.json" || rc=$?
+            [ "$rc" -le 1 ] || { echo "::error::$n のイメージの結果を読めません"; exit 1; }
+            found=$(jq --arg k "$KEY" '[.[] | select(.id == $k)] | length' "$RUNNER_TEMP/scan/detected-$n.json")
+            [ "$found" = 0 ] || { echo "::error::$n のイメージに $KEY が残っています"; exit 1; }
+          done
+
+  # cooldown の4つのジョブ: Claude の変更が依存の版を宣言するファイルを変えたときだけ、PR の dependency-cooldown の
+  # 検査が見るものを一時のブランチに用意し、同じ判定を PR を作る前に行う。
+  # 一時のブランチに、起点のコードに final.patch を当てたコミットを bot の PAT で push する。
+  # push で動くワークフローは、どれも main への push だけで動くので、一時のブランチへの push で動くワークフローはない
+  cooldown-push:
+    needs: [prepare, verify, verify-image]
+    # ship と同じく、verify ジョブの結果も読み、確かめ終えていない変更を push しない
+    if: "!cancelled() && needs.verify.result == 'success' && needs.verify.outputs.outcome == 'ok' && needs.verify.outputs.cooldown == 'true' && (needs.verify-image.result == 'success' || needs.verify-image.result == 'skipped')"
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    outputs:
+      branch: ${{ steps.final.outputs.branch }}
+      sha: ${{ steps.final.outputs.sha }}
+    steps:
+      - name: Checkout target
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          path: target
+          fetch-depth: 0
+
+      - name: Download base patch
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: base-patch
+          path: ${{ runner.temp }}
+
+      - name: Download final patch
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: final-patch
+          path: ${{ runner.temp }}
+
+      - name: Rebuild base
+        id: base
+        env:
+          REASON: ${{ inputs.reason }}
+          BASE_SHA: ${{ needs.prepare.outputs.base_sha }}
+          MAIN_SHA: ${{ needs.prepare.outputs.main_sha }}
+          BASE_SHA256: ${{ needs.prepare.outputs.base_sha256 }}
+        run: |
+          set -euo pipefail
+          p="$RUNNER_TEMP/claude-auto-fix-base.patch"
+          start="$MAIN_SHA"
+          [ "$REASON" != red-check ] || start="$BASE_SHA"
+          git -C target checkout -q --detach "$start"
+          [ "$(sha256sum <"$p" | cut -d' ' -f1)" = "$BASE_SHA256" ] || { echo "::error::base.patch の SHA-256 が prepare ジョブの出力と違います"; exit 1; }
+          if [ -s "$p" ]; then git -C target apply --index "$p"; fi
+
+      # ブランチの名前は fix/claude-auto-fix-cooldown-<種類>-<key のスラグ> にする。前の実行が消し損ねた同じ名前の
+      # ブランチがあっても、この実行のコミットで置き換える。gh auth setup-git で、GH_TOKEN の bot の PAT を git に渡す
+      - name: Push temporary branch
+        id: final
+        env:
+          GH_TOKEN: ${{ secrets.BOT_GITHUB_TOKEN }}
+          FINAL_SHA256: ${{ needs.verify.outputs.final_sha256 }}
+          KIND: ${{ inputs.kind }}
+          KEY: ${{ inputs.key }}
+        run: |
+          set -euo pipefail
+          p="$RUNNER_TEMP/claude-auto-fix-final.patch"
+          [ "$(sha256sum <"$p" | cut -d' ' -f1)" = "$FINAL_SHA256" ] || { echo "::error::final.patch の SHA-256 が verify ジョブの出力と違います"; exit 1; }
+          git -C target apply --index "$p"
+          slug=$(printf '%s' "$KEY" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//' | cut -c1-80)
+          [ -n "$slug" ] || { echo "::error::key からブランチの名前を作れません"; exit 1; }
+          branch="fix/claude-auto-fix-cooldown-$KIND-$slug"
+          git -C target -c core.hooksPath=/dev/null -c user.name=claude-auto-fix -c user.email=claude-auto-fix@users.noreply.github.com \
+            commit -q --no-verify -m "claude-auto-fix: dependency-cooldown の判定"
+          gh auth setup-git
+          git -C target -c core.hooksPath=/dev/null push -q --force origin "HEAD:refs/heads/$branch"
+          echo "branch=$branch" >>"$GITHUB_OUTPUT"
+          echo "sha=$(git -C target rev-parse HEAD)" >>"$GITHUB_OUTPUT"
+
+  # 一時のブランチのコミットの Gradle の依存のスナップショットを作る。Claude が変えたビルドのスクリプトが動くので、
+  # 書き込みの権限を持たせない。スナップショットは、2つの環境変数で、一時のブランチのコミットとブランチに結び付ける
+  # (何も渡さないと main に結び付く。タスク 1.4 で、渡したコミットとブランチに結び付くことを確かめた)
+  cooldown-generate:
+    needs: [cooldown-push]
+    if: "!cancelled() && needs.cooldown-push.result == 'success'"
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    env:
+      GITHUB_DEPENDENCY_GRAPH_SHA: ${{ needs.cooldown-push.outputs.sha }}
+      GITHUB_DEPENDENCY_GRAPH_REF: refs/heads/${{ needs.cooldown-push.outputs.branch }}
+    steps:
+      - name: Checkout temporary branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.cooldown-push.outputs.sha }}
+          persist-credentials: false
+
+      - name: Setup Java
+        uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      # 組み立て方は dependency-review.yaml の generate ジョブと同じにする
+      - name: Generate dependency graph
+        uses: gradle/actions/dependency-submission@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+        env:
+          DEPENDENCY_GRAPH_RUNTIME_INCLUDE_CONFIGURATIONS: productionRuntimeClasspath
+        with:
+          build-root-directory: backend
+          dependency-graph: generate-and-upload
+          dependency-graph-report-dir: ${{ runner.temp }}/dependency-graph-reports
+          dependency-graph-exclude-configurations: 'detachedConfiguration[0-9]+'
+          # Claude が変えたビルドのスクリプトが main のキャッシュの範囲で動くので、キャッシュを読み書きしない
+          # (このジョブは1回きりなので、キャッシュが無くても困らない)
+          cache-disabled: true
+
+      - name: Test dependency snapshot check
+        run: bash .github/scripts/tests/test-check-dependency-snapshot.sh
+
+      # 空のスナップショットを送ると、判定が maven の追加を0件とみなす
+      - name: Check dependency snapshot
+        run: bash .github/scripts/check-dependency-snapshot.sh "${{ runner.temp }}/dependency-graph-reports"
+
+  # スナップショットを送るだけのジョブ。checkout せず、Claude が変えたコードを動かさない。
+  # 成果物は同じ実行の中から読むので、actions: read は要らない(gradle/actions の download-and-submit は、
+  # workflow_run のきっかけのときだけ GITHUB_TOKEN で成果物を探す。sources/src/dependency-graph.ts の downloadDependencyGraphs)
+  cooldown-submit:
+    needs: [cooldown-push, cooldown-generate]
+    if: "!cancelled() && needs.cooldown-generate.result == 'success'"
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    env:
+      GITHUB_DEPENDENCY_GRAPH_SHA: ${{ needs.cooldown-push.outputs.sha }}
+      GITHUB_DEPENDENCY_GRAPH_REF: refs/heads/${{ needs.cooldown-push.outputs.branch }}
+    steps:
+      - name: Submit dependency graph
+        uses: gradle/actions/dependency-submission@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+        with:
+          dependency-graph: download-and-submit
+
+  # dependency-review.yaml の dependency-cooldown ジョブと同じ3つの判定を、PR を作る前の形(COOLDOWN_MODE=predict)で行う。
+  # 3つの判定の手順は、PR の検査と同じく、前の手順の終わり方によらずすべて動かす。どの終わり方でも、最後に一時のブランチを消す
+  cooldown-judge:
+    needs: [prepare, cooldown-push, cooldown-submit]
+    if: "!cancelled() && needs.cooldown-push.result == 'success'"
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: write
+      vulnerability-alerts: read
+    outputs:
+      result: ${{ steps.judge.outputs.result }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # go と CI の道具の判定のスクリプトは、今のフォルダを head のコミットを checkout したフォルダとみなし、
+      # base のコミットのファイルも git で読むので、履歴ごと取り出す
+      - name: Checkout temporary branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: target
+          ref: ${{ needs.cooldown-push.outputs.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      # dependency-review.yaml の「Test dependency cooldown check」と同じテストと、cooldown_outcome のテスト
+      - name: Test dependency cooldown check
+        run: |
+          set -euo pipefail
+          for t in test-check-dependency-cooldown.sh test-cooldown-match-alerts.sh test-cooldown-check-malware.sh \
+            test-cooldown-check-signer.sh test-cooldown-check-pnpm-exclude.sh test-record-cooldown-exception.sh \
+            test-lib-notice-comment.sh test-lib-ci-tool-releases.sh test-check-ci-tool-release-age.sh test-lib-gomod-index.sh \
+            test-lib-go-release.sh test-check-go-release-age.sh test-lib-claude-auto-fix.sh; do
+            bash ".github/scripts/tests/$t"
+          done
+
+      # スナップショットを送れていないと、maven の差を判定できない。判定の手順は動かすが、このジョブを失敗にし、
+      # ship に進ませない
+      - name: Check snapshot submitted
+        id: submitted
+        env:
+          SUBMIT_RESULT: ${{ needs.cooldown-submit.result }}
+        run: |
+          [ "$SUBMIT_RESULT" = success ] || { echo "::error::Gradle の依存のスナップショットを送れていません($SUBMIT_RESULT)"; exit 1; }
+
+      # pnpm の除外の欄の判定が、verify ジョブが除外の欄に足した版を読むよう、PNPM_WORKSPACE_FILE を渡す
+      - name: Check dependency cooldown
+        id: judge_npm
+        if: "!cancelled()"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          COOLDOWN_MODE: predict
+          PNPM_WORKSPACE_FILE: target/frontend/pnpm-workspace.yaml
+          BASE: ${{ needs.prepare.outputs.main_sha }}
+          HEAD: ${{ needs.cooldown-push.outputs.sha }}
+        run: |
+          rc=0
+          bash .github/scripts/check-dependency-cooldown.sh "$BASE" "$HEAD" || rc=$?
+          echo "rc=$rc" >>"$GITHUB_OUTPUT"
+
+      - name: Check Go release age
+        id: judge_go
+        if: "!cancelled()"
+        working-directory: target
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BASE: ${{ needs.prepare.outputs.main_sha }}
+          HEAD: ${{ needs.cooldown-push.outputs.sha }}
+        run: |
+          rc=0
+          bash ../.github/scripts/check-go-release-age.sh "$BASE" "$HEAD" || rc=$?
+          echo "rc=$rc" >>"$GITHUB_OUTPUT"
+
+      - name: Check CI tool release age
+        id: judge_ci_tool
+        if: "!cancelled()"
+        working-directory: target
+        env:
+          GH_TOKEN: ${{ github.token }}
+          COOLDOWN_MODE: predict
+          CI_TOOL_CHANGED_FILE: ${{ runner.temp }}/ci-tool-changed.tsv
+          BASE: ${{ needs.prepare.outputs.main_sha }}
+          HEAD: ${{ needs.cooldown-push.outputs.sha }}
+        run: |
+          rc=0
+          bash ../.github/scripts/check-ci-tool-release-age.sh "$BASE" "$HEAD" || rc=$?
+          echo "rc=$rc" >>"$GITHUB_OUTPUT"
+
+      # dependency-review.yaml の「Verify CI tool signatures」と同じく、変わった CI の版を配布元の署名で確かめる。
+      # 道具は動かさず、置き場を足す GITHUB_PATH には使い捨ての空のファイルを渡す。失敗は judge の手順が読む
+      - name: Verify CI tool signatures
+        id: judge_ci_signature
+        if: "!cancelled() && steps.judge_ci_tool.outputs.rc == '0'"
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CHANGED: ${{ runner.temp }}/ci-tool-changed.tsv
+        run: |
+          set -euo pipefail
+          if [ ! -s "$CHANGED" ]; then
+            echo "変わった CI の版はありません。"
+            exit 0
+          fi
+          while IFS="$(printf '\t')" read -r tool version; do
+            [ -n "$tool" ] || continue
+            case "$tool" in node | trivy | codex | terraform) ;; *) echo "::error::知らない道具の名前です: $tool"; exit 1 ;; esac
+            echo "::group::${tool} ${version}"
+            GITHUB_PATH="$(mktemp)" bash ".github/scripts/install-verified-${tool}.sh" "$version"
+            echo "::endgroup::"
+          done <"$CHANGED"
+
+      # 署名を確かめられなかったときは、CI の道具の判定の終わり方を1(止める版がある)にする
+      - name: Decide
+        id: judge
+        if: "!cancelled()"
+        env:
+          NPM: ${{ steps.judge_npm.outputs.rc }}
+          GO: ${{ steps.judge_go.outputs.rc }}
+          CI: ${{ steps.judge_ci_tool.outputs.rc }}
+          SIG: ${{ steps.judge_ci_signature.outcome }}
+        run: |
+          set -euo pipefail
+          source .github/scripts/lib-claude-auto-fix.sh
+          ci="$CI"
+          [ "$SIG" != failure ] || ci=1
+          result=$(cooldown_outcome "$NPM" "$GO" "$ci")
+          echo "result=$result" >>"$GITHUB_OUTPUT"
+          [ "$result" != fail ] || { echo "::error::dependency-cooldown の判定ができませんでした(依存 $NPM、Go $GO、CI の道具 $ci)"; exit 1; }
+
+      - name: Delete temporary branch
+        id: delete_branch
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: ${{ needs.cooldown-push.outputs.branch }}
+        run: gh api -X DELETE "repos/$GITHUB_REPOSITORY/git/refs/heads/$BRANCH"
+
+  # 確かめた最後の差分をコミットして push し、PR を作る。秘密の値は bot のトークンだけを ship の手順に渡す
+  ship:
+    needs: [prepare, verify, verify-image, cooldown-judge]
+    # verify の check の手順が ok を出したあとに CodeQL か confirm の手順が失敗するか、verify ジョブが打ち切られると、
+    # verify の出力 outcome は ok のまま残る。!cancelled() で verify-image の暗黙の success() を外したので、
+    # verify ジョブの結果も読み、確かめ終えていない変更を PR にしない。
+    # cooldown の判定が要るときは、cooldown-judge が ship を出し、そのうえでジョブが通ったときだけ動く
+    # (判定のあとに一時のブランチを消せないか、スナップショットを送れていないと、出力 result が ship でもジョブは失敗する)
+    if: "!cancelled() && needs.verify.result == 'success' && needs.verify.outputs.outcome == 'ok' && (needs.verify-image.result == 'success' || needs.verify-image.result == 'skipped') && (needs.verify.outputs.cooldown != 'true' || needs.cooldown-judge.outputs.result == 'ship') && (needs.verify.outputs.cooldown != 'true' || needs.cooldown-judge.result == 'success')"
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    outputs:
+      outcome: ${{ steps.ship.outputs.outcome }}
+      pr_url: ${{ steps.ship.outputs.pr_url }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Checkout target
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: target
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Download base patch
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: base-patch
+          path: ${{ runner.temp }}
+
+      - name: Download final patch
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: final-patch
+          path: ${{ runner.temp }}
+
+      # claude-auto-fix-ship.sh の起点のコミットは、red-check では PR の head、そのほかでは main_sha に
+      # base.patch を当てたコミットである。red-check の base.patch は空なので、PR の head のままになる
+      - name: Rebuild base
+        id: base
+        env:
+          REASON: ${{ inputs.reason }}
+          BASE_SHA: ${{ needs.prepare.outputs.base_sha }}
+          MAIN_SHA: ${{ needs.prepare.outputs.main_sha }}
+          BASE_SHA256: ${{ needs.prepare.outputs.base_sha256 }}
+        run: |
+          set -euo pipefail
+          p="$RUNNER_TEMP/claude-auto-fix-base.patch"
+          start="$MAIN_SHA"
+          [ "$REASON" != red-check ] || start="$BASE_SHA"
+          git -C target checkout -q --detach "$start"
+          [ "$(sha256sum <"$p" | cut -d' ' -f1)" = "$BASE_SHA256" ] || { echo "::error::base.patch の SHA-256 が prepare ジョブの出力と違います"; exit 1; }
+          if [ -s "$p" ]; then
+            git -C target apply --index "$p"
+            git -C target -c core.hooksPath=/dev/null -c user.name=claude-auto-fix -c user.email=claude-auto-fix@users.noreply.github.com \
+              commit -q --no-verify -m "claude-auto-fix: 作業の起点"
+          fi
+          echo "start=$(git -C target rev-parse HEAD)" >>"$GITHUB_OUTPUT"
+
+      - name: Test ship script
+        run: bash .github/scripts/tests/test-lib-claude-auto-fix.sh && bash .github/scripts/tests/test-claude-auto-fix-guard.sh && bash .github/scripts/tests/test-claude-auto-fix-ship.sh
+
+      - name: Ship
+        id: ship
+        env:
+          GH_TOKEN: ${{ secrets.BOT_GITHUB_TOKEN }}
+          CAF_MAIN_SHA: ${{ needs.prepare.outputs.main_sha }}
+          KIND: ${{ inputs.kind }}
+          KEY: ${{ inputs.key }}
+          REASON: ${{ inputs.reason }}
+          PR: ${{ inputs.pr }}
+          CHECKS: ${{ inputs.kind == 'dependabot' && needs.prepare.outputs.checks || inputs.checks }}
+          DETAIL: ${{ inputs.detail }}
+          FINAL_SHA256: ${{ needs.verify.outputs.final_sha256 }}
+          START: ${{ steps.base.outputs.start }}
+        run: |
+          bash .github/scripts/claude-auto-fix-ship.sh "$KIND" "$KEY" "$REASON" "$PR" "$CHECKS" "$DETAIL" \
+            "$RUNNER_TEMP/claude-auto-fix-final.patch" "$FINAL_SHA256" "$START" >>"$GITHUB_OUTPUT"
+
+  # 結果のファイルを書いて上げ、所有者に Issue で知らせる。前のジョブがどう終わっても動く
+  report:
+    needs: [prepare, edit, verify, verify-image, cooldown-push, cooldown-generate, cooldown-submit, cooldown-judge, ship]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: read
+      actions: read
+    env:
+      KIND: ${{ inputs.kind }}
+      KEY: ${{ inputs.key }}
+      REASON: ${{ inputs.reason }}
+      PR: ${{ inputs.pr }}
+      CHECKS: ${{ inputs.kind == 'dependabot' && needs.prepare.outputs.checks || inputs.checks }}
+      DETAIL: ${{ inputs.detail }}
+      CAUSE: ${{ needs.prepare.outputs.cause || needs.edit.outputs.reason }}
+      PR_URL: ${{ needs.ship.outputs.pr_url }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Test report script
+        run: bash .github/scripts/tests/test-lib-claude-auto-fix.sh && bash .github/scripts/tests/test-claude-auto-fix-report.sh
+
+      # 結果は、最も後ろで結果を出したジョブの outcome にする。edit と verify の ok は途中の結果なので使わない。
+      # cooldown-judge は、ジョブが通り、判定が blocked のときだけ結果を出す(ship と fail と、ジョブの失敗は、
+      # ship のジョブと JOB_RESULTS に任せる)。
+      # どのジョブも結果を出していなければ空にし、record が JOB_RESULTS から決める
+      - name: Record outcome
+        id: record
+        env:
+          JOB_RESULTS: '{"prepare":"${{ needs.prepare.result }}","edit":"${{ needs.edit.result }}","verify":"${{ needs.verify.result }}","verify-image":"${{ needs.verify-image.result }}","cooldown-push":"${{ needs.cooldown-push.result }}","cooldown-generate":"${{ needs.cooldown-generate.result }}","cooldown-submit":"${{ needs.cooldown-submit.result }}","cooldown-judge":"${{ needs.cooldown-judge.result }}","ship":"${{ needs.ship.result }}"}'
+          OUTCOME: ${{ needs.ship.outputs.outcome || (needs.cooldown-judge.result == 'success' && needs.cooldown-judge.outputs.result == 'blocked' && 'blocked') || (needs.verify.outputs.outcome != 'ok' && needs.verify.outputs.outcome) || (needs.edit.outputs.outcome != 'ok' && needs.edit.outputs.outcome) || needs.prepare.outputs.outcome }}
+          CAF_HEAD_SHA: ${{ needs.prepare.outputs.base_sha }}
+        run: |
+          bash .github/scripts/claude-auto-fix-report.sh record "$OUTCOME" "$KIND" "$KEY" "$REASON" "$PR" "$CHECKS" "$DETAIL" \
+            "$CAUSE" "$PR_URL" >>"$GITHUB_OUTPUT"
+
+      # Issue の API が失敗しても、dispatch の動かし直しと3日の数え方が結果を読めるよう、先に上げる
+      - name: Upload outcome
+        id: upload_outcome
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: outcome
+          path: ${{ runner.temp }}/outcome
+          if-no-files-found: error
+
+      - name: Notify owner
+        id: notify
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EDIT_OUTCOME: ${{ needs.edit.outputs.outcome }}
+          RESULT: ${{ steps.record.outputs.result }}
+        run: |
+          bash .github/scripts/claude-auto-fix-report.sh notify "$RESULT" "$KIND" "$KEY" "$REASON" "$PR" "$CHECKS" "$DETAIL" \
+            "$CAUSE" "$PR_URL"
+
+  # この実行の成果物のうち、結果のファイル outcome のほかを消す
+  cleanup:
+    needs: [report]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      actions: write
+    steps:
+      - name: Delete artifacts
+        id: cleanup
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts" --paginate --jq '.artifacts[] | select(.name != "outcome") | .id' |
+            while read -r id; do gh api -X DELETE "repos/$GITHUB_REPOSITORY/actions/artifacts/$id"; done
