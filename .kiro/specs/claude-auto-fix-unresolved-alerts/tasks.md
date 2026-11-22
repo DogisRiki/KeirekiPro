@@ -450,7 +450,7 @@
   - _対象の部品: claude-auto-fix-run-branch.sh_
   - _依存: 9.1_
 
-- [ ] 9.3 振り分けのスクリプトと後始末のスクリプトが、対象ごとの実行を専用のブランチで起動するようにする (並行可)
+- [x] 9.3 振り分けのスクリプトと後始末のスクリプトが、対象ごとの実行を専用のブランチで起動するようにする (並行可)
 
   Claude は、置き場所の `claude-auto-fix-dispatch.sh` と `claude-auto-fix-sweep.sh` の `gh workflow run claude-auto-fix-target.yaml` の `--ref main` を、`--ref "$CAF_RUN_BRANCH"` に直す。Claude は、2つのスクリプトの説明の行のうち、対象ごとの実行を `--ref main` で起動すると書いた行も、専用のブランチで起動すると直す。振り分けのスクリプトでは、60行目あたりの説明の行がその1つである。Claude は、2つのスクリプトのテストのうち、起動のときの `--ref` が `main` であることを求める2つの箇所を、`claude-auto-fix/run` を求める形に直す。1つ目は、`test-claude-auto-fix-dispatch.sh` の場合「対象ごとのワークフローを main で起動する」である。Claude は、この場合の名前を「実行が --ref claude-auto-fix/run で起動される」に変える。2つ目は、`test-claude-auto-fix-sweep.sh` の偽の `gh` が、`--ref` が `main` でないときに0以外で終わる箇所である。Claude は、この偽の `gh` を使う場合として「赤の検査で起動する実行が --ref claude-auto-fix/run で起動される」を足す。振り分けのテストの偽の `gh workflow run` が待っている実行に付ける実行のブランチは、タスク 9.1 で直すので、Claude はこのタスクで変えない。
   - 完了の確かめ方: 次の3つが起きる
