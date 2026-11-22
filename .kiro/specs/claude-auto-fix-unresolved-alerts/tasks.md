@@ -544,7 +544,7 @@
   - _対象の部品: claude-auto-fix-target.yaml_
   - _依存: 9.4_
 
-- [ ] 9.6 振り分けのワークフローに run-branch ジョブを足し、dispatch ジョブと sweep ジョブをそのあとに動かす (並行可)
+- [x] 9.6 振り分けのワークフローに run-branch ジョブを足し、dispatch ジョブと sweep ジョブをそのあとに動かす (並行可)
 
   Claude は、置き場所の `claude-auto-fix.yaml` に、設計の「claude-auto-fix.yaml」の部品の節のとおりに run-branch ジョブを足し、dispatch ジョブと sweep ジョブに `needs: [run-branch]` を足す。Claude は、run-branch ジョブに `if` を付けない。run-branch ジョブは、どのきっかけでも動く。dispatch ジョブと sweep ジョブは、それぞれの `if` のとおりに、run-branch ジョブが通ったあとに動く。run-branch ジョブは、main のコミットを `persist-credentials: false` で checkout し、秘密の値の無い手順で `test-claude-auto-fix-run-branch.sh` と `test-lib-claude-auto-fix.sh` を流してから、`secrets.BOT_GITHUB_TOKEN` を `GH_TOKEN` で渡した手順で `claude-auto-fix-run-branch.sh` を呼ぶ。
   - 完了の確かめ方: 次の2つが起きる
