@@ -83,7 +83,7 @@
 - design.md「Java 版は、PDF の設定が無ければ既定の設定を使い、設定の値を直せないときは 400 の業務の誤りにする」: ExportResumeUseCase.java 95-112行
 - design.md「出力の前提の文言は8つで、名前、日付、氏名、姓、名、職歴、プロジェクト、自己PR の順に確かめる」: ResumeExportRuleCheckService.java 25-58行
 - design.md「本文の欄の注釈と文言。errors の鍵は Java の欄の名前と、isPdfSettingsRequired と isSpecifiedOnce の名前で決まる」: ExportResumeRequest.java 32-47行、80-92行、101-121行、130-142行、163-181行
-- design.md「Rは255以下で入力してください は句点が無い」: ExportResumeRequest.java 167行
+- 赤と緑と青の欄の上限の文言「Rは255以下で入力してください。」は、ほかの文言と同じく句点で終わる: ExportResumeRequest.java 167行
 - design.md「ファイル名は、空白だけなら resume にし、前後の空白を除き、\ / : * ? " < > | を _ に、制御の字を消し、_ だけなら resume にし、255 字で切る」: FileUtil.java 81-90行
 - design.md「既定の設定と、フォントの名前の直し方と、文字の大きさの丸め方と、色の直し方」: ResumePdfExportSettings.java 24-94行
 - design.md「Java 版の出力のモデルとひな形を組み立てるクラス」: backend/src/main/java/com/example/keirekipro/infrastructure/export/resume/ResumeExportModelBuilder.java、ThymeleafResumeMarkdownExporter.java、ThymeleafResumePdfExporter.java
@@ -248,7 +248,7 @@
 | rgb の r | 12.7、255.9、-0.5、-0.9、12.0 | PDF(小数を 0 の向きに切り捨てる) |
 | rgb の r | `" 12"`、`"+12"`、`"012"` | PDF |
 | rgb の r | `""` | 「Rは入力必須です。」 |
-| rgb の r | 256、2147483647、300.5 | 「Rは255以下で入力してください」 |
+| rgb の r | 256、2147483647、300.5 | 「Rは255以下で入力してください。」 |
 | rgb の r | -1、-2147483648 | 「Rは0以上で入力してください。」 |
 | rgb の r | 1e10、2147483648、`"0x0c"`、`"1e2"`、`[12]`、`{}` | {} |
 | rgb | `{"red":12}`(鍵が r でない) | 「Rは入力必須です。」 |
@@ -270,7 +270,55 @@
 | 断る本文の errors | 3つの欄が同時に誤り | 鍵ごとのオブジェクト。鍵は `pdfSettings.tableHeaderColor.specifiedOnce`、`pdfSettings.fontSizes.title`、`pdfSettings.fontFamily` |
 | 断る本文の errors | rgb の r が範囲の外 | 鍵は `pdfSettings.tableHeaderColor.rgb.red`(Java の欄の名前) |
 
-数の欄に真偽の値を入れた本文と、文字列の欄に指数の付いた数を入れた本文の答えは、記録を残していない。設計では、この2つを比べる検査の筋書きで確かめる。
+数の欄に真偽の値を入れた本文と、文字列の欄に指数の付いた数を入れた本文の答えは、試作では記録を残していなかった。実装で確かめた答えは、次の節に書く。
+
+## 実装で確かめた Java 版の動き
+
+実装の小タスク1.2 で、Java 版の答えを正解のファイル(`backend/internal/resume/testdata/export/` の `body.json` と `filenames.json`)に控えた。
+小タスク6.1 から6.3 では、Java 版と Go 版を比べる検査で、Java 版の答えを確かめた。ここには、その2つで確かめた Java 版の動きを書く。
+
+### 数の欄に真偽を入れた本文と、文字列の欄に指数の付いた数を入れた本文
+
+経歴書に、Accept を `application/pdf, application/json` にした POST で、1つの欄だけを変えた本文を送った答えである。「{}」は、上の節と同じく、400 と「入力エラーがあります。」と空の errors を指す。
+
+| 欄 | 送った値 | Java 版の答え |
+|---|---|---|
+| title、date | true | {} |
+| rgb の r | true | {} |
+| hex | true | 400、`pdfSettings.tableHeaderColor.hex` に「カラーコードが不正です。」 |
+| hex | 数の 1e5 | 400、`pdfSettings.tableHeaderColor.hex` に「カラーコードが不正です。」 |
+| fontFamily | true | 400、`pdfSettings.fontFamily` に「フォント種類が不正です。」 |
+| format | true | 400、`format` に「エクスポート形式が不正です。」 |
+| disposition | true | 400、`disposition` に「出力方法が不正です。」 |
+| rgb の r | 数の 1.2e1、1E1 | PDF |
+| rgb の r | 文字列の `"1e2"` | {} |
+
+- Java 版は、数の欄の真偽を読めない本文として断る。文字列の欄の真偽と数は、書かれたとおりの字(`true`、`1e5`)の文字列として読み、そのあとの検査で断る
+- Java 版は、赤と緑と青の欄の、指数の付いた数を double として読み、0 の向きに切り捨てる。指数の付いた文字列は読めない本文として断る。design.md の出力の本文の読み手の節は、指数の付いた書き方をすべて読めない値としているが、Go 版は、Java 版の答えのとおりに読む
+
+### 本文の読み手が、design.md に書かれていない形で読むもの
+
+JDK 21 の上で Jackson 3.1.7 を動かして確かめた。Go 版の本文の読み手は、次の3つも Java 版と同じに読む。
+
+- Java 版は、本文のどこかにある数の数字が1000桁を超えると、本文を読まない。数の欄の文字列は、前後の空白を除いた長さが1000を超えると、読まない
+- Java 版は、数の欄の文字列の `"null"` と、空白だけの文字列を、値が無いとして読む
+- Java 版は、赤と緑と青の欄の文字列を `Integer.parseInt` と同じく読むので、基本多言語面の Unicode の10進数の数字(アラビア文字の数字や全角の数字)も数字として読む。文字の大きさの欄の文字列は、全角の数字を読まない
+
+### ファイル名と Content-Disposition
+
+- 経歴書の名前が空か空白だけのとき、Java 版は、ファイル名を作る前に、出力の前提の検査で 400 と「職務経歴書をエクスポートできません。」「職務経歴書名を入力してください。」で断る
+- Java 版は、名前を UTF-16 で255の長さで切る。切った所で絵文字が半分に割れると、残った前の半分を、`filename="…"` では `_` 1つに、`filename*=` では `?`(`%3F`)に書く
+- Spring は、`filename="…"` を作るときに、字を正準分解して ASCII の字だけを残す。Java 版を動かす JDK 21 は Unicode 15.0 の表を使うので、Unicode 15.0 で割り当てられていない字(例: Unicode 16.0 で足した U+0897)を `_` にする。Go の標準の表はそれより新しい版なので、Go 版は Unicode 15.0 の表で同じに分ける
+
+### PDF の職歴の表の期間の列
+
+- Java 版と Go 版の2つのひな形は、どちらも `* { box-sizing: border-box }` を持つ。Java 版の PDF の部品は、表のマスの幅に box-sizing を使わないので、職歴の表の期間の列を、185px に右の余白 8px を足した 193px にする。Chromium は box-sizing を使うので、185px にする
+- 期間の列の幅が違うと、すべての経歴書の PDF で、会社名の列の左の端が、Java 版で 175.91pt、Go 版で 170.25pt と違った。Go 版のひな形の `.career-list .career-period` に `box-sizing: content-box` を足すと、同じ位置になった
+
+### 断る要求と、500 で答える要求
+
+- 出力の前提を満たさない経歴書、無い経歴書、ほかの利用者の経歴書、退会してすでに居ない利用者の要求に、Java 版は 400 か 404 で答えた。退会してすでに居ない利用者の出力の要求にも、Java 版は 404 と「対象の職務経歴書データが存在しません。」で答える
+- 小タスク6.1 から6.3 の筋書きでは、Java 版が 500 で答える出力の要求は見つからなかった
 
 ## 設計の決めごと
 
