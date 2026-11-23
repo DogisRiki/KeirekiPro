@@ -188,7 +188,7 @@
   - _要件: 1.1, 1.3_
 
 - [ ] 6. 出力の操作の筋書きで Java 版と Go 版を比べる
-- [ ] 6.1 画面が送る4種類の要求の筋書きを書く
+- [x] 6.1 画面が送る4種類の要求の筋書きを書く
 
   Claude は、出力の操作の筋書きの節のとおりに、`backend/compat/scenarios/export/formats.yaml` を `group: 4` で書き、要求の本文 `backend/compat/fixtures/export/inline-default.json` を置く。Claude は、設定を付けた出力の段に `csrf: true` を付け、Accept の行を `headers` の欄に書く。
   - 完了の確かめ方: `go test -tags compat -count=1 -run 'TestCompare_Scenarios/<formats.yaml の筋書きの名前>' ./compat/` が通る
@@ -276,6 +276,7 @@
 - design.md の出力の本文の読み手の節は、赤と緑と青の欄の「指数の付いた書き方」を読めない値とするが、小タスク1.2 で控えた `body.json` では、Java 版は数の `1.2e1` と `1E1` を読み、文字列の `"1e2"` だけを読めない値とした。本文の読み手は、正解のファイルのとおり、指数の付いた数を double に読んでから切り捨て、指数の付いた文字列を読めない値とする。design の文と字のとおりではないので、Claude は、この食い違いと理由を PR の本文に書く
 - 本文の読み手は、JDK 21 で Jackson 3.1.7 を動かして確かめた、design.md に書かれていない3つの読み方も Java 版に合わせる。1つ目は、本文のどこにある数でも数字が1000を超えれば本文を読まないことと、数の欄の文字列の前後の空白を除いた長さが1000を超えれば読まないこと。2つ目は、数の欄の文字列の `"null"` と空白だけの文字列を、値が無いとすること。3つ目は、赤と緑と青の欄の文字列が、Java の `Integer.parseInt` と同じく、基本多言語面の Unicode の10進数の数字(アラビア文字の数字、全角の数字など)を読むこと。Claude は、この3つも PR の本文に書く
 - Thymeleaf の TEXT のひな形は、本文が改行で始まり改行で終わる繰り返しで、2回目からの繰り返しの先頭の改行を出さない。Go の Markdown のひな形は、その改行を1回目だけ出す。Claude は、ひな形の空白と改行の正しさを、Java 版のひな形を Thymeleaf 3.1.5 で動かして確かめる。開発環境の Java 版のコンテナの gradle の置き場には OGNL が無いので、Claude は、thymeleaf-spring6 と Spring 6.2.19 の部品を読み込み、`SpringTemplateEngine` で動かす
+- 小タスク6.1 の比べる検査で、すべての経歴書の PDF の職歴の表の会社名の列の左の端が、Java 版で 175.91pt、Go 版で 170.25pt と違った。2つのひな形は `* { box-sizing: border-box }` を持つが、Java 版の PDF の部品は表のマスの幅に box-sizing を使わず、期間の列を 185px に右の余白 8px を足した 193px にする。Chromium は box-sizing を使い、185px にする。Claude は、比べる部品の許す幅を広げずに、Go 版のひな形の `.career-list .career-period` に `box-sizing: content-box` を足し、同じ位置にした。design.md の、Chromium で Java 版と同じ見た目にするために足す CSS の一覧に無い CSS なので、Claude は、この食い違いと理由を PR の本文に書く
 
 ## 完了条件(全タスク共通)
 

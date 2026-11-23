@@ -131,6 +131,9 @@
         .career-list .career-period {
             width: 185px;
             white-space: nowrap;
+            /* Java 版の PDF の部品は表のマスの幅に box-sizing を使わず、185px に右の余白 8px を足した 193px を列の幅にする。
+               Chromium で同じ列の幅にするため、このマスだけ幅に余白を含めない */
+            box-sizing: content-box;
         }
 
         .company-section {

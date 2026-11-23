@@ -147,7 +147,7 @@ func cssRuleBody(t *testing.T, html, selector string) string {
 }
 
 // TestRenderPDFHTML_SettingsAndCSS は、利用者が選んだフォントと4つの文字の大きさと表の見出しの色が HTML の CSS に入ることと、
-// Chromium で Java 版と同じ見た目にするための6つの CSS が HTML に入ることを確かめる。
+// Chromium で Java 版と同じ見た目にするための7つの CSS が HTML に入ることを確かめる。
 func TestRenderPDFHTML_SettingsAndCSS(t *testing.T) {
 	s := pdfSettings{
 		FontFamily: "Noto Serif JP", TitleFontSize: 17.5, DateFontSize: 9, FullNameFontSize: 12.5,
@@ -223,6 +223,8 @@ func TestRenderPDFHTML_SettingsAndCSS(t *testing.T) {
 			{".sns-item", "padding-top: 5.9pt;"},
 			// 英字の合字を作らない。
 			{"body", "font-variant-ligatures: none;"},
+			// 職歴の表の期間の列の幅を、Java 版と同じく、185px に右の余白を足した幅にする。
+			{".career-list .career-period", "box-sizing: content-box;"},
 		} {
 			if body := cssRuleBody(t, html, c.selector); !strings.Contains(body, c.decl) {
 				t.Errorf("%s の規則に %q が無い: %q", c.selector, c.decl, body)
