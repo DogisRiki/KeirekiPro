@@ -124,7 +124,7 @@
   - _要件: 1.1, 1.2, 3.1_
   - _依存: 1.2, 1.4, 3.1_
 
-- [ ] 4. 出力のモデルとひな形と Service の出力を作る
+- [x] 4. 出力のモデルとひな形と Service の出力を作る
 - [x] 4.1 出力のモデルと Markdown のひな形を作る
 
   Claude は、出力のモデルとひな形の節のとおりに、`backend/internal/resume/exportmodel.go` に出力のモデルを作り、`templates/resume.md.tmpl` に Markdown のひな形を写し、`exporttemplate.go` に `renderMarkdown` を作る。写す元は、Java 版の `ResumeExportModelBuilder` と `templates/resume/markdown/default.md` である。`exporttemplate.go` は、ひな形を `embed` で読み込み、起動のときに `template.Must` で1度だけ読み込む。
@@ -146,7 +146,7 @@
   - 受入基準とテストの対応: 要件3の受入基準4(本文を断る条件で先に確かめ、断る本文には経歴書によらず本文の誤りで答える)は、`export_test.go` の `TestExport_RejectBodyFirst` で確かめる。このテストは、断る本文の要求に、経歴書の ID が読めないときも、本文の誤りで答え、足りない項目の一覧を入れないことを確かめる。Claude は、無い経歴書と、ほかの利用者の経歴書と、出力の前提を満たさない経歴書で同じことを、小タスク4.4 の結合テストで確かめる。要件1の受入基準1のうち、`Export` が PDF と Markdown の Content-Type とファイル名と出し方を持つことは、`TestExport_ResultFields` で確かめる。`PDF` が nil のときに PDF を求めると誤りになることは、`TestExport_NilPDFRenderer` で確かめる。Claude は、`PDFRenderer` の偽の部品を `export_test.go` に1つだけ作る。小タスク4.4 の結合テストも、この偽の部品を使う。2つのテストのファイルは同じパッケージなので、2つ作ると組み立てられないためである
   - _要件: 1.1, 3.4_
 
-- [ ] 4.4 出力の2つのメソッドの結合テストを書く
+- [x] 4.4 出力の2つのメソッドの結合テストを書く
 
   Claude は、テストの方針の節の結合テストのとおりに、`backend/internal/resume/export_integration_test.go` を書く。このテストは、`backend/compat/fixtures` の `users/basic.sql` と、経歴書のファイルと、`export/export.sql` をデータベースに入れ、`Deps` の `PDF` に小タスク4.3 の偽の部品を渡して動く。
   - 完了の確かめ方: `go test ./internal/resume/ -run TestExportIntegration` が通る。4つ目の大きなまとまりの最後のタスクなので、大きなまとまりの最後のタスクで verify のスキルを流すと決めた完了条件の2つ目のとおり、`/verify-backend` も通る
