@@ -105,7 +105,7 @@
   - _対象の部品: ファイル名_
   - _依存: 1.2_
 
-- [ ] 3.4 Content-Disposition のヘッダを Spring と同じ規則で作る (並行可)
+- [x] 3.4 Content-Disposition のヘッダを Spring と同じ規則で作る (並行可)
 
   Claude は、出力の受け口の節のとおりに、`backend/internal/httpapi/exportdisposition.go` に `formatContentDisposition` を作る。Claude は、ASCII への写し方の字の表を、Spring 7.0.10 の `ContentDisposition` のソースを開いて写す。
   - 完了の確かめ方: `go test ./internal/httpapi/ -run TestFormatContentDisposition` が通る
@@ -272,7 +272,7 @@
 - `filenames.json` の、UTF-16 で255を超える名前のファイル名の末尾の `?` は、Java 版が UTF-16 の255で切って半分に割れた絵文字を、ヘッダを作るときに UTF-8 で `?` に替えたものである。`fileName` は、Content-Disposition の `filename*=` を読んだ値で、拡張子を含む
 - PDF を比べる部品は、design.md の「減った行の高さ」を、それぞれの版のまとまりが1つの頁にあるときは、Java 版のまとまりの上の端から下の端までの高さから Go 版の同じ高さを引いた値として読む。行が1行減ると、下の行は行の箱の高さではなく行の間の隙間を含む行の送りの幅だけ上がるためである。まとまりが頁をまたぐときは、減った Java 版の行の箱の高さの合計を使う。design の文と字のとおりではないので、Claude は、この食い違いと理由を PR の本文に書く
 - PDF を比べる部品は、design.md のとおり、余分な上へのずれを、Java 版でまとまりと同じ頁にある、まとまりより下の行にだけ許す。前の頁の折り返しで Go 版の行が減って改頁の位置が変わると、あとの頁に残った行が1行の送りの幅だけ上がり、「行の位置」の違いになる。要件5の受入基準5の3つ目の箇条と要件2の受入基準4の4つ目の動きに届かない design の穴である。Claude は、小タスク6.1 と6.2 の比べる検査でこの違いが出たら、許す幅を広げずに止まり、所有者に報告する
-- `sanitizeFileName` は、UTF-16 の255で切って半分に割れた絵文字の前の半分を、Java 版の文字列と同じくサロゲートのまま、UTF-8 と同じ規則の3バイト(0xED 0xA0〜0xAF 0x80〜0xBF)で返す。Go では正しくない UTF-8 である。Claude は、小タスク3.4 の `formatContentDisposition` で、この3バイトを、`filename="…"` では Spring と同じく UTF-16 の1単位ぶんの `_` 1つに、`filename*=` では Java の UTF-8 への書き方と同じく `?`(`%3F`)に書く。ファイル名をほかの場所に書くときも、この3バイトを考える
+- `sanitizeFileName` は、UTF-16 の255で切って半分に割れた絵文字の前の半分を、Java 版の文字列と同じくサロゲートのまま、UTF-8 と同じ規則の3バイト(0xED 0xA0〜0xAF 0x80〜0xBF)で返す。Go では正しくない UTF-8 である。Claude は、小タスク3.4 の `formatContentDisposition` で、この3バイトを、`filename="…"` では Spring と同じく `_` 1つに、`filename*=` では Java の UTF-8 への書き方と同じく `?`(`%3F`)に書く。ファイル名をほかの場所に書くときも、この3バイトを考える
 
 ## 完了条件(全タスク共通)
 
