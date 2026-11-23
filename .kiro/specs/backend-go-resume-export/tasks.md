@@ -36,7 +36,7 @@
   - _要件: 1.2, 2.4_
 
 - [ ] 2. 確認に使う道具を広げる
-- [ ] 2.1 筋書きの要求と期待の欄を足す (並行可)
+- [x] 2.1 筋書きの要求と期待の欄を足す (並行可)
 
   Claude は、Java 版と Go 版を比べる検査の広げ方の節のとおりに、`backend/compat/harness` の筋書きの形を広げる。Claude は、要求の `json_file` を `scenario.go` と `capture.go` に、期待の `body_contains` を `scenario.go` と `steps.go` に足す。Claude は、期待の `content_type` を、版に送る段でも書けるように、`validateVersionBody` の断る条件から外し、`checkStepExpect` で確かめる。`scenario_test.go` の `TestScenarioValidate_UserFields` の場合「版に送る段の expect の content_type」は、今の断る条件で筋書きが断られることを期待するので、この変更のあとに失敗する。そのため、Claude は、この場合を `TestScenarioValidate_UserFields` から外し、版に送る段の `content_type` を書いた筋書きが断られずに読めることを確かめる場合として、`TestExpectContentType_VersionStep` に移す。Claude は、移した場合のアサーションを消さず、期待だけを替える。
   - 完了の確かめ方: `go test -tags compat ./compat/harness/ -run 'TestLoadScenarios|TestCapture|TestExpect|TestScenarioValidate'` が通る

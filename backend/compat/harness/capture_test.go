@@ -292,3 +292,44 @@ func TestSubstitute_BodyHeaderAndCookie(t *testing.T) {
 		t.Errorf("取り出した値 = %v", s.vars)
 	}
 }
+
+func TestCapture_JSONFileSentAsIs(t *testing.T) {
+	var (
+		mu          sync.Mutex
+		gotBody     []byte
+		contentType string
+	)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		b, _ := io.ReadAll(r.Body)
+		mu.Lock()
+		gotBody, contentType = b, r.Header.Get("Content-Type")
+		mu.Unlock()
+		_, _ = w.Write([]byte(`{}`))
+	}))
+	t.Cleanup(srv.Close)
+
+	want, err := readFixture("resumes/fonts-NotoSansJP.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	step := Step{Name: "export", Request: Request{Method: http.MethodPost, Path: "/api/resumes/x/export", JSONFile: "resumes/fonts-NotoSansJP.json"}}
+	if _, err := NewSession().Send(t.Context(), srv.Client(), srv.URL, step); err != nil {
+		t.Fatalf("Send: %v", err)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	// ファイルのバイトを、空白と改行と項目の順を含めて、そのまま本文にする
+	if string(gotBody) != string(want) {
+		t.Errorf("本文 = %q, want %q", gotBody, want)
+	}
+	if contentType != "application/json" {
+		t.Errorf("Content-Type = %q, want application/json", contentType)
+	}
+
+	// 送る時点でファイルを読めないときは、段の誤りにする
+	missing := Step{Name: "gone", Request: Request{Method: http.MethodPost, Path: "/x", JSONFile: "export/none.json"}}
+	if _, err := NewSession().Send(t.Context(), srv.Client(), srv.URL, missing); err == nil ||
+		!strings.Contains(err.Error(), `段 gone の json_file "export/none.json" を読めません`) {
+		t.Errorf("無いファイルの段の誤り = %v", err)
+	}
+}
