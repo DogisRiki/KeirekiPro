@@ -59,7 +59,7 @@ func truncateUTF16(s string, max int) string {
 		if units+n > max {
 			if units < max {
 				hi := 0xD800 + (r-0x10000)>>10
-				return s[:i] + string([]byte{0xE0 | byte(hi>>12), 0x80 | byte(hi>>6&0x3F), 0x80 | byte(hi&0x3F)})
+				return s[:i] + string([]byte{0xE0 | byte(hi>>12&0x0F), 0x80 | byte(hi>>6&0x3F), 0x80 | byte(hi&0x3F)})
 			}
 			return s[:i]
 		}
