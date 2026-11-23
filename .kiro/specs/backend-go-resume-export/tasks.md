@@ -187,7 +187,7 @@
   - 受入基準とテストの対応: 要件1の受入基準3のうち、Go 版を相手に PDF を作れることは、`main_test.go` の `TestRun_PassesPDFEngineToResume` で確かめる。このテストは、入口を起動し、出力の前提を満たす経歴書をデータベースに入れ、ログインした利用者として設定を付けた出力で PDF を求め、200 と `application/pdf` と `%PDF-` で始まる本文で答えることを確かめる
   - _要件: 1.1, 1.3_
 
-- [ ] 6. 出力の操作の筋書きで Java 版と Go 版を比べる
+- [x] 6. 出力の操作の筋書きで Java 版と Go 版を比べる
 - [x] 6.1 画面が送る4種類の要求の筋書きを書く
 
   Claude は、出力の操作の筋書きの節のとおりに、`backend/compat/scenarios/export/formats.yaml` を `group: 4` で書き、要求の本文 `backend/compat/fixtures/export/inline-default.json` を置く。Claude は、設定を付けた出力の段に `csrf: true` を付け、Accept の行を `headers` の欄に書く。
@@ -224,7 +224,7 @@
   - _要件: 6.1, 6.2_
   - _依存: 2.1, 6.1_
 
-- [ ] 6.5 出力の応答の時間とメモリの最大を測る
+- [x] 6.5 出力の応答の時間とメモリの最大を測る
 
   Claude は、まず、時間を測る筋書きを読むテスト `TestLoadScenarios_ExportPerf` を `backend/compat/harness/perfmeasure_test.go` に作る。このテストは、2つの筋書きが無ければ失敗する。Claude は、次に、出力の操作の筋書きの節のとおりに、`perf-export-pdf.yaml` と `perf-export-markdown.yaml` を書く。Claude は、`make compat-perf` で2つの操作を測り、進み具合の表の節のとおりに、結果を `progress.md` の応答の時間を比べた結果の表に足し、PDF の出力のメモリの最大を表の下の箇条に書く。
   - 完了の確かめ方: `go test -tags compat -run TestLoadScenarios_ExportPerf ./compat/harness/` が通る。`make compat-perf` が2つの操作を測り、`progress.md` に結果が書かれる。6つ目の大きなまとまりの最後のタスクなので、大きなまとまりの最後のタスクで verify のスキルを流すと決めた完了条件の2つ目のとおり、`/verify-backend` も通る

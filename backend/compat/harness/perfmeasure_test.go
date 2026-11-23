@@ -528,3 +528,58 @@ func jsonField(body any, key string) any {
 	}
 	return fields[key]
 }
+
+// TestLoadScenarios_ExportPerf は、出力の操作の筋書きのうち、応答の時間を測る筋書きが、出力のまとまり(group 4)で、
+// ログインの段のあとに、設定を付けた出力の PDF を求める段と、設定を付けない出力の Markdown を求める段を、最後の段で
+// 送ることを確かめる。メモリの最大は PDF の筋書きだけで測る。PDF を作る処理が、出力の操作の中で最も多くメモリを使うためである。
+// どちらも回ごとに準備の段を送り直さない。2つの筋書きのどちらかが無いときは失敗する。
+func TestLoadScenarios_ExportPerf(t *testing.T) {
+	scenarios, err := LoadScenarios(filepath.Join("..", "scenarios", "export"), ModePerf)
+	if err != nil {
+		t.Fatalf("LoadScenarios: %v", err)
+	}
+	type want struct {
+		last          string
+		measureMemory bool
+	}
+	wants := map[string]want{
+		"export-perf-pdf":      {"POST /api/resumes/00000000-0000-4000-8000-000000000401/export", true},
+		"export-perf-markdown": {"GET /api/resumes/00000000-0000-4000-8000-000000000401/export", false},
+	}
+	got := map[string]Scenario{}
+	for _, s := range scenarios {
+		got[s.Name] = s
+	}
+	if len(got) != len(wants) {
+		t.Errorf("測る筋書きの数 = %d, want %d(読んだ筋書きは %v)", len(got), len(wants), slices.Sorted(maps.Keys(got)))
+	}
+	for name, w := range wants {
+		s, ok := got[name]
+		if !ok {
+			t.Errorf("測る筋書き %s がありません", name)
+			continue
+		}
+		if s.Group != 4 {
+			t.Errorf("筋書き %s の group = %d, want 4", name, s.Group)
+		}
+		if len(s.Steps) != 2 {
+			t.Errorf("筋書き %s の段の数 = %d, want 2", name, len(s.Steps))
+			continue
+		}
+		login, last := s.Steps[0], s.Steps[1]
+		if login.Request.Method+" "+login.Request.Path != "POST /api/auth/login" ||
+			jsonField(login.Request.JSON, "email") != "user1@example.com" {
+			t.Errorf("筋書き %s の準備の段 = %s %s %v, want user1@example.com のログイン",
+				name, login.Request.Method, login.Request.Path, login.Request.JSON)
+		}
+		if op := last.Request.Method + " " + last.Request.Path; op != w.last {
+			t.Errorf("筋書き %s の最後の段 = %s, want %s", name, op, w.last)
+		}
+		if s.MeasureMemory != w.measureMemory {
+			t.Errorf("筋書き %s の measure_memory = %v, want %v", name, s.MeasureMemory, w.measureMemory)
+		}
+		if s.PrepareEach {
+			t.Errorf("筋書き %s が prepare_each を持ちます。出力の段は、回ごとに準備の段を送り直さなくても同じに答えます", name)
+		}
+	}
+}
