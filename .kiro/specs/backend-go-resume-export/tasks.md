@@ -1,6 +1,6 @@
 # タスク
 
-- [ ] 1. 出力の操作の土台を作る
+- [x] 1. 出力の操作の土台を作る
 - [x] 1.1 出力の経歴書の初期のデータを書く
 
   Claude は、初期のデータと要求の本文の節のとおりに、`backend/compat/fixtures/export/export.sql` に、経歴書 601 と 701 と、経歴書 201 に自己PR を1件足す行を書く。Claude は、ポートフォリオと SNS と自己PR の項目の名前を、`fonts.sql` と同じく、名前の頭の英大文字(`A ` と `B `)で順が決まる名前にする。
@@ -28,7 +28,7 @@
   - 受入基準とテストの対応: Claude は、この小タスクで土台を作り、この小タスクでは受入基準を直接は確かめない。要件1の受入基準1のうち、設定を付けた出力の本文を Java 版と同じに読むことは、小タスク3.5 の `exportbody_test.go` と、小タスク5.2 の `resumes_test.go` で確かめる
   - _要件: 1.1_
 
-- [ ] 1.4 変えた動きの一覧に、設計で決まった出力の違いを足す
+- [x] 1.4 変えた動きの一覧に、設計で決まった出力の違いを足す
 
   Claude は、変えた動きの一覧に載せる違いの節のとおりに、CB-056 から CB-061 の6つの違いを、`backend/compat/changed-behaviors.yaml` の末尾に `group: 4` で足す。Claude は、どの違いの「画面に影響が無い理由」にも「所有者が 2026-11-23 に受け入れた(requirements の承認)」と書く。Claude は、CB-056 から CB-061 のどれにも match を書かない。CB-056 から CB-058 の違いは、PDF を比べる部品が許す幅の中で扱うためである。CB-059 から CB-061 の要求と本文は、Java 版と Go 版を比べる検査が送らないので、match が照らす答えが無いためである。Claude は、CB-004 の文に、PDF の文字の位置と「〜」のほかの Go 版の PDF の違いを CB-056 から CB-058 に載せたことを書き足す。Claude は、`backend/compat/harness/match_test.go` の `TestLoadChangedBehaviors_CB005HasNoMatch` の期待する数を、55 から 61 に替える。CB-062 は、Go 版の本文の読み手の答えが決まる小タスク3.5 で、違いがあるときだけ足す。
   - 完了の確かめ方: `go test -tags compat ./compat/harness/ -run 'TestLoadChangedBehaviors|TestChangedBehaviors'` が通る。1つ目の大きなまとまりの最後のタスクなので、大きなまとまりの最後のタスクで verify のスキルを流すと決めた完了条件の2つ目のとおり、`/verify-backend` も通る
