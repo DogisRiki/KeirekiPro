@@ -136,7 +136,7 @@
 # claim と takeover も、Issueの記録を同じ錠の中で読み書きし、15秒待っても錠を取れなければ記録を書かずに終了コード69で終わる。
 # check-spec も、同じ錠の中で調べと spec の予約を行い、錠を返してから JSON を出す。15秒待っても錠を取れないときと、
 # 予約を書けないときは、JSON を出さずに終了コード69で終わる。
-# busy-issues も、同じ錠の中で記録を読み、錠を返してから JSON を出す。15秒待っても錠を取れないときは、
+# busy-issues も、同じ錠の中で記録を読み、錠を返してから spec.json を読んで JSON を出す。15秒待っても錠を取れないときは、
 # JSON を出さずに終了コード69で終わる。
 #
 # 終了コード: 0(成功)、1(claim がほかのセッションの記録を断った、takeover が引き継げなかった)、64(呼び方の誤り)、
@@ -1548,9 +1548,11 @@ kp_session_spec_names() {
 }
 
 # spec があるIssueの番号と、ほかの作業中のセッションが着手の記録(予約か claim)を持つIssueの番号を、
-# 記録を書かずに JSON で出す。記録の錠の中で記録を読み、錠を返してから JSON を出す
+# 記録を書かずに JSON で出す。記録の錠の中で記録を読み、錠を返してから spec.json を読んで JSON を出す。
+# ブランチの木の spec.json は、ブランチの数によらず決まった回数の git cat-file でまとめて読む
+# (ブランチやファイルごとに git を呼ぶと、記録が増えるほど遅くなり、Windows では数分かかるため)
 kp_session_busy_issues() {
-    local session="" state sid ic paths gone_sessions out
+    local session="" state sid ic paths gone_sessions recs out
     while [ $# -gt 0 ]; do
         case "$1" in
             --session)
@@ -1569,17 +1571,18 @@ kp_session_busy_issues() {
     # spec-names と同じ作業フォルダの一覧
     paths=$(_kp_ss_worktree_paths)
 
-    # ここから JSON を作り終えるまで、記録の錠の中で読む(記録は書かない)
+    # ここから記録を読み終えるまで、記録の錠の中で読む(記録は書かない)
     _kp_ss_lock "$state"
 
     # 作業フォルダが無くなったセッションの記録(prune が消し終えるまで残す記録)は作業中に数えない
     gone_sessions=$(_kp_ss_gone_sessions "$state") \
         || _kp_ss_die69 "[parallel] 調べられない: 作業フォルダの一覧から、無くなったセッションの記録を見分けられない"
 
-    out=$(perl -MJSON::PP -e "$_KP_SS_PL_ACTIVE" -e '
+    # 記録から、作業中のIssueの番号(A の行)と、記録の branch(B の行)を出す
+    recs=$(perl -MJSON::PP -e "$_KP_SS_PL_ACTIVE" -e '
         use strict; use warnings;
-        my ($state, $sid, $ic, $gone_list, $paths) = @ARGV;
-        utf8::decode($_) for ($state, $sid, $paths);
+        my ($state, $sid, $ic, $gone_list) = @ARGV;
+        utf8::decode($_) for ($state, $sid);
         $KP_IC = $ic;
 
         # git を呼んで標準出力を返す(標準エラーは捨てる)。失敗したら undef
@@ -1625,7 +1628,7 @@ kp_session_busy_issues() {
         my (%active, %branches);
         for my $d (load_dir("$state/issues")) {
             my $br = str($d->{branch});
-            $branches{$br} = 1 if length $br;
+            $branches{$br} = 1 if length $br && $br !~ /\n/;
             my $n = num($d->{issue});
             next unless defined $n;
             my $isid = str($d->{session_id});
@@ -1637,6 +1640,35 @@ kp_session_busy_issues() {
                 (ref $d->{handed_over_from} eq "ARRAY" ? @{ $d->{handed_over_from} } : ());
             next if $handed{$fid};
             $active{$n} = 1;
+        }
+        for my $br (sort keys %branches) {
+            utf8::encode($br);
+            print "B\t$br\n";
+        }
+        print "A\t$_\n" for sort { $a <=> $b } keys %active;
+    ' -- "$state" "$sid" "$ic" "$gone_sessions") \
+        || _kp_ss_die69 "[parallel] 調べられない: 記録を読めない"
+
+    # 錠を返してから spec.json を読む(spec.json を読む間、ほかのセッションの記録の読み書きを待たせないため)
+    _kp_ss_unlock
+
+    out=$(perl -MJSON::PP -e '
+        use strict; use warnings;
+        use File::Temp ();
+        use POSIX ();
+        my ($recs, $paths) = @ARGV;
+        my (@active, @branches);
+        for my $line (split /\n/, $recs) {
+            push @active, $1 + 0 if $line =~ /\AA\t([0-9]+)\z/;
+            push @branches, $1 if $line =~ /\AB\t(.+)\z/;
+        }
+
+        # Issueの番号(数か "#<数>" の文字列)。番号でなければ undef
+        sub num {
+            my ($v) = @_;
+            return undef unless defined $v && !ref $v;
+            (my $s = $v) =~ s/\A#//;
+            return $s =~ /\A0*([0-9]+)\z/ ? $1 + 0 : undef;
         }
 
         # spec: spec.json の issue と additional_issues の番号
@@ -1654,6 +1686,47 @@ kp_session_busy_issues() {
                 my $n = num($v);
                 $spec{$n} = 1 if defined $n;
             }
+        }
+
+        # git cat-file に <名前> を1行ずつ渡し、名前ごとに [種類, 中身] を返す(無い名前は undef)。
+        # <batch> が真なら中身も読み、偽なら種類とオブジェクトだけを読む([種類, オブジェクト])。
+        # git を起動できないか git が失敗したら、終了コード69で終わる
+        sub cat_file {
+            my ($batch, @names) = @_;
+            return () unless @names;
+            my $in = File::Temp->new;
+            binmode $in;
+            print {$in} map { "$_\n" } @names;
+            $in->flush;
+            my $pid = open(my $fh, "-|");
+            die "git を起動できない: $!\n" unless defined $pid;
+            if (!$pid) {
+                open(STDERR, ">", "/dev/null");
+                open(STDIN, "<", $in->filename) or POSIX::_exit(127);
+                exec("git", "cat-file", $batch ? "--batch" : "--batch-check") or POSIX::_exit(127);
+            }
+            binmode $fh;
+            my $out = do { local $/; <$fh> } // "";
+            close $fh;
+            die "git cat-file が失敗した\n" if $?;
+            my ($pos, @res) = (0);
+            for my $name (@names) {
+                my $nl = index($out, "\n", $pos);
+                die "git cat-file の出力が途中で切れた\n" if $nl < 0;
+                my $head = substr($out, $pos, $nl - $pos);
+                $pos = $nl + 1;
+                if ($head =~ /\A([0-9a-f]+) (\S+) ([0-9]+)\z/) {
+                    if ($batch) {
+                        push @res, [ $2, substr($out, $pos, $3) ];
+                        $pos += $3 + 1;
+                    } else {
+                        push @res, [ $2, $1 ];
+                    }
+                } else {
+                    push @res, undef;
+                }
+            }
+            return @res;
         }
 
         # 1. すべての作業フォルダの中身
@@ -1674,36 +1747,64 @@ kp_session_busy_issues() {
 
         # 2. refs/remotes/origin/main の木と、3. 記録の branch のブランチの木(refs/heads/<branch>、
         #    無ければ refs/remotes/origin/<branch>)。無い参照は飛ばす。同じコミットは1回だけ読む
-        my %read;
-        sub read_tree {
-            my ($ref) = @_;
-            my $c = git_out("rev-parse", "--verify", "-q", "$ref^{commit}");
-            return 0 unless defined $c;
-            $c =~ s/\s+\z//;
-            return 1 if $read{$c}++;
-            my $ls = git_out("ls-tree", "-r", "-z", "--name-only", "$c:.kiro/specs");
-            return 1 unless defined $ls;
-            for my $rel (sort split /\0/, $ls) {
-                next unless $rel =~ m{\A([^/]+)/spec\.json\z} && $1 !~ /\A\./;
-                my $path = ".kiro/specs/$rel";
-                add_spec(git_out("show", "--no-textconv", "$c:$path"), "$ref:$path");
-            }
-            return 1;
+        my @try = ("refs/remotes/origin/main", map { ("refs/heads/$_", "refs/remotes/origin/$_") } @branches);
+        my %commit_of;
+        my @found = cat_file(0, map { "$_^{commit}" } @try);
+        for my $i (0 .. $#try) {
+            $commit_of{ $try[$i] } = $found[$i][1] if $found[$i] && $found[$i][0] eq "commit";
         }
-        read_tree("refs/remotes/origin/main");
-        for my $br (sort keys %branches) {
-            read_tree("refs/heads/$br") or read_tree("refs/remotes/origin/$br");
+        my (@refs, %seen);
+        for my $ref ("refs/remotes/origin/main", @branches) {
+            my $r = $ref eq "refs/remotes/origin/main" ? $ref
+                : (exists $commit_of{"refs/heads/$ref"} ? "refs/heads/$ref" : "refs/remotes/origin/$ref");
+            my $c = $commit_of{$r};
+            next unless defined $c && !$seen{$c}++;
+            push @refs, [ $r, $c ];
+        }
+
+        # コミットごとの .kiro/specs の木を読み、spec.json を持ちうる下のディレクトリ(名前と木)を取る
+        my @trees = cat_file(1, map { "$_->[1]:.kiro/specs" } @refs);
+        my (@entries, %want);
+        for my $i (0 .. $#refs) {
+            my $t = $trees[$i];
+            next unless $t && $t->[0] eq "tree";
+            my $raw = length($refs[$i][1]) / 2;
+            my ($data, $pos, @dirs) = ($t->[1], 0);
+            while ($pos < length $data) {
+                my $nul = index($data, "\0", $pos);
+                last if $nul < 0;
+                my ($mode, $name) = split / /, substr($data, $pos, $nul - $pos), 2;
+                my $oid = unpack("H*", substr($data, $nul + 1, $raw));
+                $pos = $nul + 1 + $raw;
+                next unless $mode eq "40000" && defined $name && $name !~ /\A\./;
+                push @dirs, [ $name, $oid ];
+                $want{$oid} = 1;
+            }
+            # git ls-tree -r の並び(<名前>/spec.json の順)と同じ順にする
+            push @entries, map { [ $refs[$i][0], $_->[0], $_->[1] ] }
+                sort { "$a->[0]/spec.json" cmp "$b->[0]/spec.json" } @dirs;
+        }
+
+        # 下のディレクトリの木ごとに spec.json を1回だけ読む(同じ木は同じ中身のため)
+        my @dir_oids = sort keys %want;
+        my @blobs = cat_file(1, map { "$_:spec.json" } @dir_oids);
+        my %text_of;
+        for my $i (0 .. $#dir_oids) {
+            $text_of{ $dir_oids[$i] } = $blobs[$i][1] if $blobs[$i] && $blobs[$i][0] eq "blob";
+        }
+        for my $e (@entries) {
+            my ($ref, $name, $oid) = @$e;
+            next unless exists $text_of{$oid};
+            add_spec($text_of{$oid}, "$ref:.kiro/specs/$name/spec.json");
         }
 
         print JSON::PP->new->canonical->encode({
-            active => [ map { $_ + 0 } sort { $a <=> $b } keys %active ],
+            active => [ @active ],
             spec => [ map { $_ + 0 } sort { $a <=> $b } keys %spec ],
         }), "\n";
-    ' -- "$state" "$sid" "$ic" "$gone_sessions" "$paths") \
-        || _kp_ss_die69 "[parallel] 調べられない: 記録と spec.json を読めない"
+    ' -- "$recs" "$paths") \
+        || _kp_die69 "[parallel] 調べられない: spec.json を読めない"
 
-    # 錠を返してから JSON を出す
-    _kp_ss_unlock
     printf '%s\n' "$out"
 }
 

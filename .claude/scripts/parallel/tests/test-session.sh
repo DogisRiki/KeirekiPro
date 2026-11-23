@@ -2463,6 +2463,82 @@ t_busy_lock_held() {
     [ -d "$LOCK" ] || die "ほかのセッションの錠を消した"
 }
 
+# 呼ばれた git のサブコマンドを $WORK/git-calls.txt に1行ずつ書き、cat-file のときは記録の錠があるかも書く偽物の git
+make_counting_git() {
+    local real_git
+    real_git=$(command -v git)
+    mkdir -p "$TMP_ROOT/gitcount"
+    cat >"$TMP_ROOT/gitcount/git" <<EOF
+#!/bin/bash
+sub=""
+for a in "\$@"; do
+    case "\$a" in -*) ;; *) sub=\$a; break ;; esac
+done
+if [ "\$sub" = cat-file ]; then
+    if [ -e "$LOCK" ]; then echo "cat-file lock" >>"$WORK/git-calls.txt"; else echo "cat-file free" >>"$WORK/git-calls.txt"; fi
+else
+    echo "\$sub" >>"$WORK/git-calls.txt"
+fi
+exec "$real_git" "\$@"
+EOF
+    chmod +x "$TMP_ROOT/gitcount/git"
+}
+
+# <数> 本のブランチを作り、ブランチごとに別の spec(issue は 100 + 番号)を置いて、Issueの記録の branch にする
+put_spec_branches() { # <数>
+    local i c
+    for i in $(seq 1 "$1"); do
+        c=$(main_commit "$SEED_SHA" ".kiro/specs/s$i/spec.json" "{\"issue\":$((100 + i))}\\n") \
+            || die "ブランチのコミットを作れない"
+        git -C "$MAIN_DIR" update-ref "refs/heads/feat/many-$i" "$c" || die "ブランチを作れない"
+        put_issue $((200 + i)) "" "feat/many-$i" ""
+    done
+}
+
+t_busy_git_calls_fixed() {
+    local out few many
+    make_counting_git
+    put_spec_branches 1
+    : >"$WORK/git-calls.txt"
+    out=$(PATH="$TMP_ROOT/gitcount:$PATH" busy "$MAIN_DIR" --session s-me) || die "$out"
+    [ "$out" = '{"active":[],"spec":[10,101]}' ] || die "ブランチが1本のときの spec が違う: $out"
+    few=$(wc -l <"$WORK/git-calls.txt")
+    put_spec_branches 8
+    : >"$WORK/git-calls.txt"
+    out=$(PATH="$TMP_ROOT/gitcount:$PATH" busy "$MAIN_DIR" --session s-me) || die "$out"
+    [ "$out" = '{"active":[],"spec":[10,101,102,103,104,105,106,107,108]}' ] || die "ブランチが8本のときの spec が違う: $out"
+    many=$(wc -l <"$WORK/git-calls.txt")
+    [ "$few" -eq "$many" ] || die "ブランチの数で git を呼ぶ回数が変わった(1本で $few 回、8本で $many 回): $(sort "$WORK/git-calls.txt" | uniq -c)"
+    grep -q '^cat-file' "$WORK/git-calls.txt" || die "前提: cat-file が呼ばれていない: $(cat "$WORK/git-calls.txt")"
+    if grep -q '^cat-file lock$' "$WORK/git-calls.txt"; then
+        die "記録の錠を持ったまま spec.json を読んだ"
+    fi
+    [ ! -e "$LOCK" ] || die "錠を残した"
+}
+
+t_busy_tree_layout() {
+    local a b out err
+    # 点で始まるディレクトリと、1段より深い spec.json は数えない(今までの読み方と同じ)
+    a=$(main_commit "$SEED_SHA" .kiro/specs/.hidden/spec.json '{"issue":70}\n' \
+        .kiro/specs/deep/sub/spec.json '{"issue":71}\n' \
+        .kiro/specs/ok/spec.json '{"issue":72}\n' \
+        .kiro/specs/bad/spec.json 'not json\n') || die "ブランチのコミットを作れない"
+    git -C "$MAIN_DIR" update-ref refs/heads/feat/layout-a "$a" || die "ブランチを作れない"
+    put_issue 64 "" feat/layout-a ""
+    # 同じ中身の壊れた spec.json を持つ別のブランチ(読むのは1回でも、場所はブランチごとに出す)
+    b=$(main_commit "$SEED_SHA" .kiro/specs/bad/spec.json 'not json\n') || die "ブランチのコミットを作れない"
+    git -C "$MAIN_DIR" update-ref refs/heads/feat/layout-b "$b" || die "ブランチを作れない"
+    put_issue 65 "" feat/layout-b ""
+    out=$(busy "$MAIN_DIR" --session s-me) || die "$out"
+    [ "$out" = '{"active":[],"spec":[10,72]}' ] || die "点で始まるディレクトリか深い spec.json を数えたか、ok を数えない: $out"
+    err=$(cat "$WORK/busy-err.txt")
+    grep -qxF '[parallel] 読めない spec.json: refs/heads/feat/layout-a:.kiro/specs/bad/spec.json' "$WORK/busy-err.txt" \
+        || die "feat/layout-a の壊れた spec.json の文が無い: $err"
+    grep -qxF '[parallel] 読めない spec.json: refs/heads/feat/layout-b:.kiro/specs/bad/spec.json' "$WORK/busy-err.txt" \
+        || die "feat/layout-b の壊れた spec.json の文が無い: $err"
+    [ "$(wc -l <"$WORK/busy-err.txt")" -eq 2 ] || die "標準エラーの文が2行でない: $err"
+}
+
 echo "--- check-start: 同じ作業フォルダの別のセッション(要件5.1・5.2)"
 run_test "同じ作業フォルダに別の作業中のセッションの記録があると folder_conflict に出る" t_folder_conflict
 run_test "同じ作業フォルダの、Issueの記録の無いセッション(着手していない記録)は folder_conflict に出ない" t_folder_conflict_idle_ignored
@@ -2586,6 +2662,8 @@ run_test "壊れた spec.json は飛ばして標準エラーに場所を出し�
 run_test "busy-issues は記録の置き場所のファイルの一覧と中身を変えず、prune も docker も呼ばない" t_busy_no_write
 run_test "余計な引数、--session の値が無い、知らないオプションは終了コード64で、JSON を出さない" t_busy_usage
 run_test "錠がほかに持たれたままなら busy-issues は終了コード69で終わり、JSON を出さず、その錠を消さない" t_busy_lock_held
+run_test "busy-issues が git を呼ぶ回数は記録のブランチの数で変わらず、spec.json は記録の錠を返してから読む(#927)" t_busy_git_calls_fixed
+run_test "ブランチの木の、点で始まるディレクトリと深い spec.json は数えず、同じ中身の壊れた spec.json はブランチごとに場所を出す(#927)" t_busy_tree_layout
 
 # =====================================================================
 # folder-kind と entered-worktree: 本体のフォルダで開いた会話が worktree に移る(Issue #817)
