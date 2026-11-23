@@ -2035,6 +2035,7 @@ components:
         type: string
     ExportResumeRequest:
       type: object
+      x-go-type: json.RawMessage
       description: |
         `format` が `pdf` なら `pdfSettings` が要る(無ければ 400、`errors` の項目名は `pdfSettingsRequired`)。
       required: [format, disposition]
