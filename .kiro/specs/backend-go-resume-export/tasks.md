@@ -161,7 +161,7 @@
   - _依存: 1.1, 1.2_
 
 - [ ] 5. 出力の受け口をつなぐ
-- [ ] 5.1 答えの型に Content-Disposition を足し、設定を付けない出力に Accept の行を渡す
+- [x] 5.1 答えの型に Content-Disposition を足し、設定を付けない出力に Accept の行を渡す
 
   Claude は、出力の受け口の節のとおりに、`backend/internal/httpapi/authresponses.go` の `authResponse` に `contentDisposition` の欄を足し、`write` で書く。Claude は、`resumeresponses.go` に、`_ gen.ExportResumeResponseObject = authResponse{}` と `_ gen.ExportResumeWithSettingsResponseObject = authResponse{}` と、2つの `Visit` の関数を足し、26の操作と書いたコメントを28にする。Claude は、`auth.go` の `authRequestMiddleware` が Accept の行を context に入れる操作に、`ExportResume` を足す。
   - 完了の確かめ方: `go test ./internal/httpapi/ -run 'TestResumeResponses|TestAuthRequestMiddleware|TestAuthResponses'` が通る

@@ -9,35 +9,37 @@ import (
 	"github.com/DogisRiki/KeirekiPro/backend/internal/resume"
 )
 
-// 経歴書の26の操作の答えも、認証と利用者の操作と同じ authResponse で書く。誤りの答えを、認証と利用者の操作と同じ
+// 経歴書の28の操作の答えも、認証と利用者の操作と同じ authResponse で書く。誤りの答えを、認証と利用者の操作と同じ
 // 形で書くためである。
 var (
-	_ gen.ListCertificationNamesResponseObject = authResponse{}
-	_ gen.ListSnsPlatformNamesResponseObject   = authResponse{}
-	_ gen.ListTechStacksResponseObject         = authResponse{}
-	_ gen.ListResumesResponseObject            = authResponse{}
-	_ gen.CreateResumeResponseObject           = authResponse{}
-	_ gen.GetResumeResponseObject              = authResponse{}
-	_ gen.DeleteResumeResponseObject           = authResponse{}
-	_ gen.UpdateResumeBasicResponseObject      = authResponse{}
-	_ gen.CreateCareerResponseObject           = authResponse{}
-	_ gen.UpdateCareerResponseObject           = authResponse{}
-	_ gen.DeleteCareerResponseObject           = authResponse{}
-	_ gen.CreateProjectResponseObject          = authResponse{}
-	_ gen.UpdateProjectResponseObject          = authResponse{}
-	_ gen.DeleteProjectResponseObject          = authResponse{}
-	_ gen.CreateCertificationResponseObject    = authResponse{}
-	_ gen.UpdateCertificationResponseObject    = authResponse{}
-	_ gen.DeleteCertificationResponseObject    = authResponse{}
-	_ gen.CreatePortfolioResponseObject        = authResponse{}
-	_ gen.UpdatePortfolioResponseObject        = authResponse{}
-	_ gen.DeletePortfolioResponseObject        = authResponse{}
-	_ gen.CreateSnsPlatformResponseObject      = authResponse{}
-	_ gen.UpdateSnsPlatformResponseObject      = authResponse{}
-	_ gen.DeleteSnsPlatformResponseObject      = authResponse{}
-	_ gen.CreateSelfPromotionResponseObject    = authResponse{}
-	_ gen.UpdateSelfPromotionResponseObject    = authResponse{}
-	_ gen.DeleteSelfPromotionResponseObject    = authResponse{}
+	_ gen.ListCertificationNamesResponseObject   = authResponse{}
+	_ gen.ListSnsPlatformNamesResponseObject     = authResponse{}
+	_ gen.ListTechStacksResponseObject           = authResponse{}
+	_ gen.ListResumesResponseObject              = authResponse{}
+	_ gen.CreateResumeResponseObject             = authResponse{}
+	_ gen.GetResumeResponseObject                = authResponse{}
+	_ gen.DeleteResumeResponseObject             = authResponse{}
+	_ gen.UpdateResumeBasicResponseObject        = authResponse{}
+	_ gen.CreateCareerResponseObject             = authResponse{}
+	_ gen.UpdateCareerResponseObject             = authResponse{}
+	_ gen.DeleteCareerResponseObject             = authResponse{}
+	_ gen.CreateProjectResponseObject            = authResponse{}
+	_ gen.UpdateProjectResponseObject            = authResponse{}
+	_ gen.DeleteProjectResponseObject            = authResponse{}
+	_ gen.CreateCertificationResponseObject      = authResponse{}
+	_ gen.UpdateCertificationResponseObject      = authResponse{}
+	_ gen.DeleteCertificationResponseObject      = authResponse{}
+	_ gen.CreatePortfolioResponseObject          = authResponse{}
+	_ gen.UpdatePortfolioResponseObject          = authResponse{}
+	_ gen.DeletePortfolioResponseObject          = authResponse{}
+	_ gen.CreateSnsPlatformResponseObject        = authResponse{}
+	_ gen.UpdateSnsPlatformResponseObject        = authResponse{}
+	_ gen.DeleteSnsPlatformResponseObject        = authResponse{}
+	_ gen.CreateSelfPromotionResponseObject      = authResponse{}
+	_ gen.UpdateSelfPromotionResponseObject      = authResponse{}
+	_ gen.DeleteSelfPromotionResponseObject      = authResponse{}
+	_ gen.ExportResumeResponseObject             = authResponse{}
+	_ gen.ExportResumeWithSettingsResponseObject = authResponse{}
 )
 
 // localDateTime は、t を Java の LocalDateTime を ISO_LOCAL_DATE_TIME で書いた形で書く。秒は 0 でも書き、秒より細かい
@@ -315,5 +317,15 @@ func (r authResponse) VisitUpdateSelfPromotionResponse(w http.ResponseWriter) er
 
 // VisitDeleteSelfPromotionResponse は、応答を書く。
 func (r authResponse) VisitDeleteSelfPromotionResponse(w http.ResponseWriter) error {
+	return r.write(w)
+}
+
+// VisitExportResumeResponse は、応答を書く。
+func (r authResponse) VisitExportResumeResponse(w http.ResponseWriter) error {
+	return r.write(w)
+}
+
+// VisitExportResumeWithSettingsResponse は、応答を書く。
+func (r authResponse) VisitExportResumeWithSettingsResponse(w http.ResponseWriter) error {
 	return r.write(w)
 }

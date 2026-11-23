@@ -800,41 +800,43 @@ func TestResumeHandlers_UnreadableItemID(t *testing.T) {
 	}
 }
 
-// TestResumeResponses_AllOperationsWrite は、経歴書の26の操作の応答のインタフェースのどのメソッドで書いても、状態の番号と、
+// TestResumeResponses_AllOperationsWrite は、経歴書の28の操作の応答のインタフェースのどのメソッドで書いても、状態の番号と、
 // Content-Type と、本文を書くことを確かめる。
 func TestResumeResponses_AllOperationsWrite(t *testing.T) {
 	r := authJSON(http.StatusCreated, map[string]string{"a": "<&>"})
 	want := wantResponse{status: http.StatusCreated, contentType: "application/json", body: `{"a":"<&>"}`}
 	visits := map[string]func(http.ResponseWriter) error{
-		"ListCertificationNames": r.VisitListCertificationNamesResponse,
-		"ListSnsPlatformNames":   r.VisitListSnsPlatformNamesResponse,
-		"ListTechStacks":         r.VisitListTechStacksResponse,
-		"ListResumes":            r.VisitListResumesResponse,
-		"CreateResume":           r.VisitCreateResumeResponse,
-		"GetResume":              r.VisitGetResumeResponse,
-		"DeleteResume":           r.VisitDeleteResumeResponse,
-		"UpdateResumeBasic":      r.VisitUpdateResumeBasicResponse,
-		"CreateCareer":           r.VisitCreateCareerResponse,
-		"UpdateCareer":           r.VisitUpdateCareerResponse,
-		"DeleteCareer":           r.VisitDeleteCareerResponse,
-		"CreateProject":          r.VisitCreateProjectResponse,
-		"UpdateProject":          r.VisitUpdateProjectResponse,
-		"DeleteProject":          r.VisitDeleteProjectResponse,
-		"CreateCertification":    r.VisitCreateCertificationResponse,
-		"UpdateCertification":    r.VisitUpdateCertificationResponse,
-		"DeleteCertification":    r.VisitDeleteCertificationResponse,
-		"CreatePortfolio":        r.VisitCreatePortfolioResponse,
-		"UpdatePortfolio":        r.VisitUpdatePortfolioResponse,
-		"DeletePortfolio":        r.VisitDeletePortfolioResponse,
-		"CreateSnsPlatform":      r.VisitCreateSnsPlatformResponse,
-		"UpdateSnsPlatform":      r.VisitUpdateSnsPlatformResponse,
-		"DeleteSnsPlatform":      r.VisitDeleteSnsPlatformResponse,
-		"CreateSelfPromotion":    r.VisitCreateSelfPromotionResponse,
-		"UpdateSelfPromotion":    r.VisitUpdateSelfPromotionResponse,
-		"DeleteSelfPromotion":    r.VisitDeleteSelfPromotionResponse,
+		"ListCertificationNames":   r.VisitListCertificationNamesResponse,
+		"ListSnsPlatformNames":     r.VisitListSnsPlatformNamesResponse,
+		"ListTechStacks":           r.VisitListTechStacksResponse,
+		"ListResumes":              r.VisitListResumesResponse,
+		"CreateResume":             r.VisitCreateResumeResponse,
+		"GetResume":                r.VisitGetResumeResponse,
+		"DeleteResume":             r.VisitDeleteResumeResponse,
+		"UpdateResumeBasic":        r.VisitUpdateResumeBasicResponse,
+		"CreateCareer":             r.VisitCreateCareerResponse,
+		"UpdateCareer":             r.VisitUpdateCareerResponse,
+		"DeleteCareer":             r.VisitDeleteCareerResponse,
+		"CreateProject":            r.VisitCreateProjectResponse,
+		"UpdateProject":            r.VisitUpdateProjectResponse,
+		"DeleteProject":            r.VisitDeleteProjectResponse,
+		"CreateCertification":      r.VisitCreateCertificationResponse,
+		"UpdateCertification":      r.VisitUpdateCertificationResponse,
+		"DeleteCertification":      r.VisitDeleteCertificationResponse,
+		"CreatePortfolio":          r.VisitCreatePortfolioResponse,
+		"UpdatePortfolio":          r.VisitUpdatePortfolioResponse,
+		"DeletePortfolio":          r.VisitDeletePortfolioResponse,
+		"CreateSnsPlatform":        r.VisitCreateSnsPlatformResponse,
+		"UpdateSnsPlatform":        r.VisitUpdateSnsPlatformResponse,
+		"DeleteSnsPlatform":        r.VisitDeleteSnsPlatformResponse,
+		"CreateSelfPromotion":      r.VisitCreateSelfPromotionResponse,
+		"UpdateSelfPromotion":      r.VisitUpdateSelfPromotionResponse,
+		"DeleteSelfPromotion":      r.VisitDeleteSelfPromotionResponse,
+		"ExportResume":             r.VisitExportResumeResponse,
+		"ExportResumeWithSettings": r.VisitExportResumeWithSettingsResponse,
 	}
-	if len(visits) != 26 {
-		t.Fatalf("メソッドの数 = %d, want 26", len(visits))
+	if len(visits) != 28 {
+		t.Fatalf("メソッドの数 = %d, want 28", len(visits))
 	}
 	for name, visit := range visits {
 		checkResponse(t, name, recordResponse(t, visit), want)
