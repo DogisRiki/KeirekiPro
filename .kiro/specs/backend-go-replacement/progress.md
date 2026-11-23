@@ -38,7 +38,7 @@ Claude は、まとまりの状態と段階の行を、その状態にした PR 
 | 認証 | #770 | `.kiro/specs/backend-go-auth` | 比べる検査に通った |
 | 利用者 | #771 | `.kiro/specs/backend-go-users` | 比べる検査に通った |
 | マスタと経歴書 | #772 | `.kiro/specs/backend-go-master-resumes` | 比べる検査に通った |
-| 出力 | #773 | `.kiro/specs/backend-go-resume-export` | 作り終えた |
+| 出力 | #773 | `.kiro/specs/backend-go-resume-export` | 比べる検査に通った |
 | バックアップ | #774 | 未定 | 未着手 |
 
 - spec の列には、まとまりの spec を作ったときに `.kiro/specs/<名前>` を書く
