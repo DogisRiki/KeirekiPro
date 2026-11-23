@@ -23,6 +23,9 @@ type Deps struct {
 	// Now は、今の時刻を返す関数である。nil のとき、New は time.Now を使う。
 	// 本番では main.go が time.Now を渡し、テストは決まった時刻を返す関数を渡す。
 	Now func() time.Time
+	// PDF は、PDF の HTML から PDF を作る部品である。本番では main.go が internal/platform/pdf の *Engine を渡す。
+	// nil のとき、PDF の出力は組み立ての誤りを返す。Markdown の出力は PDF の部品を使わない。
+	PDF PDFRenderer
 }
 
 // Service は、マスタと経歴書の26の操作の処理の入口である。要求をまたぐ状態をメモリに持たず、

@@ -139,7 +139,7 @@
   - 受入基準とテストの対応: 要件2の受入基準1のうち、利用者が選んだフォントと4つの文字の大きさと表の見出しの色が PDF に出ることと、要件2の受入基準4の違いに抑えるための CSS は、`exporttemplate_test.go` の `TestRenderPDFHTML_SettingsAndCSS` で確かめる。このテストは、HTML に、設定の値と、出力のモデルとひな形の節の6つの CSS が入ることを確かめる。利用者が書いた字を HTML として読まれない形で書き、改行を残すことは、`TestRenderPDFHTML_EscapesUserText` で確かめる。PDF の見た目が Java 版と同じことは、小タスク6.1 と6.2 の筋書きで確かめる
   - _要件: 2.1, 2.4_
 
-- [ ] 4.3 Service の出力の2つのメソッドを作る
+- [x] 4.3 Service の出力の2つのメソッドを作る
 
   Claude は、Service の出力の節のとおりに、`backend/internal/resume/export.go` に、`ExportResume` と `ExportResumeWithSettings` と、出力の結果の型 `Export` と、形式の型 `ExportFormat` を作る。Claude は、`service.go` の `Deps` に `PDF PDFRenderer` を足す。写す元は、Java 版の `ExportResumeUseCase` である。2つのメソッドは、処理の流れの節の確かめる順で、小タスク3.5 の本文の読み手と、マスタと経歴書のまとまりの経歴書の読み取りと、小タスク3.2 の出力の前提の確認と、小タスク3.1 の設定の値の直し方と、小タスク4.1 と4.2 のひな形と、小タスク3.3 のファイル名を呼ぶ。
   - 完了の確かめ方: `go test ./internal/resume/ -run TestExport_` が通る
