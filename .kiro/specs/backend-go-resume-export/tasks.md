@@ -88,7 +88,7 @@
   - _要件: 1.1, 2.1_
   - _対象の部品: PDF の設定の値_
 
-- [ ] 3.2 出力の前提の確認と8つの文言を作る (並行可)
+- [x] 3.2 出力の前提の確認と8つの文言を作る (並行可)
 
   Claude は、出力の前提の確認の節のとおりに、`backend/internal/resume/exportrule.go` に、出力の前提の確認と、足りないものごとの8つの文言と、2つの始まりの文を作る。写す元は、Java 版の `ResumeExportRuleCheckService` である。Claude は、文言を `ResumeExportRuleCheckService.java` の文字列からそのまま写す。
   - 完了の確かめ方: `go test ./internal/resume/ -run TestExportRule` が通る
