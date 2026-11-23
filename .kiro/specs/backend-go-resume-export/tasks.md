@@ -168,7 +168,7 @@
   - 受入基準とテストの対応: 要件1の受入基準1のうち、答えに Content-Disposition のヘッダを書くことは、`auth_test.go` の `TestAuthResponses_ContentDisposition` で確かめる。応答の型の数は、`resumes_test.go` の `TestResumeResponses_AllOperationsWrite` の期待を26から28にして確かめる。設定を付けない出力が Accept の行を受け口で読めることは、`auth_test.go` の今の `TestAuthOIDCHandlers_MiddlewareOnlyOIDC` を `TestAuthRequestMiddleware_Operations` に名前を替えて広げて確かめる。Claude は、このテストの表に `ExportResume` と `ExportResumeWithSettings` を足す。このテストは、`authRequestMiddleware` が、`ExportResume` のときだけ Accept の行を context に入れ、`ExportResumeWithSettings` では入れないことを確かめる。Claude は、テストのコメントを、値を入れる3つの操作の説明に直す。同じことを確かめるテストを2つにしないためである
   - _要件: 1.1_
 
-- [ ] 5.2 出力の2つの受け口を作り、経路につなぐ
+- [x] 5.2 出力の2つの受け口を作り、経路につなぐ
 
   Claude は、出力の受け口の節のとおりに、`backend/internal/httpapi/resumes.go` の `ResumeService` に出力の2つのメソッドを足し、`ExportResume` と `ExportResumeWithSettings` の受け口を作る。2つの受け口は、小タスク3.4 の `formatContentDisposition` でヘッダを作る。Claude は、`server.go` の `Options` の `ResumeHandlers` のコメントと `resumeOperations` を、26の操作から28の操作にする。
   - 完了の確かめ方: `go test ./internal/httpapi/ -run 'TestResumeHandlers|TestResumeRoutes|TestExportHandlers'` が通る
