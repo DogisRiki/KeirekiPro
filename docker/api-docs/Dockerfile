@@ -6,4 +6,4 @@
 # compose.yaml に image: を直書きせず Dockerfile に置いているのは、Dependabot の
 # docker の項目が docker/*/Dockerfile を対象にしており、直書きのままでは
 # 更新の経路が無いため。土台のイメージを差し替えるだけで中身は足さない。
-FROM swaggerapi/swagger-ui:v5.34.1@sha256:59ee9021a8884437c7fd8aae79e0a46ee6b6dd3afd7f24a587c4501585fde53b
+FROM swaggerapi/swagger-ui:v5.35.1@sha256:cd314c0a167841dc1c9869ff2df6f949e2e7fa63f8b77f610b7e75878ac2da4e
