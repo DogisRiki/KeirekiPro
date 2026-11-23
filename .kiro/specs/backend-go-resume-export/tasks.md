@@ -160,7 +160,7 @@
   - _要件: 2.1, 2.2, 3.3, 3.4, 4.1, 4.2, 6.1_
   - _依存: 1.1, 1.2_
 
-- [ ] 5. 出力の受け口をつなぐ
+- [x] 5. 出力の受け口をつなぐ
 - [x] 5.1 答えの型に Content-Disposition を足し、設定を付けない出力に Accept の行を渡す
 
   Claude は、出力の受け口の節のとおりに、`backend/internal/httpapi/authresponses.go` の `authResponse` に `contentDisposition` の欄を足し、`write` で書く。Claude は、`resumeresponses.go` に、`_ gen.ExportResumeResponseObject = authResponse{}` と `_ gen.ExportResumeWithSettingsResponseObject = authResponse{}` と、2つの `Visit` の関数を足し、26の操作と書いたコメントを28にする。Claude は、`auth.go` の `authRequestMiddleware` が Accept の行を context に入れる操作に、`ExportResume` を足す。
@@ -180,7 +180,7 @@
   - _要件: 1.1, 1.2_
   - _依存: 1.4, 3.4, 4.3_
 
-- [ ] 5.3 Go 版を起動する入口で、PDF の部品を経歴書の処理に渡す
+- [x] 5.3 Go 版を起動する入口で、PDF の部品を経歴書の処理に渡す
 
   Claude は、main.go の節のとおりに、`backend/cmd/keirekipro/main.go` の `resume.New` を `d.newPDF` のあとに移し、`resume.Deps` に PDF の部品を渡す。Claude は、`main_test.go` に `TestRun_PassesPDFEngineToResume` を足す。手本は、同じファイルの `TestRun_PassesResumeHandlers` である。
   - 完了の確かめ方: `go test ./cmd/keirekipro/ -run 'TestRun_PassesPDFEngineToResume|TestRun_PassesResumeHandlers'` が通る。5つ目の大きなまとまりの最後のタスクなので、大きなまとまりの最後のタスクで verify のスキルを流すと決めた完了条件の2つ目のとおり、`/verify-backend` も通る
