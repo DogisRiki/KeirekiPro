@@ -1,0 +1,44 @@
+# 出力の操作で、出力の前提を満たさない経歴書の筋書き(要件3の受入基準2)。
+# user1 が、resumes/empty.sql の経歴書 101(名前と日付だけを持ち、氏名と子の項目を持たない)に、次の4種類の要求を送る。
+#   - 設定を付けない出力の PDF と Markdown
+#   - 設定を付けた出力の inline(画面のプレビュー。誤りの文言が PDF のプレビューの文で始まる)と attachment
+# Accept は、画面と同じく application/json を含める。
+name: export-prerequisite
+group: 4
+fixtures: [users/basic.sql, resumes/empty.sql]
+modes: [compare]
+steps:
+  - name: login-user1
+    request:
+      method: POST
+      path: /api/auth/login
+      json: {email: user1@example.com, password: Passw0rd!}
+    expect: {status: 200}
+  - name: default-pdf-empty
+    request:
+      method: GET
+      path: /api/resumes/00000000-0000-4000-8000-000000000101/export
+      headers: {Accept: 'application/pdf, application/json'}
+    expect: {status: 400, content_type: application/json}
+  - name: markdown-empty
+    request:
+      method: GET
+      path: /api/resumes/00000000-0000-4000-8000-000000000101/export
+      headers: {Accept: 'text/markdown, application/json'}
+    expect: {status: 400, content_type: application/json}
+  - name: preview-pdf-empty
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-000000000101/export
+      csrf: true
+      headers: {Accept: 'application/pdf, application/json'}
+      json_file: export/inline-default.json
+    expect: {status: 400, content_type: application/json}
+  - name: save-pdf-empty
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-000000000101/export
+      csrf: true
+      headers: {Accept: 'application/pdf, application/json'}
+      json_file: resumes/fonts-NotoSansJP.json
+    expect: {status: 400, content_type: application/json}

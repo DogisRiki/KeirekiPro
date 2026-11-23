@@ -1,0 +1,43 @@
+# 出力の操作で、退会してすでに居ない利用者の筋書き(要件4の受入基準2)。手本は scenarios/resumes/deleted-user.yaml である。
+# resumes/resume-ops.sql の退会用の利用者(000000000340)がログインし、ログインの状態の値を取り出してから退会する。
+# 退会用の利用者は、パスワードを変えていないので、ログインの状態の世代の番号が 0 のままであり、取り出した値は退会のあとも
+# ログインの状態の検査を通る。退会の答えは Cookie の XSRF-TOKEN を残すので、退会のあとの csrf の段は、残った XSRF-TOKEN を使う。
+# 退会のあとの段は、取り出した値を Cookie のヘッダで送り、退会の前の経歴書(000000000350)に、設定を付けない出力の Markdown と、
+# 設定を付けた出力の attachment を送る。Accept は、画面と同じく application/json を含める。
+name: export-deleted-user
+group: 4
+fixtures: [users/basic.sql, resumes/resume-ops.sql]
+modes: [compare]
+steps:
+  - name: login-withdraw
+    request:
+      method: POST
+      path: /api/auth/login
+      json: {email: resume-withdraw@example.com, password: Passw0rd!}
+    capture: {withdrawAccess: 'cookie:accessToken'}
+    expect: {status: 200}
+  - name: get-resume-before-delete
+    request:
+      method: GET
+      path: /api/resumes/00000000-0000-4000-8000-000000000350
+    expect: {status: 200}
+  - name: delete-withdraw-user
+    request:
+      method: DELETE
+      path: /api/users/me
+      csrf: true
+    expect: {status: 204}
+  - name: markdown-after-delete
+    request:
+      method: GET
+      path: /api/resumes/00000000-0000-4000-8000-000000000350/export
+      headers: {Cookie: 'accessToken={withdrawAccess}', Accept: 'text/markdown, application/json'}
+    expect: {status: 404, content_type: application/json}
+  - name: save-pdf-after-delete
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-000000000350/export
+      csrf: true
+      headers: {Cookie: 'accessToken={withdrawAccess}', Accept: 'application/pdf, application/json'}
+      json_file: resumes/fonts-NotoSansJP.json
+    expect: {status: 404, content_type: application/json}

@@ -204,7 +204,7 @@
   - _要件: 1.1, 2.1, 3.1, 3.4, 5.1_
   - _依存: 3.5_
 
-- [ ] 6.3 出力の前提と無い経歴書とほかの利用者と退会した利用者の筋書きを書き、進み具合の表を「作り終えた」にする
+- [x] 6.3 出力の前提と無い経歴書とほかの利用者と退会した利用者の筋書きを書き、進み具合の表を「作り終えた」にする
 
   Claude は、この小タスクで次の3つをする。
 
@@ -278,6 +278,7 @@
 - Thymeleaf の TEXT のひな形は、本文が改行で始まり改行で終わる繰り返しで、2回目からの繰り返しの先頭の改行を出さない。Go の Markdown のひな形は、その改行を1回目だけ出す。Claude は、ひな形の空白と改行の正しさを、Java 版のひな形を Thymeleaf 3.1.5 で動かして確かめる。開発環境の Java 版のコンテナの gradle の置き場には OGNL が無いので、Claude は、thymeleaf-spring6 と Spring 6.2.19 の部品を読み込み、`SpringTemplateEngine` で動かす
 - 小タスク6.1 の比べる検査で、すべての経歴書の PDF の職歴の表の会社名の列の左の端が、Java 版で 175.91pt、Go 版で 170.25pt と違った。2つのひな形は `* { box-sizing: border-box }` を持つが、Java 版の PDF の部品は表のマスの幅に box-sizing を使わず、期間の列を 185px に右の余白 8px を足した 193px にする。Chromium は box-sizing を使い、185px にする。Claude は、比べる部品の許す幅を広げずに、Go 版のひな形の `.career-list .career-period` に `box-sizing: content-box` を足し、同じ位置にした。design.md の、Chromium で Java 版と同じ見た目にするために足す CSS の一覧に無い CSS なので、Claude は、この食い違いと理由を PR の本文に書く
 - 小タスク6.2 の `settings.yaml` と `rejects.yaml` は、`fixtures` に `export/export.sql` を書かない。2つの筋書きは `resumes/fonts.sql` の経歴書 401 だけを使い、`export/export.sql` は `resumes/many-pages.sql` の経歴書 201 に自己PR を足すので、書くと使わない経歴書のファイルも読み込むことになるためである。design.md の初期のデータと要求の本文の節は、筋書きが `export/export.sql` を書くとしているので、Claude は、この違いを PR の本文に書く
+- 小タスク6.1 から6.3 の筋書きで、Java 版が 500 で答える出力の要求は見つからなかった。退会してすでに居ない利用者の出力の要求にも、Java 版は 404 と「対象の職務経歴書データが存在しません。」で答える。そのため、Claude は、変えた動きの一覧に出力の違いを足していない。Claude は、このことを小タスク7.2 で PR の本文に書く
 
 ## 完了条件(全タスク共通)
 
