@@ -1,0 +1,71 @@
+# 出力の操作で、設定を付けた出力の本文を断る条件の筋書き(要件3の受入基準1と4)。
+# user1 が、resumes/fonts.sql の経歴書 401 に、要件3の受入基準1の5種類の断る条件のそれぞれに当たる本文を送る。
+#   - 形式に選べない値を入れた本文(export/reject-format.json)
+#   - 形式が pdf で PDF の設定の無い本文(export/reject-no-settings.json)
+#   - フォントに選べない値を入れた本文(export/reject-font.json)
+#   - 文字の大きさに72より大きい値を入れた本文(export/reject-size.json)
+#   - 16進数と赤と緑と青の両方で書いた色の本文(export/reject-color.json)
+# 形式の条件に当たる本文は、無い経歴書(0000000004ff)にも送る。Go 版は、経歴書があるかを確かめる前に本文を確かめるので、
+# 無い経歴書でも本文の誤りとして断る(要件3の受入基準4)。
+# Accept は、画面と同じく application/json を含める。application/json の無い Accept では、2つの版の答えが違う
+# (変えた動きの一覧の CB-060)ので送らない。1つの欄に2つの文言が付く本文は、2つの版で文言の並びが違う(CB-061)ので送らない。
+name: export-rejects
+group: 4
+fixtures: [users/basic.sql, resumes/fonts.sql]
+modes: [compare]
+steps:
+  - name: login-user1
+    request:
+      method: POST
+      path: /api/auth/login
+      json: {email: user1@example.com, password: Passw0rd!}
+    expect: {status: 200}
+  - name: reject-format
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-000000000401/export
+      csrf: true
+      headers: {Accept: 'application/pdf, application/json'}
+      json_file: export/reject-format.json
+    expect: {status: 400, content_type: application/json}
+  - name: reject-no-settings
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-000000000401/export
+      csrf: true
+      headers: {Accept: 'application/pdf, application/json'}
+      json_file: export/reject-no-settings.json
+    expect: {status: 400, content_type: application/json}
+  - name: reject-font
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-000000000401/export
+      csrf: true
+      headers: {Accept: 'application/pdf, application/json'}
+      json_file: export/reject-font.json
+    expect: {status: 400, content_type: application/json}
+  - name: reject-size
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-000000000401/export
+      csrf: true
+      headers: {Accept: 'application/pdf, application/json'}
+      json_file: export/reject-size.json
+    expect: {status: 400, content_type: application/json}
+  - name: reject-color
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-000000000401/export
+      csrf: true
+      headers: {Accept: 'application/pdf, application/json'}
+      json_file: export/reject-color.json
+    expect: {status: 400, content_type: application/json}
+  # 無い経歴書に、形式の条件に当たる本文を送る
+  - name: reject-format-missing-resume
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-0000000004ff/export
+      csrf: true
+      headers: {Accept: 'application/pdf, application/json'}
+      json_file: export/reject-format.json
+    expect: {status: 400, content_type: application/json}

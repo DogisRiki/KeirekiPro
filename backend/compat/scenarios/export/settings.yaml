@@ -1,0 +1,94 @@
+# 出力の操作で、設定を付けた出力の本文の、PDF の設定の値の筋書き(要件1の受入基準1、要件2の受入基準1)。
+# user1 が、resumes/fonts.sql の経歴書 401 に、設定を付けた出力の本文を、画面と同じ Accept の行で送る。
+#   - 2つのフォントの本文(resumes/fonts-NotoSansJP.json と fonts-NotoSerifJP.json)
+#   - 文字の大きさと色を変えた2つの本文(resumes/sizes-NotoSansJP.json と sizes-NotoSerifJP.json)
+#   - 4つの文字の大きさを既定から 0.5 違う値にした本文(export/half-step-sizes.json)
+#   - 0.5 刻みでない文字の大きさと、大文字の16進数の色の本文(export/odd-values.json)
+#   - 赤と緑と青の値で書いた色の本文(export/rgb-color.json)
+# 画面が送らない次の2つの本文も送り、Java 版と同じに断ることを確かめる。2つの本文の Go 版の答えは、
+# internal/resume の exportbody_test.go が、Java 版の正解のファイルと同じであることを確かめている。
+#   - 文字の大きさの欄に真偽を入れた本文(export/bool-number.json)
+#   - 16進数の色の欄に指数の付いた数を入れた本文(export/exp-string.json)
+name: export-settings
+group: 4
+fixtures: [users/basic.sql, resumes/fonts.sql]
+modes: [compare]
+steps:
+  - name: login-user1
+    request:
+      method: POST
+      path: /api/auth/login
+      json: {email: user1@example.com, password: Passw0rd!}
+    expect: {status: 200}
+  - name: font-sans
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-000000000401/export
+      csrf: true
+      headers: {Accept: 'application/pdf, application/json'}
+      json_file: resumes/fonts-NotoSansJP.json
+    expect: {status: 200, content_type: application/pdf}
+  - name: font-serif
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-000000000401/export
+      csrf: true
+      headers: {Accept: 'application/pdf, application/json'}
+      json_file: resumes/fonts-NotoSerifJP.json
+    expect: {status: 200, content_type: application/pdf}
+  - name: sizes-sans
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-000000000401/export
+      csrf: true
+      headers: {Accept: 'application/pdf, application/json'}
+      json_file: resumes/sizes-NotoSansJP.json
+    expect: {status: 200, content_type: application/pdf}
+  - name: sizes-serif
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-000000000401/export
+      csrf: true
+      headers: {Accept: 'application/pdf, application/json'}
+      json_file: resumes/sizes-NotoSerifJP.json
+    expect: {status: 200, content_type: application/pdf}
+  - name: half-step-sizes
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-000000000401/export
+      csrf: true
+      headers: {Accept: 'application/pdf, application/json'}
+      json_file: export/half-step-sizes.json
+    expect: {status: 200, content_type: application/pdf}
+  - name: odd-values
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-000000000401/export
+      csrf: true
+      headers: {Accept: 'application/pdf, application/json'}
+      json_file: export/odd-values.json
+    expect: {status: 200, content_type: application/pdf}
+  - name: rgb-color
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-000000000401/export
+      csrf: true
+      headers: {Accept: 'application/pdf, application/json'}
+      json_file: export/rgb-color.json
+    expect: {status: 200, content_type: application/pdf}
+  - name: bool-number
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-000000000401/export
+      csrf: true
+      headers: {Accept: 'application/pdf, application/json'}
+      json_file: export/bool-number.json
+    expect: {status: 400, content_type: application/json}
+  - name: exp-string
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-000000000401/export
+      csrf: true
+      headers: {Accept: 'application/pdf, application/json'}
+      json_file: export/exp-string.json
+    expect: {status: 400, content_type: application/json}

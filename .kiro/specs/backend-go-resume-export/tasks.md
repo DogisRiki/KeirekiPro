@@ -196,7 +196,7 @@
   - _要件: 1.1, 1.3, 2.1, 2.2, 2.3, 5.1, 5.2_
   - _依存: 2.1, 2.3, 5.3_
 
-- [ ] 6.2 PDF の設定の値と断る条件の筋書きを書く
+- [x] 6.2 PDF の設定の値と断る条件の筋書きを書く
 
   Claude は、出力の操作の筋書きの節のとおりに、`settings.yaml` と `rejects.yaml` を書き、初期のデータと要求の本文の節の表の、`half-step-sizes.json` から `reject-color.json` までの10の要求の本文を `backend/compat/fixtures/export/` に置く。`settings.yaml` は、置き換えの spec が置いた4つの要求の本文を `json_file` で送る。Claude は、`bool-number.json` と `exp-string.json` のうち、Go 版の答えが Java 版と違うと小タスク3.5 の `exportbody_test.go` で分かった本文を、`settings.yaml` から外す。断る条件と誤りの答えを確かめる要求の Accept には、Claude は `application/json` を含める。
   - 完了の確かめ方: `go test -tags compat -count=1 -run 'TestCompare_Scenarios/(<settings.yaml と rejects.yaml の筋書きの名前を | でつないだもの>)' ./compat/` が通る
@@ -277,6 +277,7 @@
 - 本文の読み手は、JDK 21 で Jackson 3.1.7 を動かして確かめた、design.md に書かれていない3つの読み方も Java 版に合わせる。1つ目は、本文のどこにある数でも数字が1000を超えれば本文を読まないことと、数の欄の文字列の前後の空白を除いた長さが1000を超えれば読まないこと。2つ目は、数の欄の文字列の `"null"` と空白だけの文字列を、値が無いとすること。3つ目は、赤と緑と青の欄の文字列が、Java の `Integer.parseInt` と同じく、基本多言語面の Unicode の10進数の数字(アラビア文字の数字、全角の数字など)を読むこと。Claude は、この3つも PR の本文に書く
 - Thymeleaf の TEXT のひな形は、本文が改行で始まり改行で終わる繰り返しで、2回目からの繰り返しの先頭の改行を出さない。Go の Markdown のひな形は、その改行を1回目だけ出す。Claude は、ひな形の空白と改行の正しさを、Java 版のひな形を Thymeleaf 3.1.5 で動かして確かめる。開発環境の Java 版のコンテナの gradle の置き場には OGNL が無いので、Claude は、thymeleaf-spring6 と Spring 6.2.19 の部品を読み込み、`SpringTemplateEngine` で動かす
 - 小タスク6.1 の比べる検査で、すべての経歴書の PDF の職歴の表の会社名の列の左の端が、Java 版で 175.91pt、Go 版で 170.25pt と違った。2つのひな形は `* { box-sizing: border-box }` を持つが、Java 版の PDF の部品は表のマスの幅に box-sizing を使わず、期間の列を 185px に右の余白 8px を足した 193px にする。Chromium は box-sizing を使い、185px にする。Claude は、比べる部品の許す幅を広げずに、Go 版のひな形の `.career-list .career-period` に `box-sizing: content-box` を足し、同じ位置にした。design.md の、Chromium で Java 版と同じ見た目にするために足す CSS の一覧に無い CSS なので、Claude は、この食い違いと理由を PR の本文に書く
+- 小タスク6.2 の `settings.yaml` と `rejects.yaml` は、`fixtures` に `export/export.sql` を書かない。2つの筋書きは `resumes/fonts.sql` の経歴書 401 だけを使い、`export/export.sql` は `resumes/many-pages.sql` の経歴書 201 に自己PR を足すので、書くと使わない経歴書のファイルも読み込むことになるためである。design.md の初期のデータと要求の本文の節は、筋書きが `export/export.sql` を書くとしているので、Claude は、この違いを PR の本文に書く
 
 ## 完了条件(全タスク共通)
 
