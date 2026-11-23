@@ -232,7 +232,7 @@
   - _要件: 5.4_
 
 - [ ] 7. API の説明画面で確かめて、記録を書く
-- [ ] 7.1 API の説明画面で出力の2つの操作を確かめる
+- [x] 7.1 API の説明画面で出力の2つの操作を確かめる
 
   Claude は、この作業フォルダの最上位から compose の `backend-go` を作り直して起動し、この作業フォルダのコードを動かす。Claude は、API の説明画面での確認の節のとおりに、開発環境の compose の `api-docs`(ポート 8082)を Playwright で開き、出力の2つの操作の答えを確かめる。Claude は、確かめた結果を、`/ship` で作るこの spec の PR の本文に書く。
   - 完了の確かめ方: 設定を付けた出力の inline と attachment の PDF の「Try it out」が、200 と `application/pdf` で答える。設定を付けない出力の Markdown の「Try it out」が、200 と `text/markdown;charset=utf-8` で答える
