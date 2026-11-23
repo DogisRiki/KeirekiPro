@@ -47,7 +47,7 @@
   - _要件: 5.2, 6.2_
   - _対象の部品: Java 版と Go 版を比べる検査の広げ方_
 
-- [ ] 2.2 PDF を比べる部品の、頁の大きさとフォントと字の比べ方を決め直す (並行可)
+- [x] 2.2 PDF を比べる部品の、頁の大きさとフォントと字の比べ方を決め直す (並行可)
 
   Claude は、PDF を比べる部品の節のとおりに、`backend/compat/pdfcmp/pdfcmp.go` の比べ方のうち、頁の大きさ、フォント、文書の全体の字の並び、フォントと色ごとの字の数の4つを決め直す。Claude は、今の字の直し方の関数 `normalizeText` を、設計の字の直し方に置き換え、Java 版の行の左の端で列をまとめる処理を作る。Claude は、文書の全体の字の並びを `pdftotext -bbox-layout` の行から、フォントと色ごとの字の数を `pdftohtml -xml -fontfullname` から取る。Claude は、今の `pdftotext -layout` で頁ごとの字を読む `readTexts` と、頁ごとの字を比べる `firstDifferentLine` を、文書の全体の字の並びの比べ方に置き換えて消す。Claude は、`Describe` と `Compare` の形と、Java 版と Go 版を比べる検査への違いの渡し方を変えない。Claude は、このタスクで作る違いの種類に、PDF を比べる部品の節の表の名前を使う。
 

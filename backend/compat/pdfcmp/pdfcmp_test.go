@@ -4,6 +4,7 @@ package pdfcmp
 
 import (
 	"context"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -89,7 +90,8 @@ func TestCompare_RejectsOneCharDiff(t *testing.T) {
 		if same {
 			t.Fatal("違いがあるはずですが、同じと読みました")
 		}
-		if javaDetail != "[ページの文字] ページ 1: 行 1: Hello World" || goDetail != "[ページの文字] ページ 1: 行 1: Hello Worle" {
+		if !strings.HasPrefix(javaDetail, "["+KindDocText+"] ") || !strings.Contains(javaDetail, "Hello World") ||
+			!strings.HasPrefix(goDetail, "["+KindDocText+"] ") || !strings.Contains(goDetail, "Hello Worle") {
 			t.Errorf("違いの説明 = %q / %q", javaDetail, goDetail)
 		}
 	})
@@ -168,6 +170,114 @@ func TestCompare_TableColorTolerance(t *testing.T) {
 		r := compare(t, java, goPDF)
 		if !hasDiff(r, KindColor, 1) || !strings.Contains(r.Diffs[0].Go, "箱がありません") {
 			t.Errorf("Go 版に箱が無い違いがあるはずですが、%+v", r.Diffs)
+		}
+	})
+}
+
+func TestCompare_PageSizeTolerance(t *testing.T) {
+	java := makePDF(t, font, twoLines(72, 700))
+	t.Run("幅と高さの 0.5pt 以内の違いを止めない", func(t *testing.T) {
+		page := twoLines(72, 700)
+		page.width, page.height = 595.3, 842.3
+		if r := compare(t, java, makePDF(t, font, page)); !r.Same() {
+			t.Errorf("違いが無いはずですが、%+v", r.Diffs)
+		}
+	})
+	for name, size := range map[string][2]float64{"幅": {595.6, 842}, "高さ": {595, 841.4}} {
+		t.Run(name+"が 0.6pt 違うページを止める", func(t *testing.T) {
+			page := twoLines(72, 700)
+			page.width, page.height = size[0], size[1]
+			r := compare(t, java, makePDF(t, font, page))
+			if !hasDiff(r, KindPageSize, 1) {
+				t.Errorf("1ページ目にページの大きさの違いがあるはずですが、%+v", r.Diffs)
+			}
+		})
+	}
+}
+
+func TestNormalizeText(t *testing.T) {
+	for name, tc := range map[string]struct{ in, want string }{
+		"互換漢字を統合漢字にする":       {"塚朗", "塚朗"},
+		"U+2011 を - にする":     {"2020‑2021", "2020-2021"},
+		"「～」(U+FF5E)を「〜」にする": {"2020～2021", "2020〜2021"},
+		"空白と改行と全角の空白を除く":     {" 期間\t2020 \n〜　2021 ", "期間2020〜2021"},
+		"結合の記号の組を1つの字にする":    {"é", "é"},
+		"ほかの字はそのままにする":       {"Hello-World", "Hello-World"},
+	} {
+		if got := normalizeText(tc.in); got != tc.want {
+			t.Errorf("%s: normalizeText(%q) = %q, want %q", name, tc.in, got, tc.want)
+		}
+	}
+}
+
+func TestCompare_RejectsMissingChar(t *testing.T) {
+	java := makePDF(t, font, twoLines(72, 700))
+	goPDF := makePDF(t, font, testPage{content: text(12, 72, 700, "Hello Wrld") + text(12, 72, 680, "Second line")})
+	r := compare(t, java, goPDF)
+	if !hasDiff(r, KindDocText, 0) {
+		t.Errorf("文書の字の並びの違いがあるはずですが、%+v", r.Diffs)
+	}
+	// 1字抜けた行は、字の数も違う
+	if !hasDiff(r, KindFontColor, 0) {
+		t.Errorf("フォントと色ごとの字の数の違いがあるはずですが、%+v", r.Diffs)
+	}
+}
+
+func TestCompare_RejectsFontColorCount(t *testing.T) {
+	// 「Hello World」は10字、「Second」は6字である。2つの版で、黒と赤の字の数が入れ替わる
+	java := makePDF(t, font, testPage{content: text(12, 72, 700, "Hello World") + coloredText(255, 0, 0, 12, 72, 680, "Second")})
+	t.Run("色ごとの字の数が同じなら止めない", func(t *testing.T) {
+		goPDF := makePDF(t, font, testPage{content: coloredText(255, 0, 0, 12, 72, 680, "Second") + text(12, 72, 700, "Hello World")})
+		if r := compare(t, java, goPDF); !r.Same() {
+			t.Errorf("違いが無いはずですが、%+v", r.Diffs)
+		}
+	})
+	t.Run("色ごとの字の数が違えば止める", func(t *testing.T) {
+		goPDF := makePDF(t, font, testPage{content: coloredText(255, 0, 0, 12, 72, 700, "Hello World") + text(12, 72, 680, "Second")})
+		r := compare(t, java, goPDF)
+		if !hasDiff(r, KindFontColor, 0) || hasDiff(r, KindDocText, 0) || hasDiff(r, KindFont, 0) {
+			t.Errorf("フォントと色の違いだけがあるはずですが、%+v", r.Diffs)
+		}
+		var details []string
+		for _, d := range r.Diffs {
+			if d.Kind == KindFontColor {
+				details = append(details, d.Java+" / "+d.Go)
+			}
+		}
+		want := []string{"Helvetica #000000: 10字 / Helvetica #000000: 6字", "Helvetica #ff0000: 6字 / Helvetica #ff0000: 10字"}
+		if !slices.Equal(details, want) {
+			t.Errorf("フォントと色の違いの説明 = %q, want %q", details, want)
+		}
+	})
+}
+
+func TestCompare_TwoColumnOrder(t *testing.T) {
+	// 左の列に Alpha と Bravo、右の列に Charlie を置く。Java 版は Charlie を Alpha より 0.5pt 上に、Go 版は 0.5pt 下に置く。
+	// 上からの位置だけで並べると、Java 版は Charlie, Alpha, Bravo、Go 版は Alpha, Charlie, Bravo の順になる
+	java := makePDF(t, font, testPage{content: text(12, 72, 700, "Alpha") + text(12, 72, 680, "Bravo") + text(12, 300, 700.5, "Charlie")})
+	t.Run("列、頁、上からの位置の順につないで同じ字の並びなら止めない", func(t *testing.T) {
+		goPDF := makePDF(t, font, testPage{content: text(12, 300, 699.5, "Charlie") + text(12, 72, 680, "Bravo") + text(12, 72, 700, "Alpha")})
+		if r := compare(t, java, goPDF); !r.Same() {
+			t.Errorf("違いが無いはずですが、%+v", r.Diffs)
+		}
+	})
+	t.Run("列の中の順が違えば止める", func(t *testing.T) {
+		goPDF := makePDF(t, font, testPage{content: text(12, 72, 700, "Bravo") + text(12, 72, 680, "Alpha") + text(12, 300, 700.5, "Charlie")})
+		if r := compare(t, java, goPDF); !hasDiff(r, KindDocText, 0) {
+			t.Errorf("文書の字の並びの違いがあるはずですが、%+v", r.Diffs)
+		}
+	})
+	t.Run("どの列にも入らない Go 版の行を止める", func(t *testing.T) {
+		goPDF := makePDF(t, font, testPage{content: text(12, 72, 700, "Alpha") + text(12, 72, 680, "Bravo") + text(12, 400, 700.5, "Charlie")})
+		r := compare(t, java, goPDF)
+		found := false
+		for _, d := range r.Diffs {
+			if d.Kind == KindDocText && strings.Contains(d.Go, "Charlie") && strings.Contains(d.Java, "列がありません") {
+				found = true
+			}
+		}
+		if !found {
+			t.Errorf("どの列にも入らない行の違いがあるはずですが、%+v", r.Diffs)
 		}
 	})
 }

@@ -7,6 +7,7 @@ package pdfcmp
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"encoding/xml"
 	"errors"
@@ -16,6 +17,7 @@ import (
 	"image/png"
 	"io"
 	"io/fs"
+	"maps"
 	"math"
 	"os"
 	"os/exec"
@@ -25,6 +27,10 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
+	"unicode/utf8"
+
+	"golang.org/x/text/unicode/norm"
 )
 
 // 許す違いの大きさ。design.md の「pdfcmp」の表のとおりにする。
@@ -35,17 +41,25 @@ const (
 	HeightTolerance = 0.35
 	// ColorTolerance は、表の色の R、G、B のそれぞれの違いとして許す大きさである。
 	ColorTolerance = 2
+	// PageSizeTolerance は、ページの幅と高さのそれぞれの違いとして許す大きさ(pt)である。
+	PageSizeTolerance = 0.5
+	// ColumnTolerance は、行の左の端を同じ列にまとめる幅(pt)である。
+	ColumnTolerance = 2.0
 )
 
 // 違いの種類。報告に、この名前で書く。
 const (
-	KindPages    = "ページの数"
-	KindPageSize = "ページの大きさ"
-	KindFont     = "フォント"
-	KindText     = "ページの文字"
-	KindWordPos  = "語の位置"
-	KindFontSize = "文字の大きさ"
-	KindColor    = "表の色"
+	KindPages     = "ページの数"
+	KindPageSize  = "ページの大きさ"
+	KindFont      = "フォント"
+	KindDocText   = "文書の字の並び"
+	KindFontColor = "フォントと色"
+	KindWordPos   = "語の位置"
+	KindFontSize  = "文字の大きさ"
+	KindColor     = "表の色"
+	// KindText は、ページごとの字の違いの種類である。部品は、ページごとの字を比べなくなったので、この種類の違いを作らない。
+	// 改頁の位置の違いを確かめるテストが、この名前を使う。行の組で改頁の位置の違いを見つける比べ方にしたら消す。
+	KindText = "ページの文字"
 )
 
 const (
@@ -137,13 +151,35 @@ func (w word) describe() string {
 	return fmt.Sprintf("「%s」 左 %.2f 上 %.2f 右 %.2f 下 %.2f", w.text, w.xMin, w.yMin, w.xMax, w.yMax)
 }
 
+// line は、pdftotext -bbox-layout の1つの行である。位置の単位は pt で、ページの左上を原点にする。
+type line struct {
+	// page は、行のあるページの番号で、1 から数える。
+	page int
+	// text は、行の語を空白でつないだ字である。norm は、text を normalizeText で直した字である。
+	text, norm             string
+	xMin, yMin, xMax, yMax float64
+}
+
+func (l line) describe() string {
+	return fmt.Sprintf("ページ %d の行「%s」", l.page, l.text)
+}
+
+// pageSize は、pdfinfo が書いた1つのページの大きさである。raw は、pdfinfo が書いたままの字である。
+type pageSize struct {
+	width, height float64
+	raw           string
+}
+
 // doc は、1つの PDF を poppler-utils で読んだものである。ページごとの値は、ページの順に並べる。
 type doc struct {
-	sizes []string
+	sizes []pageSize
 	fonts []string
-	texts []string
+	// lines は、pdftotext -bbox-layout が書いた順の、文書の全体の行である。
+	lines []line
 	words [][]word
-	pages []image.Image
+	// fontColors は、pdftohtml が写した字の、フォントの名前と色の組ごとの数である。
+	fontColors map[string]int
+	pages      []image.Image
 }
 
 // pdfFile は、版ごとの作業のフォルダに書く PDF の名前である。poppler-utils の道具は、版ごとの作業のフォルダで動かし、
@@ -167,10 +203,10 @@ func readDoc(ctx context.Context, dir, name string, pdf []byte) (doc, error) {
 	if d.fonts, err = readFonts(ctx, work); err != nil {
 		return doc{}, err
 	}
-	if d.texts, err = readTexts(ctx, work); err != nil {
+	if d.lines, d.words, err = readLayout(ctx, work); err != nil {
 		return doc{}, err
 	}
-	if d.words, err = readWords(ctx, work); err != nil {
+	if d.fontColors, err = readFontColors(ctx, work); err != nil {
 		return doc{}, err
 	}
 	if d.pages, err = readImages(ctx, work); err != nil {
@@ -193,12 +229,12 @@ func run(cmd *exec.Cmd, work string) ([]byte, error) {
 
 var (
 	pagesLine = regexp.MustCompile(`(?m)^Pages:\s+(\d+)\s*$`)
-	sizeLine  = regexp.MustCompile(`(?m)^Page\s+\d+ size:\s+(.+?)\s*$`)
+	sizeLine  = regexp.MustCompile(`(?m)^Page\s+\d+ size:\s+(([0-9.]+) x ([0-9.]+) pts.*?)\s*$`)
 )
 
 // readSizes は、pdfinfo で、ページごとの大きさを読む。ページの数は、返す値の数になる。
 // 最後のページの番号に、どの PDF のページの数よりも大きい数を渡す。pdfinfo は、最後のページの番号をページの数に縮める。
-func readSizes(ctx context.Context, work string) ([]string, error) {
+func readSizes(ctx context.Context, work string) ([]pageSize, error) {
 	out, err := run(exec.CommandContext(ctx, "pdfinfo", "-f", "1", "-l", "1000000", pdfFile), work)
 	if err != nil {
 		return nil, err
@@ -207,9 +243,14 @@ func readSizes(ctx context.Context, work string) ([]string, error) {
 	if m == nil {
 		return nil, errors.New("pdfinfo の出力にページの数がありません")
 	}
-	var sizes []string
+	var sizes []pageSize
 	for _, s := range sizeLine.FindAllSubmatch(out, -1) {
-		sizes = append(sizes, string(s[1]))
+		w, errW := strconv.ParseFloat(string(s[2]), 64)
+		h, errH := strconv.ParseFloat(string(s[3]), 64)
+		if err := errors.Join(errW, errH); err != nil {
+			return nil, fmt.Errorf("pdfinfo のページの大きさ %q を読めません: %w", s[1], err)
+		}
+		sizes = append(sizes, pageSize{width: w, height: h, raw: string(s[1])})
 	}
 	if n, _ := strconv.Atoi(string(m[1])); len(sizes) != n {
 		return nil, fmt.Errorf("pdfinfo の出力のページの大きさが %d 件で、ページの数 %d と合いません", len(sizes), n)
@@ -243,82 +284,91 @@ func readFonts(ctx context.Context, work string) ([]string, error) {
 	return slices.Compact(fonts), nil
 }
 
-// readTexts は、pdftotext -layout で、ページごとの文字を読む。
-func readTexts(ctx context.Context, work string) ([]string, error) {
-	out, err := run(exec.CommandContext(ctx, "pdftotext", "-layout", "-enc", "UTF-8", pdfFile, "-"), work)
-	if err != nil {
-		return nil, err
-	}
-	pages := strings.Split(string(out), "\f")
-	// pdftotext は、各ページの終わりに改ページの文字を書くので、最後の要素は空になる
-	pages = pages[:len(pages)-1]
-	texts := make([]string, len(pages))
-	for i, p := range pages {
-		texts[i] = normalizeText(p)
-	}
-	return texts, nil
-}
-
-var spaces = regexp.MustCompile(`[ \t]+`)
-
-// normalizeText は、ページの文字を比べる形にする。
-//   - Java 版の PDF から写すと「〜」(U+301C)が「～」(U+FF5E)になるので、「～」を「〜」に直す
-//   - 行の中の空白の続きを1つの空白にし、行の前後の空白と空の行を除く。-layout は、文字の位置から空白と空の行の数を決めるので、
-//     許す幅の中のずれでも数が変わるためである。位置の違いは、語の位置で比べる
+// normalizeText は、行の字を比べる形にする。
+//   - Unicode の NFC で直す。Java 版の PDF から写した互換漢字を、Go 版と同じ統合漢字にするためである
+//   - U+2011(改行しないハイフン)を「-」に直す。Java 版の PDF から写すと、「-」が U+2011 になるためである
+//   - 「～」(U+FF5E)を「〜」(U+301C)に直す。Java 版の PDF から写すと、「〜」が「～」になるためである
+//   - 空白を除く。2つの版で、語と行の区切りが違うためである
 func normalizeText(s string) string {
-	s = strings.ReplaceAll(s, "～", "〜")
-	var lines []string
-	for line := range strings.SplitSeq(s, "\n") {
-		line = strings.TrimSpace(spaces.ReplaceAllString(line, " "))
-		if line != "" {
-			lines = append(lines, line)
+	var b strings.Builder
+	for _, r := range norm.NFC.String(s) {
+		switch {
+		case unicode.IsSpace(r):
+			continue
+		case r == '‑':
+			r = '-'
+		case r == '～':
+			r = '〜'
 		}
+		b.WriteRune(r)
 	}
-	return strings.Join(lines, "\n")
+	return b.String()
 }
 
-// readWords は、pdftotext -bbox-layout で、ページごとの語と、その箱を読む。
-func readWords(ctx context.Context, work string) ([][]word, error) {
+// readLayout は、pdftotext -bbox-layout で、文書の全体の行と、ページごとの語と、それぞれの箱を読む。
+func readLayout(ctx context.Context, work string) ([]line, [][]word, error) {
 	out, err := run(exec.CommandContext(ctx, "pdftotext", "-bbox-layout", "-enc", "UTF-8", pdfFile, "-"), work)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	dec := xml.NewDecoder(bytes.NewReader(out))
 	dec.Strict = false
 	dec.AutoClose = xml.HTMLAutoClose
 	dec.Entity = xml.HTMLEntity
-	var pages [][]word
+	var (
+		lines []line
+		pages [][]word
+		// cur は、読んでいる途中の行である。行の外では nil にする。
+		cur   *line
+		texts []string
+	)
 	for {
 		tok, err := dec.Token()
 		if errors.Is(err, io.EOF) {
-			return pages, nil
+			return lines, pages, nil
 		}
 		if err != nil {
-			return nil, fmt.Errorf("pdftotext -bbox-layout の出力を読めません: %w", err)
+			return nil, nil, fmt.Errorf("pdftotext -bbox-layout の出力を読めません: %w", err)
 		}
-		start, ok := tok.(xml.StartElement)
-		if !ok {
-			continue
-		}
-		switch start.Name.Local {
-		case "page":
-			pages = append(pages, nil)
-		case "word":
-			if len(pages) == 0 {
-				return nil, errors.New("pdftotext -bbox-layout の出力で、ページの外に語があります")
+		switch t := tok.(type) {
+		case xml.StartElement:
+			switch t.Name.Local {
+			case "page":
+				pages = append(pages, nil)
+			case "line":
+				if len(pages) == 0 {
+					return nil, nil, errors.New("pdftotext -bbox-layout の出力で、ページの外に行があります")
+				}
+				l := line{page: len(pages)}
+				if err := decodeBox(t, "行", &l.xMin, &l.yMin, &l.xMax, &l.yMax); err != nil {
+					return nil, nil, err
+				}
+				cur, texts = &l, nil
+			case "word":
+				if cur == nil {
+					return nil, nil, errors.New("pdftotext -bbox-layout の出力で、行の外に語があります")
+				}
+				w, err := decodeWord(dec, t)
+				if err != nil {
+					return nil, nil, err
+				}
+				pages[len(pages)-1] = append(pages[len(pages)-1], w)
+				texts = append(texts, w.text)
 			}
-			w, err := decodeWord(dec, start)
-			if err != nil {
-				return nil, err
+		case xml.EndElement:
+			if t.Name.Local == "line" && cur != nil {
+				cur.text = strings.Join(texts, " ")
+				cur.norm = normalizeText(cur.text)
+				lines = append(lines, *cur)
+				cur = nil
 			}
-			pages[len(pages)-1] = append(pages[len(pages)-1], w)
 		}
 	}
 }
 
-func decodeWord(dec *xml.Decoder, start xml.StartElement) (word, error) {
-	var w word
-	targets := map[string]*float64{"xMin": &w.xMin, "yMin": &w.yMin, "xMax": &w.xMax, "yMax": &w.yMax}
+// decodeBox は、要素 start の xMin、yMin、xMax、yMax の属性を読む。what は、誤りに書く、要素の呼び名である。
+func decodeBox(start xml.StartElement, what string, xMin, yMin, xMax, yMax *float64) error {
+	targets := map[string]*float64{"xMin": xMin, "yMin": yMin, "xMax": xMax, "yMax": yMax}
 	for _, a := range start.Attr {
 		p, ok := targets[a.Name.Local]
 		if !ok {
@@ -326,20 +376,102 @@ func decodeWord(dec *xml.Decoder, start xml.StartElement) (word, error) {
 		}
 		v, err := strconv.ParseFloat(a.Value, 64)
 		if err != nil {
-			return word{}, fmt.Errorf("語の位置 %s=%q を読めません: %w", a.Name.Local, a.Value, err)
+			return fmt.Errorf("%sの位置 %s=%q を読めません: %w", what, a.Name.Local, a.Value, err)
 		}
 		*p = v
 		delete(targets, a.Name.Local)
 	}
 	if len(targets) > 0 {
-		return word{}, errors.New("pdftotext -bbox-layout の語に、位置の属性が足りません")
+		return fmt.Errorf("pdftotext -bbox-layout の%sに、位置の属性が足りません", what)
 	}
-	var text string
-	if err := dec.DecodeElement(&text, &start); err != nil {
+	return nil
+}
+
+func decodeWord(dec *xml.Decoder, start xml.StartElement) (word, error) {
+	var w word
+	if err := decodeBox(start, "語", &w.xMin, &w.yMin, &w.xMax, &w.yMax); err != nil {
+		return word{}, err
+	}
+	if err := dec.DecodeElement(&w.text, &start); err != nil {
 		return word{}, fmt.Errorf("語の文字を読めません: %w", err)
 	}
-	w.text = strings.ReplaceAll(text, "～", "〜")
 	return w, nil
+}
+
+// readFontColors は、pdftohtml -xml -fontfullname で、写した字を、フォントの名前と色の組ごとに数える。
+// 空白は数えない。フォントの名前の先頭の6文字の付け足しを除く。pdftohtml は Go 版の一部の字を部首の字として写すので、
+// 字そのものは比べる材料に使わず、数だけを使う。
+func readFontColors(ctx context.Context, work string) (map[string]int, error) {
+	out, err := run(exec.CommandContext(ctx, "pdftohtml", "-xml", "-stdout", "-i", "-q", "-fontfullname", pdfFile), work)
+	if err != nil {
+		return nil, err
+	}
+	dec := xml.NewDecoder(bytes.NewReader(out))
+	dec.Strict = false
+	dec.Entity = xml.HTMLEntity
+	// pdftohtml は、フォントの番号を文書の全体で付け、番号を最初に使うページに fontspec を書く
+	fonts := map[string]string{}
+	counts := map[string]int{}
+	for {
+		tok, err := dec.Token()
+		if errors.Is(err, io.EOF) {
+			return counts, nil
+		}
+		if err != nil {
+			return nil, fmt.Errorf("pdftohtml -xml の出力を読めません: %w", err)
+		}
+		start, ok := tok.(xml.StartElement)
+		if !ok {
+			continue
+		}
+		switch start.Name.Local {
+		case "fontspec":
+			fonts[attr(start, "id")] = subsetPrefix.ReplaceAllString(attr(start, "family"), "") + " " + attr(start, "color")
+		case "text":
+			key, ok := fonts[attr(start, "font")]
+			if !ok {
+				return nil, fmt.Errorf("pdftohtml -xml の出力の字が、書かれていないフォントの番号 %q を使います", attr(start, "font"))
+			}
+			n, err := countChars(dec)
+			if err != nil {
+				return nil, err
+			}
+			counts[key] += n
+		}
+	}
+}
+
+func attr(start xml.StartElement, name string) string {
+	for _, a := range start.Attr {
+		if a.Name.Local == name {
+			return a.Value
+		}
+	}
+	return ""
+}
+
+// countChars は、読み始めた要素の終わりまでの字のうち、空白でない字を数える。要素の中の b や i の要素の字も数える。
+func countChars(dec *xml.Decoder) (int, error) {
+	n := 0
+	for depth := 1; depth > 0; {
+		tok, err := dec.Token()
+		if err != nil {
+			return 0, fmt.Errorf("pdftohtml -xml の出力の字を読めません: %w", err)
+		}
+		switch t := tok.(type) {
+		case xml.StartElement:
+			depth++
+		case xml.EndElement:
+			depth--
+		case xml.CharData:
+			for _, r := range string(t) {
+				if !unicode.IsSpace(r) {
+					n++
+				}
+			}
+		}
+	}
+	return n, nil
 }
 
 // readImages は、pdftoppm -r 72 で、ページごとの画像を作って読む。72dpi では、1画素が 1pt になる。
@@ -394,16 +526,17 @@ func compareDocs(j, g doc) Result {
 	if !slices.Equal(j.fonts, g.fonts) {
 		add(KindFont, 0, strings.Join(j.fonts, ", "), strings.Join(g.fonts, ", "))
 	}
+	textDiffs, sameText := compareDocText(j.lines, g.lines)
+	r.Diffs = append(r.Diffs, textDiffs...)
+	r.Diffs = append(r.Diffs, compareFontColors(j.fontColors, g.fontColors)...)
 	for i := range min(len(j.sizes), len(g.sizes)) {
 		page := i + 1
-		if j.sizes[i] != g.sizes[i] {
-			add(KindPageSize, page, j.sizes[i], g.sizes[i])
+		js, gs := j.sizes[i], g.sizes[i]
+		if exceeds(js.width, gs.width, PageSizeTolerance) || exceeds(js.height, gs.height, PageSizeTolerance) {
+			add(KindPageSize, page, js.raw, gs.raw)
 		}
-		if i < len(j.texts) && i < len(g.texts) && j.texts[i] != g.texts[i] {
-			jl, gl := firstDifferentLine(j.texts[i], g.texts[i])
-			add(KindText, page, jl, gl)
-		} else if i < len(j.words) && i < len(g.words) {
-			// 文字が違うページでは、語の組がずれるので、語の位置と大きさを比べない
+		// 字の並びが違う文書では、語の組がずれるので、語の位置と大きさを比べない
+		if sameText && i < len(j.words) && i < len(g.words) {
 			for _, d := range compareWords(j.words[i], g.words[i]) {
 				add(d.Kind, page, d.Java, d.Go)
 			}
@@ -424,23 +557,144 @@ func compareDocs(j, g doc) Result {
 	return r
 }
 
-// firstDifferentLine は、2つのページの文字のうち、最初に違う行を、行の番号を付けて返す。
-func firstDifferentLine(j, g string) (string, string) {
-	jl, gl := strings.Split(j, "\n"), strings.Split(g, "\n")
-	for k := range max(len(jl), len(gl)) {
-		a, b := lineAt(jl, k), lineAt(gl, k)
-		if a != b {
-			return fmt.Sprintf("行 %d: %s", k+1, a), fmt.Sprintf("行 %d: %s", k+1, b)
-		}
-	}
-	return j, g
+// column は、Java 版の行の左の端を ColumnTolerance 以内のものどうしでまとめた列である。lo と hi は、列の行の左の端の最小と最大である。
+type column struct {
+	lo, hi float64
 }
 
-func lineAt(lines []string, k int) string {
-	if k < len(lines) {
-		return lines[k]
+// javaColumns は、Java 版の行の左の端を、隣との差が ColumnTolerance 以内のものどうしで列にまとめ、左から順に返す。
+func javaColumns(lines []line) []column {
+	xs := make([]float64, 0, len(lines))
+	for _, l := range lines {
+		xs = append(xs, l.xMin)
 	}
-	return "(行がありません)"
+	slices.Sort(xs)
+	var cols []column
+	for _, x := range xs {
+		if n := len(cols); n > 0 && !exceeds(x, cols[n-1].hi, ColumnTolerance) {
+			cols[n-1].hi = x
+			continue
+		}
+		cols = append(cols, column{lo: x, hi: x})
+	}
+	return cols
+}
+
+// findColumn は、左の端 x の行に最も近い列の番号と、その列との差が ColumnTolerance 以内で、行が列に入るかを返す。
+// 列が無ければ -1 を返す。
+func findColumn(cols []column, x float64) (int, bool) {
+	best, bestDist := -1, math.Inf(1)
+	for k, c := range cols {
+		d := 0.0
+		if x < c.lo {
+			d = c.lo - x
+		} else if x > c.hi {
+			d = x - c.hi
+		}
+		if d < bestDist {
+			best, bestDist = k, d
+		}
+	}
+	return best, best >= 0 && bestDist <= ColumnTolerance+epsilon
+}
+
+// textSeq は、列、ページ、上からの位置の順に並べた行の字をつないだものである。ends[k] は、lines[k] の字の終わりの位置である。
+type textSeq struct {
+	text  string
+	lines []line
+	ends  []int
+}
+
+// orderLines は、行を列、ページ、上からの位置の順に並べ、直した字をつなぐ。cols は、行ごとの列の番号である。
+// 直した字が空の行は、つながない。
+func orderLines(lines []line, cols []int) textSeq {
+	idx := make([]int, 0, len(lines))
+	for k := range lines {
+		if lines[k].norm != "" {
+			idx = append(idx, k)
+		}
+	}
+	slices.SortStableFunc(idx, func(a, b int) int {
+		la, lb := lines[a], lines[b]
+		if c := cmp.Compare(cols[a], cols[b]); c != 0 {
+			return c
+		}
+		if c := cmp.Compare(la.page, lb.page); c != 0 {
+			return c
+		}
+		if c := cmp.Compare(la.yMin, lb.yMin); c != 0 {
+			return c
+		}
+		return cmp.Compare(la.xMin, lb.xMin)
+	})
+	var s textSeq
+	var b strings.Builder
+	for _, k := range idx {
+		b.WriteString(lines[k].norm)
+		s.lines = append(s.lines, lines[k])
+		s.ends = append(s.ends, b.Len())
+	}
+	s.text = b.String()
+	return s
+}
+
+// lineAt は、つないだ字の位置 pos を含む行の説明を返す。pos が字の終わりなら、そのことを返す。
+func (s textSeq) lineAt(pos int) string {
+	k, _ := slices.BinarySearch(s.ends, pos+1)
+	if k >= len(s.lines) {
+		return "(字の並びの終わり)"
+	}
+	return s.lines[k].describe()
+}
+
+// compareDocText は、2つの版の文書の全体の行を、Java 版の行で決めた列、ページ、上からの位置の順につなぎ、字の並びを比べる。
+// 列でまとめるのは、表の列の字が1行にまとまる順が2つの版で違うためである。どの列にも入らない Go 版の行は、1行ずつ違いにし、
+// 字の並びの比べでは最も近い列に置く。字の並びが違えば、最初に違う字を含む行を、両方の版について書く。
+// sameSeq は、つないだ字の並びが同じかを返す。
+func compareDocText(j, g []line) (diffs []Diff, sameSeq bool) {
+	cols := javaColumns(j)
+	jc := make([]int, len(j))
+	for k, l := range j {
+		jc[k], _ = findColumn(cols, l.xMin)
+	}
+	gc := make([]int, len(g))
+	for k, l := range g {
+		var in bool
+		if gc[k], in = findColumn(cols, l.xMin); !in {
+			diffs = append(diffs, Diff{Kind: KindDocText, Java: "(入る列がありません)", Go: fmt.Sprintf("%s 左 %.2f", l.describe(), l.xMin)})
+		}
+	}
+	js, gs := orderLines(j, jc), orderLines(g, gc)
+	if js.text == gs.text {
+		return diffs, true
+	}
+	pos := 0
+	for pos < len(js.text) && pos < len(gs.text) && js.text[pos] == gs.text[pos] {
+		pos++
+	}
+	// 2つの字の並びは pos の前まで同じなので、片方で字の途中なら、もう片方でも字の途中である。違う字の始まりまで戻す
+	for pos > 0 && pos < len(js.text) && !utf8.RuneStart(js.text[pos]) {
+		pos--
+	}
+	return append(diffs, Diff{Kind: KindDocText, Java: js.lineAt(pos), Go: gs.lineAt(pos)}), false
+}
+
+// compareFontColors は、フォントの名前と色の組ごとの字の数を比べ、数が違う組を、組の名前の順に1つずつ違いにする。
+func compareFontColors(j, g map[string]int) []Diff {
+	keys := slices.Sorted(maps.Keys(j))
+	for k := range g {
+		if _, ok := j[k]; !ok {
+			keys = append(keys, k)
+		}
+	}
+	slices.Sort(keys)
+	var diffs []Diff
+	for _, k := range keys {
+		if j[k] != g[k] {
+			diffs = append(diffs, Diff{Kind: KindFontColor, Java: fmt.Sprintf("%s: %d字", k, j[k]), Go: fmt.Sprintf("%s: %d字", k, g[k])})
+		}
+	}
+	return diffs
 }
 
 // compareWords は、1つのページの語を、出てくる順で組にし、箱の端のずれと高さの違いを比べる。
