@@ -325,8 +325,8 @@ func TestLoadChangedBehaviors_CB005HasNoMatch(t *testing.T) {
 			t.Errorf("%s が一覧にありません", id)
 		}
 	}
-	if len(got) != 55 {
-		t.Errorf("一覧の項目は55のはずですが、%d です", len(got))
+	if len(got) != 61 {
+		t.Errorf("一覧の項目は61のはずですが、%d です", len(got))
 	}
 	// CB-022 は、利用者の操作の筋書きの管理者で違いが出るので match を持つ(TestChangedBehaviors_RefreshTokenRoles で確かめる)
 	for _, id := range []string{

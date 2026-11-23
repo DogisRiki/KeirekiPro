@@ -46,7 +46,7 @@ type Options struct {
 	// UserHandlers は、利用者の7つの操作の処理である。*users.Service を渡す。利用者の操作はログインを求めるので、
 	// AuthHandlers があるときだけ使う。nil なら、利用者の操作も Handlers が答える。
 	UserHandlers UserService
-	// ResumeHandlers は、マスタと経歴書の26の操作の処理である。*resume.Service を渡す。マスタと経歴書の操作は
+	// ResumeHandlers は、マスタと経歴書の28の操作の処理である。*resume.Service を渡す。マスタと経歴書の操作は
 	// ログインを求めるので、AuthHandlers があるときだけ使う。nil なら、マスタと経歴書の操作も Handlers が答える。
 	ResumeHandlers ResumeService
 	// CookieSecure は、認証の操作が書く Cookie に Secure を付けるかである。config の App.CookieSecure を渡す。
@@ -90,7 +90,7 @@ type userOperations interface {
 	) (gen.RemoveAuthProviderResponseObject, error)
 }
 
-// resumeOperations は、マスタと経歴書の26の操作のメソッドである。Options の ResumeHandlers が無いときは、ほかの操作の答えを
+// resumeOperations は、マスタと経歴書の28の操作のメソッドである。Options の ResumeHandlers が無いときは、ほかの操作の答えを
 // 入れ、マスタと経歴書の操作にも、ほかの操作と同じ答え(Options の Handlers か未実装の答え)を返す。
 type resumeOperations interface {
 	ListCertificationNames(
@@ -117,6 +117,12 @@ type resumeOperations interface {
 	UpdateResumeBasic(
 		ctx context.Context, request gen.UpdateResumeBasicRequestObject,
 	) (gen.UpdateResumeBasicResponseObject, error)
+	ExportResume(
+		ctx context.Context, request gen.ExportResumeRequestObject,
+	) (gen.ExportResumeResponseObject, error)
+	ExportResumeWithSettings(
+		ctx context.Context, request gen.ExportResumeWithSettingsRequestObject,
+	) (gen.ExportResumeWithSettingsResponseObject, error)
 	CreateCareer(
 		ctx context.Context, request gen.CreateCareerRequestObject,
 	) (gen.CreateCareerResponseObject, error)

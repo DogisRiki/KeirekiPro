@@ -24,6 +24,8 @@ type ResumeService interface {
 	DeleteResume(ctx context.Context, userID uuid.UUID, resumeID string) error
 	CreateResume(ctx context.Context, userID uuid.UUID, body []byte) (resume.Resume, error)
 	UpdateResumeBasic(ctx context.Context, userID uuid.UUID, resumeID string, body []byte) (resume.Resume, error)
+	ExportResume(ctx context.Context, userID uuid.UUID, resumeID string, format resume.ExportFormat) (resume.Export, error)
+	ExportResumeWithSettings(ctx context.Context, userID uuid.UUID, resumeID string, body []byte) (resume.Export, error)
 
 	CreateCareer(ctx context.Context, userID uuid.UUID, resumeID string, body []byte) (resume.Resume, error)
 	UpdateCareer(ctx context.Context, userID uuid.UUID, resumeID, careerID string, body []byte) (resume.Resume, error)
@@ -52,7 +54,7 @@ type ResumeService interface {
 
 var _ ResumeService = (*resume.Service)(nil)
 
-// resumeHandlers は、経歴書の26の操作の受け口である。
+// resumeHandlers は、経歴書の28の操作の受け口である。
 type resumeHandlers struct {
 	svc    ResumeService
 	secure bool
@@ -348,4 +350,71 @@ func (h *resumeHandlers) DeleteSelfPromotion(
 	return h.withNoContent(ctx, func(userID uuid.UUID) error {
 		return h.svc.DeleteSelfPromotion(ctx, userID, req.ResumeId, req.SelfPromotionId)
 	})
+}
+
+// exportNotAcceptableMessage は、設定を付けない出力で、Accept の行から形式を選べないときの文言である。
+const exportNotAcceptableMessage = "対応していない形式が指定されました。"
+
+// exportFormatFromAccept は、Accept の行を型の並びとして読み、型が application/pdf の値があれば PDF を、無くて
+// 型が text/markdown の値があれば Markdown を返す。どちらも無いときと、Accept の行を読めないときは ok が false になる。
+// Java 版は、Accept の行の字の並びに application/pdf か text/markdown が含まれるかで選ぶ(変えた動きの一覧の CB-059)。
+func exportFormatFromAccept(lines []string) (resume.ExportFormat, bool) {
+	types, ok := parseAccept(lines)
+	if !ok {
+		return "", false
+	}
+	has := func(typ, sub string) bool {
+		for _, m := range types {
+			if m.typ == typ && m.sub == sub {
+				return true
+			}
+		}
+		return false
+	}
+	switch {
+	case has("application", "pdf"):
+		return resume.ExportPDF, true
+	case has("text", "markdown"):
+		return resume.ExportMarkdown, true
+	}
+	return "", false
+}
+
+// exported は、出力 e を、200 と、出力の Content-Type と、出し方とファイル名から作った Content-Disposition と、
+// 出力の本文で答える。err があれば、ほかの経歴書の操作と同じく答える。
+func (h *resumeHandlers) exported(e resume.Export, err error) (authResponse, error) {
+	if err != nil {
+		return h.fail(err)
+	}
+	return authResponse{
+		status: http.StatusOK, contentType: e.ContentType,
+		contentDisposition: formatContentDisposition(e.Inline, e.FileName), body: e.Body,
+	}, nil
+}
+
+// ExportResume は、設定を付けずに経歴書を出力する。形式は、authRequestMiddleware が context に入れた Accept の行で
+// 選ぶ。選べないときは、経歴書を読まずに、406 と「対応していない形式が指定されました。」で答える。
+func (h *resumeHandlers) ExportResume(
+	ctx context.Context, req gen.ExportResumeRequestObject,
+) (gen.ExportResumeResponseObject, error) {
+	id, ok := authctx.UserID(ctx)
+	if !ok {
+		return authResponse{}, errNoLoginUser
+	}
+	format, ok := exportFormatFromAccept(requestInfo(ctx).accept)
+	if !ok {
+		return authJSON(http.StatusNotAcceptable, authErrorBody{Message: exportNotAcceptableMessage, Errors: map[string][]string{}}), nil
+	}
+	return h.exported(h.svc.ExportResume(ctx, id, req.ResumeId, format))
+}
+
+// ExportResumeWithSettings は、本文の設定を付けて経歴書を出力する。本文は読まずに処理に渡し、Accept の行を見ない。
+func (h *resumeHandlers) ExportResumeWithSettings(
+	ctx context.Context, req gen.ExportResumeWithSettingsRequestObject,
+) (gen.ExportResumeWithSettingsResponseObject, error) {
+	id, ok := authctx.UserID(ctx)
+	if !ok {
+		return authResponse{}, errNoLoginUser
+	}
+	return h.exported(h.svc.ExportResumeWithSettings(ctx, id, req.ResumeId, rawBody(req.Body)))
 }

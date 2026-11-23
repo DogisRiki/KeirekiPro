@@ -38,42 +38,6 @@ func (e EmailNotVerifiedErrorResponseKind) Valid() bool {
 	}
 }
 
-// Defines values for ExportResumeRequestDisposition.
-const (
-	Attachment ExportResumeRequestDisposition = "attachment"
-	Inline     ExportResumeRequestDisposition = "inline"
-)
-
-// Valid indicates whether the value is a known member of the ExportResumeRequestDisposition enum.
-func (e ExportResumeRequestDisposition) Valid() bool {
-	switch e {
-	case Attachment:
-		return true
-	case Inline:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for ExportResumeRequestFormat.
-const (
-	Markdown ExportResumeRequestFormat = "markdown"
-	Pdf      ExportResumeRequestFormat = "pdf"
-)
-
-// Valid indicates whether the value is a known member of the ExportResumeRequestFormat enum.
-func (e ExportResumeRequestFormat) Valid() bool {
-	switch e {
-	case Markdown:
-		return true
-	case Pdf:
-		return true
-	default:
-		return false
-	}
-}
-
 // Defines values for ForbiddenResponseMessage.
 const (
 	Empty ForbiddenResponseMessage = "アクセス権限がありません。"
@@ -312,17 +276,7 @@ type ErrorResponse struct {
 }
 
 // ExportResumeRequest `format` が `pdf` なら `pdfSettings` が要る(無ければ 400、`errors` の項目名は `pdfSettingsRequired`)。
-type ExportResumeRequest struct {
-	Disposition ExportResumeRequestDisposition `json:"disposition"`
-	Format      ExportResumeRequestFormat      `json:"format"`
-	PdfSettings *PdfSettings                   `json:"pdfSettings,omitempty"`
-}
-
-// ExportResumeRequestDisposition defines model for ExportResumeRequest.Disposition.
-type ExportResumeRequestDisposition string
-
-// ExportResumeRequestFormat defines model for ExportResumeRequest.Format.
-type ExportResumeRequestFormat string
+type ExportResumeRequest = json.RawMessage
 
 // FontSizes 文字の大きさ(pt)。どれも 6 以上 72 以下の小数。
 type FontSizes struct {

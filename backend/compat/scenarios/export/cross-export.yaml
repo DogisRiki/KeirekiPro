@@ -1,0 +1,159 @@
+# 一方の版で保存した経歴書を、もう一方の版で Markdown と PDF に出力できることを確かめる、版をまたぐ筋書き(要件6)。
+# user1 が、最初の版で経歴書を作り、基本の情報と、職歴、プロジェクト、自己PR の項目を足して、出力の前提を満たす経歴書にする。
+# 最初の版で経歴書を読み、更新の日時を取り出す。
+# もう一方の版(to: other)で、設定を付けない出力の Markdown を求め、content_type と body_contains で、足した項目の値が
+# 出ていることを確かめる。続けてもう一方の版で、設定を付けた出力の PDF を求め、content_type が application/pdf であることを
+# 確かめる。最後に、最初の版(to: other)で経歴書を読み、expect の values で、項目と更新の日時が変わっていないことを確かめる。
+name: export-cross-export
+group: 4
+fixtures: [users/basic.sql]
+modes: [cross]
+steps:
+  - name: login-user1
+    request:
+      method: POST
+      path: /api/auth/login
+      json: {email: user1@example.com, password: Passw0rd!}
+    expect: {status: 200}
+  # 最初の版で、経歴書を作り、基本の情報と3つの欄に項目を足す
+  - name: create-resume
+    request:
+      method: POST
+      path: /api/resumes
+      csrf: true
+      json: {resumeName: 版をまたいで出力する経歴書}
+    capture: {resumeID: $.id}
+    expect: {status: 201}
+  - name: update-basic
+    request:
+      method: PUT
+      path: /api/resumes/{resumeID}/basic
+      csrf: true
+      json: {resumeName: 版をまたいで出力する経歴書, date: '2026-04-01', lastName: 出力, firstName: 太郎}
+    expect: {status: 200}
+  - name: create-career
+    request:
+      method: POST
+      path: /api/resumes/{resumeID}/careers
+      csrf: true
+      json: {companyName: 株式会社またいで出力, startDate: '2015-04', endDate: '2019-03', isActive: false}
+    expect: {status: 201}
+  - name: create-project
+    request:
+      method: POST
+      path: /api/resumes/{resumeID}/projects
+      csrf: true
+      json:
+        companyName: 株式会社またいで出力
+        startDate: '2016-04'
+        endDate: '2018-03'
+        isActive: false
+        name: 版をまたいで出力するプロジェクト
+        overview: 一方の版で足すプロジェクト
+        teamComp: 全体5名
+        role: 開発の担当
+        achievement: 予定どおりに終えた。
+        requirements: true
+        basicDesign: true
+        detailedDesign: false
+        implementation: true
+        integrationTest: false
+        systemTest: true
+        maintenance: false
+        frontendLanguages: [TypeScript, JavaScript]
+        frontendFrameworks: [React]
+        frontendLibraries: []
+        frontendBuildTools: []
+        frontendPackageManagers: []
+        frontendLinters: []
+        frontendFormatters: []
+        frontendTestingTools: []
+        backendLanguages: [Go]
+        backendFrameworks: []
+        backendBuildTools: []
+        backendPackageManagers: []
+        backendLinters: []
+        backendFormatters: []
+        backendTestingTools: []
+        ormTools: []
+        auth: []
+        clouds: [AWS]
+        operatingSystems: []
+        containers: []
+        databases: [PostgreSQL]
+        webServers: []
+        ciCdTools: []
+        iacTools: []
+        monitoringTools: []
+        loggingTools: []
+        sourceControls: [Git]
+        projectManagements: []
+        communicationTools: []
+        documentationTools: []
+        apiDevelopmentTools: []
+        designTools: []
+        editors: []
+        developmentEnvironments: []
+    expect: {status: 201}
+  - name: create-self-promotion
+    request:
+      method: POST
+      path: /api/resumes/{resumeID}/self-promotions
+      csrf: true
+      json: {title: 版をまたいで出力する自己PR, content: 一方の版で足す自己PR}
+    expect: {status: 201}
+  # 最初の版で読み、更新の日時と項目の ID を取り出す
+  - name: get-resume-saved-version
+    request:
+      method: GET
+      path: /api/resumes/{resumeID}
+    capture:
+      updatedAt: $.updatedAt
+      careerID: '$.careers[0].id'
+      projectID: '$.projects[0].id'
+      selfPromotionID: '$.selfPromotions[0].id'
+    expect: {status: 200}
+  # もう一方の版で、Markdown と PDF に出力する
+  - name: export-markdown-other-version
+    to: other
+    request:
+      method: GET
+      path: /api/resumes/{resumeID}/export
+      headers: {Accept: 'text/markdown, application/json'}
+    expect:
+      status: 200
+      content_type: text/markdown;charset=utf-8
+      body_contains:
+        - '**氏名：出力 太郎**'
+        - 株式会社またいで出力
+        - 版をまたいで出力するプロジェクト
+        - 版をまたいで出力する自己PR
+        - 一方の版で足す自己PR
+  - name: export-pdf-other-version
+    request:
+      method: POST
+      path: /api/resumes/{resumeID}/export
+      csrf: true
+      headers: {Accept: 'application/pdf, application/json'}
+      json_file: resumes/fonts-NotoSansJP.json
+    expect: {status: 200, content_type: application/pdf}
+  # 最初の版で読み、出力のあとも項目が変わっていないことを確かめる
+  - name: get-resume-first-version
+    to: other
+    request:
+      method: GET
+      path: /api/resumes/{resumeID}
+    expect:
+      status: 200
+      values:
+        $.id: '{resumeID}'
+        $.resumeName: 版をまたいで出力する経歴書
+        $.lastName: 出力
+        $.firstName: 太郎
+        $.updatedAt: '{updatedAt}'
+        '$.careers[0].id': '{careerID}'
+        '$.careers[0].companyName': 株式会社またいで出力
+        '$.projects[0].id': '{projectID}'
+        '$.projects[0].name': 版をまたいで出力するプロジェクト
+        '$.selfPromotions[0].id': '{selfPromotionID}'
+        '$.selfPromotions[0].title': 版をまたいで出力する自己PR

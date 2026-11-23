@@ -10,13 +10,21 @@ import (
 )
 
 // testPage は、テストの PDF の1ページである。content は、ページの内容のストリームの命令である。
+// width と height は、ページの大きさ(pt)である。0 なら A4(595 x 842)にする。
 type testPage struct {
-	content string
+	content       string
+	width, height float64
 }
 
 // text は、フォント /F1 の size の大きさで、(x, y) に s を書く命令を返す。
 func text(size, x, y float64, s string) string {
 	return fmt.Sprintf("BT /F1 %g Tf %g %g Td (%s) Tj ET\n", size, x, y, s)
+}
+
+// coloredText は、text と同じ命令を、字の色 (r, g, b)(0〜255)で書く命令を返す。q と Q で囲み、色を後ろの命令に残さない。
+func coloredText(r, g, b int, size, x, y float64, s string) string {
+	return fmt.Sprintf("q BT %.6f %.6f %.6f rg /F1 %g Tf %g %g Td (%s) Tj ET Q\n",
+		float64(r)/255, float64(g)/255, float64(b)/255, size, x, y, s)
 }
 
 // rect は、色 (r, g, b)(0〜255)で、(x, y) から幅 w、高さ h の四角を塗る命令を返す。
@@ -25,7 +33,7 @@ func rect(r, g, b int, x, y, w, h float64) string {
 		float64(r)/255, float64(g)/255, float64(b)/255, x, y, w, h)
 }
 
-// makePDF は、フォント baseFont(標準の Type1 のフォントの名前に、付け足しを付けてよい)を使う、A4 の PDF を作る。
+// makePDF は、フォント baseFont(標準の Type1 のフォントの名前に、付け足しを付けてよい)を使う PDF を作る。
 func makePDF(t *testing.T, baseFont string, pages ...testPage) []byte {
 	t.Helper()
 	n := len(pages)
@@ -41,8 +49,12 @@ func makePDF(t *testing.T, baseFont string, pages ...testPage) []byte {
 		fmt.Sprintf("<< /Type /Font /Subtype /Type1 /BaseFont /%s /Encoding /WinAnsiEncoding >>", baseFont),
 	)
 	for i, p := range pages {
+		width, height := p.width, p.height
+		if width == 0 {
+			width, height = 595, 842
+		}
 		objs = append(objs,
-			fmt.Sprintf("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents %d 0 R >>", 5+2*i),
+			fmt.Sprintf("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 %g %g] /Resources << /Font << /F1 3 0 R >> >> /Contents %d 0 R >>", width, height, 5+2*i),
 			fmt.Sprintf("<< /Length %d >>\nstream\n%sendstream", len(p.content), p.content),
 		)
 	}

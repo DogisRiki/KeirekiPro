@@ -170,13 +170,14 @@ func run(ctx context.Context, d deps) int {
 		RewritePresignHost: cfg.Env == config.EnvDev,
 		AWSEndpoint:        cfg.AWS.Endpoint,
 	})
-	resumeService := resume.New(resume.Deps{Pool: pool, Now: time.Now})
 
 	engine, err := d.newPDF(pdf.Options{Logger: logging.Named(logger, "pdf")})
 	if err != nil {
 		return fail(logger, "startup_failed", "PDF を作る部品を起動できません", err)
 	}
 	defer engine.Close()
+	// 経歴書の処理は、PDF の出力に、起動した PDF を作る部品を使う
+	resumeService := resume.New(resume.Deps{Pool: pool, Now: time.Now, PDF: engine})
 
 	listener, err := d.listen()
 	if err != nil {

@@ -283,7 +283,7 @@ func javaHost(host string) string {
 	return host[:i+1] + strconv.Itoa(port)
 }
 
-// authRequestInfo は、Google と GitHub の操作の受け口が使う、要求の Host と Accept の行である。
+// authRequestInfo は、Google と GitHub の操作の受け口と、設定を付けない出力の受け口が使う、要求の Host と Accept の行である。
 type authRequestInfo struct {
 	host   string
 	accept []string
@@ -291,10 +291,11 @@ type authRequestInfo struct {
 
 type authRequestKey struct{}
 
-// authRequestMiddleware は、生成したコードの中間処理である。Google と GitHub のログインの開始と戻り先の操作のときに、
-// 要求の Host と Accept の行を context に入れる。
+// authRequestMiddleware は、生成したコードの中間処理である。Google と GitHub のログインの開始と戻り先の操作と、
+// 設定を付けない出力の操作のときに、要求の Host と Accept の行を context に入れる。設定を付けない出力は、Accept の行で
+// 形式を選ぶ。生成した GET の要求の型は Accept を持たないので、この中間処理で渡す。
 func authRequestMiddleware(f gen.StrictHandlerFunc, operationID string) gen.StrictHandlerFunc {
-	if operationID != "StartOidcAuthorization" && operationID != "HandleOidcCallback" {
+	if operationID != "StartOidcAuthorization" && operationID != "HandleOidcCallback" && operationID != "ExportResume" {
 		return f
 	}
 	return func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error) {
