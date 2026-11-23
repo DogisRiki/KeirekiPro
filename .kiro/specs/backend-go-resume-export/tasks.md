@@ -79,7 +79,7 @@
   - _要件: 2.4, 5.5_
   - _依存: 2.2_
 
-- [ ] 3. 本文と設定と出力の前提とファイル名を扱う部品を作る
+- [x] 3. 本文と設定と出力の前提とファイル名を扱う部品を作る
 - [x] 3.1 PDF の設定の既定の値と直し方を作る (並行可)
 
   Claude は、PDF の設定の値の節のとおりに、`backend/internal/resume/exportsettings.go` に、`defaultPDFSettings` と `normalizePDFSettings` と、直す前の設定の値の型 `exportPDFSettingsInput` と、直したあとの型 `pdfSettings` を作る。写す元は、Java 版の `ResumePdfExportSettings` である。
@@ -125,7 +125,7 @@
   - _依存: 1.2, 1.4, 3.1_
 
 - [ ] 4. 出力のモデルとひな形と Service の出力を作る
-- [ ] 4.1 出力のモデルと Markdown のひな形を作る
+- [x] 4.1 出力のモデルと Markdown のひな形を作る
 
   Claude は、出力のモデルとひな形の節のとおりに、`backend/internal/resume/exportmodel.go` に出力のモデルを作り、`templates/resume.md.tmpl` に Markdown のひな形を写し、`exporttemplate.go` に `renderMarkdown` を作る。写す元は、Java 版の `ResumeExportModelBuilder` と `templates/resume/markdown/default.md` である。`exporttemplate.go` は、ひな形を `embed` で読み込み、起動のときに `template.Must` で1度だけ読み込む。
   - 完了の確かめ方: `go test ./internal/resume/ -run 'TestExportModel|TestRenderMarkdown'` が通る
@@ -275,6 +275,7 @@
 - `sanitizeFileName` は、UTF-16 の255で切って半分に割れた絵文字の前の半分を、Java 版の文字列と同じくサロゲートのまま、UTF-8 と同じ規則の3バイト(0xED 0xA0〜0xAF 0x80〜0xBF)で返す。Go では正しくない UTF-8 である。Claude は、小タスク3.4 の `formatContentDisposition` で、この3バイトを、`filename="…"` では Spring と同じく `_` 1つに、`filename*=` では Java の UTF-8 への書き方と同じく `?`(`%3F`)に書く。ファイル名をほかの場所に書くときも、この3バイトを考える
 - design.md の出力の本文の読み手の節は、赤と緑と青の欄の「指数の付いた書き方」を読めない値とするが、小タスク1.2 で控えた `body.json` では、Java 版は数の `1.2e1` と `1E1` を読み、文字列の `"1e2"` だけを読めない値とした。本文の読み手は、正解のファイルのとおり、指数の付いた数を double に読んでから切り捨て、指数の付いた文字列を読めない値とする。design の文と字のとおりではないので、Claude は、この食い違いと理由を PR の本文に書く
 - 本文の読み手は、JDK 21 で Jackson 3.1.7 を動かして確かめた、design.md に書かれていない3つの読み方も Java 版に合わせる。1つ目は、本文のどこにある数でも数字が1000を超えれば本文を読まないことと、数の欄の文字列の前後の空白を除いた長さが1000を超えれば読まないこと。2つ目は、数の欄の文字列の `"null"` と空白だけの文字列を、値が無いとすること。3つ目は、赤と緑と青の欄の文字列が、Java の `Integer.parseInt` と同じく、基本多言語面の Unicode の10進数の数字(アラビア文字の数字、全角の数字など)を読むこと。Claude は、この3つも PR の本文に書く
+- Thymeleaf の TEXT のひな形は、本文が改行で始まり改行で終わる繰り返しで、2回目からの繰り返しの先頭の改行を出さない。Go の Markdown のひな形は、その改行を1回目だけ出す。Claude は、ひな形の空白と改行の正しさを、Java 版のひな形を Thymeleaf 3.1.5 で動かして確かめる。開発環境の Java 版のコンテナの gradle の置き場には OGNL が無いので、Claude は、thymeleaf-spring6 と Spring 6.2.19 の部品を読み込み、`SpringTemplateEngine` で動かす
 
 ## 完了条件(全タスク共通)
 
