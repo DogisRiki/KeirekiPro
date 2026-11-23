@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>{{.Export.Title}}</title>
+    <style>
+        @font-face {
+            font-family: "Noto Sans JP";
+            font-weight: 400;
+            src: local("Noto Sans JP Regular"), local("NotoSansJP-Regular");
+            ascent-override: 112.1%;
+            descent-override: 32.7%;
+        }
+
+        @font-face {
+            font-family: "Noto Sans JP";
+            font-weight: 700;
+            src: local("Noto Sans JP Bold"), local("NotoSansJP-Bold");
+            ascent-override: 112.1%;
+            descent-override: 32.7%;
+        }
+
+        @font-face {
+            font-family: "Noto Serif JP";
+            font-weight: 400;
+            src: local("Noto Serif JP Regular"), local("NotoSerifJP-Regular");
+            ascent-override: 111.2%;
+            descent-override: 32.5%;
+        }
+
+        @font-face {
+            font-family: "Noto Serif JP";
+            font-weight: 700;
+            src: local("Noto Serif JP Bold"), local("NotoSerifJP-Bold");
+            ascent-override: 111.2%;
+            descent-override: 32.5%;
+        }
+
+        @page {
+            size: A4;
+            margin: calc(9mm + 5.9pt) 11mm 9mm 11mm;
+        }
+
+        @page :first {
+            margin-top: 9mm;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: "{{.PDF.FontFamily}}", sans-serif;
+            color: #000;
+            font-size: 10.4px;
+            line-height: 1.4;
+            word-break: break-all;
+            overflow-wrap: break-word;
+            font-variant-ligatures: none;
+        }
+
+        .header {
+            margin-bottom: 8px;
+            position: relative;
+        }
+
+        .document-title {
+            text-align: center;
+            font-size: {{.PDF.TitleFontSize}}px;
+            font-weight: 700;
+            letter-spacing: 0.55em;
+            margin: 0 0 7px;
+            line-height: 1.2;
+        }
+
+        .header-meta {
+            text-align: right;
+            font-size: {{.PDF.DateFontSize}}px;
+            line-height: 1.35;
+            margin-top: 0;
+        }
+
+        .header-name-label {
+            display: inline-block;
+            border-bottom: 1px solid #000;
+            padding: 0 2px 1px;
+            font-size: {{.PDF.FullNameFontSize}}px;
+        }
+
+        .section {
+            margin-top: 8px;
+        }
+
+        .section:last-child {
+            margin-bottom: 0;
+        }
+
+        .section-title {
+            font-size: {{.PDF.SectionHeadingFontSize}}px;
+            font-weight: 700;
+            margin: 0 0 3px;
+            line-height: 1.25;
+        }
+
+        .section-title::before {
+            content: "■";
+        }
+
+        .career-list {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 0 0 6px;
+            table-layout: fixed;
+        }
+
+        .career-list td {
+            border: none;
+            padding: 0 8px 1px 0;
+            font-size: 10.4px;
+            line-height: 1.35;
+            vertical-align: top;
+        }
+
+        .career-list .career-period {
+            width: 185px;
+            white-space: nowrap;
+            /* Java 版の PDF の部品は表のマスの幅に box-sizing を使わず、185px に右の余白 8px を足した 193px を列の幅にする。
+               Chromium で同じ列の幅にするため、このマスだけ幅に余白を含めない */
+            box-sizing: content-box;
+        }
+
+        .company-section {
+            page-break-inside: auto;
+        }
+
+        .company-page-break {
+            page-break-before: always;
+        }
+
+        .company-title {
+            font-weight: 700;
+            font-size: 11px;
+            line-height: 1.35;
+            margin: 0 0 2px;
+        }
+
+        .work-table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+            margin: 0 0 6px;
+            page-break-inside: auto;
+        }
+
+        .work-table th,
+        .work-table td {
+            border: 1px solid #000;
+            padding: 2.5px 4.5px;
+            vertical-align: top;
+        }
+
+        .work-table thead {
+            display: table-row-group;
+        }
+
+        .work-table th {
+            background-color: {{.PDF.TableHeaderColor}};
+            text-align: center;
+            font-weight: 400;
+            line-height: 1.2;
+        }
+
+        .period-col {
+            width: 87px;
+        }
+
+        .content-col {
+            width: 400.33px;
+        }
+
+        .tech-col {
+            width: auto;
+        }
+
+        .period-cell {
+            text-align: center;
+            line-height: 1.7;
+            white-space: normal;
+        }
+
+        .period-cell .period-part {
+            display: block;
+        }
+
+        .content-cell {
+            line-height: 1.4;
+        }
+
+        .tech-cell {
+            line-height: 1.34;
+            font-size: 9.8px;
+        }
+
+        .project-block {
+            margin: 0;
+        }
+
+        .project-heading {
+            font-weight: 700;
+            margin: 0 0 5px;
+            line-height: 1.3;
+        }
+
+        .project-name {
+            font-weight: 700;
+            margin: 0 0 7px;
+            line-height: 1.3;
+        }
+
+        .field-block {
+            margin: 0 0 7px;
+        }
+
+        .field-label {
+            display: block;
+            margin: 0;
+        }
+
+        .field-text {
+            margin: 0;
+            white-space: pre-line;
+        }
+
+        .achievement-list {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+        }
+
+        .achievement-list li {
+            margin: 0 0 1px;
+            padding: 0;
+            text-indent: 0;
+        }
+
+        .tech-section {
+            margin: 0 0 7px;
+        }
+
+        .tech-section-title {
+            font-weight: 700;
+            margin: 0 0 1px;
+            line-height: 1.3;
+        }
+
+        .tech-line {
+            margin: 0;
+            line-height: 1.34;
+        }
+
+        .sub-table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+            margin-top: 2px;
+        }
+
+        .sub-table th,
+        .sub-table td {
+            border: 1px solid #000;
+            padding: 3px 5px;
+            vertical-align: top;
+            font-size: 10.4px;
+            line-height: 1.35;
+        }
+
+        .sub-table th {
+            background-color: {{.PDF.TableHeaderColor}};
+            text-align: center;
+            font-weight: 400;
+        }
+
+        .cert-date-col {
+            width: 22%;
+        }
+
+        .portfolio-title,
+        .pr-title {
+            font-weight: 700;
+            margin: 0 0 3px;
+        }
+
+        .portfolio-box {
+            border: 1px solid #000;
+            padding: 4px 5px;
+            margin-bottom: 6px;
+            page-break-inside: avoid;
+        }
+
+        .pr-section {
+            border: 1px solid #000;
+            padding: 4px 5px;
+            margin-bottom: 6px;
+            page-break-inside: auto;
+        }
+
+        .portfolio-box p,
+        .pr-section p {
+            margin: 0 0 3px;
+            white-space: pre-line;
+            line-height: 1.4;
+        }
+
+        .sns-list {
+            margin: 0;
+            padding: 0;
+        }
+
+        .sns-item {
+            margin: 0 0 1px;
+            line-height: 1.35;
+            padding-top: 5.9pt;
+        }
+
+        .sns-bullet {
+            display: inline;
+            font-size: 10.4px;
+            line-height: 1;
+        }
+
+        body>*:last-child,
+        .section:last-child,
+        .pr-section:last-child,
+        .pr-section:last-child p:last-child {
+            margin-bottom: 0;
+            padding-bottom: 0;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="header">
+        <h1 class="document-title">{{.Export.Title}}</h1>
+        <div class="header-meta">
+            <div>{{.Export.AsOfDateLabel}}</div>
+            <div class="header-name-label">
+                氏名：<span>{{.Export.FullName}}</span>
+            </div>
+        </div>
+    </div>
+{{with .Export.Careers}}
+    <div class="section">
+        <div class="section-title">職歴</div>
+        <table class="career-list">
+            <tbody>{{range .}}
+                <tr>
+                    <td class="career-period">{{.PeriodLabel}}</td>
+                    <td>{{.CompanyName}}</td>
+                </tr>{{end}}
+            </tbody>
+        </table>
+    </div>
+{{end}}{{with .Export.CompanySections}}
+    <div class="section">
+        <div class="section-title">職務内容</div>
+{{range $i, $company := .}}
+        <div class="company-section{{if $i}} company-page-break{{end}}">
+            <div class="company-title">
+                勤務先：<span>{{.CompanyLabel}}</span>
+                {{if notBlankText .CompanyPeriodLabel}}<span>
+                    （勤務期間：<span>{{.CompanyPeriodLabel}}</span>）
+                </span>{{end}}
+            </div>
+
+            <table class="work-table">
+                <thead>
+                    <tr>
+                        <th class="period-col">期間</th>
+                        <th class="content-col">業務内容</th>
+                        <th class="tech-col">技術スタック</th>
+                    </tr>
+                </thead>
+                <tbody>{{range .Projects}}
+                    <tr>
+                        <td class="period-cell">
+                            <span class="period-part">{{.PeriodStartLabel}}</span>
+                            <span class="period-part">～</span>
+                            <span class="period-part">{{.PeriodEndLabel}}</span>
+                        </td>
+                        <td class="content-cell">
+                            <div class="project-block">
+                                <div class="project-heading">【プロジェクト内容】</div>
+                                <div class="project-name">{{.ProjectName}}</div>
+{{if notBlankText .Overview}}
+                                <div class="field-block">
+                                    <span class="field-label">プロジェクト概要：</span>
+                                    <p class="field-text">{{.Overview}}</p>
+                                </div>
+{{end}}{{if notBlankText .TeamComp}}
+                                <div class="field-block">
+                                    <span class="field-label">チーム構成：</span>
+                                    <p class="field-text">{{.TeamComp}}</p>
+                                </div>
+{{end}}{{if notBlankText .Role}}
+                                <div class="field-block">
+                                    <span class="field-label">役割：</span>
+                                    <p class="field-text">{{.Role}}</p>
+                                </div>
+{{end}}{{with .Achievements}}
+                                <div class="field-block">
+                                    <span class="field-label">主な成果：</span>
+                                    <ul class="achievement-list">{{range .}}
+                                        <li>{{.}}</li>{{end}}
+                                    </ul>
+                                </div>
+{{end}}{{if notBlankText .Process.Label}}
+                                <div class="field-block">
+                                    <span class="field-label">【作業工程】</span>
+                                    <p class="field-text">{{.Process.Label}}</p>
+                                </div>
+{{end}}
+                            </div>
+                        </td>
+                        <td class="tech-cell">{{with .TechSections}}
+                            <div>{{range .}}
+                                <div class="tech-section">
+                                    <div class="tech-section-title">【<span>{{.Title}}</span>】
+                                    </div>{{range .Lines}}
+                                    <p class="tech-line">
+                                        <span>{{.Label}}</span>：<span>{{.Value}}</span>
+                                    </p>{{end}}
+                                </div>{{end}}
+                            </div>{{end}}
+                        </td>
+                    </tr>{{end}}
+                </tbody>
+            </table>
+        </div>
+{{end}}
+    </div>
+{{end}}{{with .Export.Certifications}}
+    <div class="section">
+        <div class="section-title">保有資格</div>
+        <table class="sub-table">
+            <thead>
+                <tr>
+                    <th class="cert-date-col">取得年月</th>
+                    <th>資格名</th>
+                </tr>
+            </thead>
+            <tbody>{{range .}}
+                <tr>
+                    <td>{{.AcquiredAtLabel}}</td>
+                    <td>{{.Name}}</td>
+                </tr>{{end}}
+            </tbody>
+        </table>
+    </div>
+{{end}}{{with .Export.Portfolios}}
+    <div class="section">
+        <div class="section-title">個人開発・成果物</div>
+{{range .}}
+        <div class="portfolio-box">
+            <div class="portfolio-title">{{.Name}}</div>
+            {{if notBlankText .Overview}}<p>{{.Overview}}</p>{{end}}
+            {{if notBlankText .URL}}<p>
+                URL：<span>{{.URL}}</span>
+            </p>{{end}}
+            {{if notBlank .TechStack}}<p>
+                技術スタック：<span>{{deref .TechStack}}</span>
+            </p>{{end}}
+        </div>
+{{end}}
+    </div>
+{{end}}{{with .Export.SnsPlatforms}}
+    <div class="section">
+        <div class="section-title">SNS</div>
+        <div class="sns-list">{{range .}}
+            <div class="sns-item">
+                <span class="sns-bullet">・</span><span>{{.Name}}</span>：<span>{{.URL}}</span>
+            </div>{{end}}
+        </div>
+    </div>
+{{end}}{{with .Export.SelfPromotions}}
+    <div class="section">
+        <div class="section-title">自己PR</div>{{range .}}
+        <div class="pr-section">
+            <div class="pr-title">{{.Title}}</div>
+            <p>{{.Content}}</p>
+        </div>{{end}}
+    </div>
+{{end}}</body>
+
+</html>

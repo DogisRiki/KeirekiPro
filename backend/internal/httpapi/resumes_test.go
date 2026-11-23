@@ -183,13 +183,14 @@ const listedResumesJSON = `{"resumes":[` +
 	`"updatedAt":"2026-11-03T00:00:01.000001"}]}`
 
 // fakeResumes は、経歴書の処理の代わりである。呼ばれた操作と引数を calls に記録し、errs に操作の名前で決めた誤りを返す。
-// 経歴書を返す操作は resume を、一覧は list を、マスタは names と master を返す。
+// 経歴書を返す操作は resume を、一覧は list を、マスタは names と master を返す。出力の操作は export を返す。
 type fakeResumes struct {
 	calls  []string
 	resume resume.Resume
 	list   []resume.Resume
 	names  []string
 	master resume.TechStackMaster
+	export resume.Export
 	errs   map[string]error
 }
 
@@ -203,6 +204,14 @@ func (f *fakeResumes) answer(op string, args ...string) (resume.Resume, error) {
 		return resume.Resume{}, err
 	}
 	return f.resume, nil
+}
+
+// exportAnswer は、呼び出しを記録し、誤りが無ければ export を返す。
+func (f *fakeResumes) exportAnswer(op string, args ...string) (resume.Export, error) {
+	if err := f.record(op, args...); err != nil {
+		return resume.Export{}, err
+	}
+	return f.export, nil
 }
 
 func (f *fakeResumes) ListCertificationNames(context.Context) ([]string, error) {
@@ -247,6 +256,18 @@ func (f *fakeResumes) CreateResume(_ context.Context, userID uuid.UUID, body []b
 
 func (f *fakeResumes) UpdateResumeBasic(_ context.Context, userID uuid.UUID, resumeID string, body []byte) (resume.Resume, error) {
 	return f.answer("UpdateResumeBasic", userID.String(), resumeID, string(body))
+}
+
+func (f *fakeResumes) ExportResume(
+	_ context.Context, userID uuid.UUID, resumeID string, format resume.ExportFormat,
+) (resume.Export, error) {
+	return f.exportAnswer("ExportResume", userID.String(), resumeID, string(format))
+}
+
+func (f *fakeResumes) ExportResumeWithSettings(
+	_ context.Context, userID uuid.UUID, resumeID string, body []byte,
+) (resume.Export, error) {
+	return f.exportAnswer("ExportResumeWithSettings", userID.String(), resumeID, string(body))
 }
 
 func (f *fakeResumes) CreateCareer(_ context.Context, userID uuid.UUID, resumeID string, body []byte) (resume.Resume, error) {
@@ -445,13 +466,14 @@ func itemOps() []itemOp {
 	}
 }
 
-// resumeOps は、経歴書の受け口の26の操作である。本文は、受け口が読まずに処理へ渡すことを確かめるため、JSON として
+// resumeOps は、経歴書の受け口の28の操作である。本文は、受け口が読まずに処理へ渡すことを確かめるため、JSON として
 // 誤った文字も含めて、操作ごとに違う文字にする。
 func resumeOps() []resumeOp {
 	user := handlerUserID.String()
 	resumeWant := jsonWant(http.StatusOK, fullResumeJSON)
 	createdWant := jsonWant(http.StatusCreated, fullResumeJSON)
 	noContent := wantResponse{status: http.StatusNoContent}
+	exportWant := wantResponse{status: http.StatusOK, contentType: "application/pdf", body: fakeExportBody}
 	ops := []resumeOp{
 		{
 			name: "ListCertificationNames",
@@ -519,6 +541,24 @@ func resumeOps() []resumeOp {
 			calls: []string{"UpdateResumeBasic(" + user + ", " + testResumeID + `, {"date":"2026-11-14"} 余り)`},
 			want:  resumeWant,
 		},
+		{
+			name: "ExportResume", needsLogin: true,
+			call: func(ctx context.Context, h *resumeHandlers) (any, error) {
+				return h.ExportResume(withAccept(ctx, screenMarkdownAccept), gen.ExportResumeRequestObject{ResumeId: testResumeID})
+			},
+			calls: []string{"ExportResume(" + user + ", " + testResumeID + ", markdown)"},
+			want:  exportWant,
+		},
+		{
+			name: "ExportResumeWithSettings", needsLogin: true,
+			call: func(ctx context.Context, h *resumeHandlers) (any, error) {
+				return h.ExportResumeWithSettings(ctx, gen.ExportResumeWithSettingsRequestObject{
+					ResumeId: testResumeID, Body: bodyOf(`{"format":"pdf"} 余り`),
+				})
+			},
+			calls: []string{"ExportResumeWithSettings(" + user + ", " + testResumeID + `, {"format":"pdf"} 余り)`},
+			want:  exportWant,
+		},
 	}
 	for _, it := range itemOps() {
 		createBody := `{"create":"` + it.name + `"}`
@@ -560,6 +600,7 @@ func newFakeResumes() *fakeResumes {
 		list:   listedResumes(),
 		names:  []string{"基本情報技術者試験", "<応用&>"},
 		master: fullMaster(),
+		export: resume.Export{Body: []byte(fakeExportBody), ContentType: "application/pdf", FileName: "職務経歴書<&>.pdf"},
 	}
 }
 
@@ -574,7 +615,7 @@ func checkResumeCalls(t *testing.T, name string, f *fakeResumes, want ...string)
 	}
 }
 
-// TestResumeHandlers_SuccessResponses は、経歴書の受け口の26の操作が、受け口の節の表のとおりの状態の番号と本文で答える
+// TestResumeHandlers_SuccessResponses は、経歴書の受け口の28の操作が、受け口の節の表のとおりの状態の番号と本文で答える
 // ことを確かめる(要件1の受入基準1)。マスタは 200 と名前の並びか4つの大分類、一覧は 200 と id と名前と日時の並び、
 // 作成と項目の作成は 201 と経歴書、取得と更新は 200 と経歴書、削除は 204 と空の本文で答える。受け口は、ログインした
 // 利用者の ID と、経路の値と、本文を読まずにそのまま処理に渡す。処理が *auth.Error を返せば、Java 版の
@@ -582,8 +623,8 @@ func checkResumeCalls(t *testing.T, name string, f *fakeResumes, want ...string)
 // context に無いときは、処理を呼ばずに errNoLoginUser を返す。
 func TestResumeHandlers_SuccessResponses(t *testing.T) {
 	ops := resumeOps()
-	if len(ops) != 26 {
-		t.Fatalf("操作の数 = %d, want 26", len(ops))
+	if len(ops) != 28 {
+		t.Fatalf("操作の数 = %d, want 28", len(ops))
 	}
 	business := auth.ErrBusiness("業務の誤りの文言")
 	for _, op := range ops {
@@ -800,41 +841,43 @@ func TestResumeHandlers_UnreadableItemID(t *testing.T) {
 	}
 }
 
-// TestResumeResponses_AllOperationsWrite は、経歴書の26の操作の応答のインタフェースのどのメソッドで書いても、状態の番号と、
+// TestResumeResponses_AllOperationsWrite は、経歴書の28の操作の応答のインタフェースのどのメソッドで書いても、状態の番号と、
 // Content-Type と、本文を書くことを確かめる。
 func TestResumeResponses_AllOperationsWrite(t *testing.T) {
 	r := authJSON(http.StatusCreated, map[string]string{"a": "<&>"})
 	want := wantResponse{status: http.StatusCreated, contentType: "application/json", body: `{"a":"<&>"}`}
 	visits := map[string]func(http.ResponseWriter) error{
-		"ListCertificationNames": r.VisitListCertificationNamesResponse,
-		"ListSnsPlatformNames":   r.VisitListSnsPlatformNamesResponse,
-		"ListTechStacks":         r.VisitListTechStacksResponse,
-		"ListResumes":            r.VisitListResumesResponse,
-		"CreateResume":           r.VisitCreateResumeResponse,
-		"GetResume":              r.VisitGetResumeResponse,
-		"DeleteResume":           r.VisitDeleteResumeResponse,
-		"UpdateResumeBasic":      r.VisitUpdateResumeBasicResponse,
-		"CreateCareer":           r.VisitCreateCareerResponse,
-		"UpdateCareer":           r.VisitUpdateCareerResponse,
-		"DeleteCareer":           r.VisitDeleteCareerResponse,
-		"CreateProject":          r.VisitCreateProjectResponse,
-		"UpdateProject":          r.VisitUpdateProjectResponse,
-		"DeleteProject":          r.VisitDeleteProjectResponse,
-		"CreateCertification":    r.VisitCreateCertificationResponse,
-		"UpdateCertification":    r.VisitUpdateCertificationResponse,
-		"DeleteCertification":    r.VisitDeleteCertificationResponse,
-		"CreatePortfolio":        r.VisitCreatePortfolioResponse,
-		"UpdatePortfolio":        r.VisitUpdatePortfolioResponse,
-		"DeletePortfolio":        r.VisitDeletePortfolioResponse,
-		"CreateSnsPlatform":      r.VisitCreateSnsPlatformResponse,
-		"UpdateSnsPlatform":      r.VisitUpdateSnsPlatformResponse,
-		"DeleteSnsPlatform":      r.VisitDeleteSnsPlatformResponse,
-		"CreateSelfPromotion":    r.VisitCreateSelfPromotionResponse,
-		"UpdateSelfPromotion":    r.VisitUpdateSelfPromotionResponse,
-		"DeleteSelfPromotion":    r.VisitDeleteSelfPromotionResponse,
+		"ListCertificationNames":   r.VisitListCertificationNamesResponse,
+		"ListSnsPlatformNames":     r.VisitListSnsPlatformNamesResponse,
+		"ListTechStacks":           r.VisitListTechStacksResponse,
+		"ListResumes":              r.VisitListResumesResponse,
+		"CreateResume":             r.VisitCreateResumeResponse,
+		"GetResume":                r.VisitGetResumeResponse,
+		"DeleteResume":             r.VisitDeleteResumeResponse,
+		"UpdateResumeBasic":        r.VisitUpdateResumeBasicResponse,
+		"CreateCareer":             r.VisitCreateCareerResponse,
+		"UpdateCareer":             r.VisitUpdateCareerResponse,
+		"DeleteCareer":             r.VisitDeleteCareerResponse,
+		"CreateProject":            r.VisitCreateProjectResponse,
+		"UpdateProject":            r.VisitUpdateProjectResponse,
+		"DeleteProject":            r.VisitDeleteProjectResponse,
+		"CreateCertification":      r.VisitCreateCertificationResponse,
+		"UpdateCertification":      r.VisitUpdateCertificationResponse,
+		"DeleteCertification":      r.VisitDeleteCertificationResponse,
+		"CreatePortfolio":          r.VisitCreatePortfolioResponse,
+		"UpdatePortfolio":          r.VisitUpdatePortfolioResponse,
+		"DeletePortfolio":          r.VisitDeletePortfolioResponse,
+		"CreateSnsPlatform":        r.VisitCreateSnsPlatformResponse,
+		"UpdateSnsPlatform":        r.VisitUpdateSnsPlatformResponse,
+		"DeleteSnsPlatform":        r.VisitDeleteSnsPlatformResponse,
+		"CreateSelfPromotion":      r.VisitCreateSelfPromotionResponse,
+		"UpdateSelfPromotion":      r.VisitUpdateSelfPromotionResponse,
+		"DeleteSelfPromotion":      r.VisitDeleteSelfPromotionResponse,
+		"ExportResume":             r.VisitExportResumeResponse,
+		"ExportResumeWithSettings": r.VisitExportResumeWithSettingsResponse,
 	}
-	if len(visits) != 26 {
-		t.Fatalf("メソッドの数 = %d, want 26", len(visits))
+	if len(visits) != 28 {
+		t.Fatalf("メソッドの数 = %d, want 28", len(visits))
 	}
 	for name, visit := range visits {
 		checkResponse(t, name, recordResponse(t, visit), want)
@@ -869,7 +912,8 @@ func resumeServer(t *testing.T, svc ResumeService, userID uuid.UUID) http.Handle
 }
 
 // sendRoute は、偽の送信の検査に通る Cookie とヘッダを付けて、要求を1つ送る。body が nil なら本文を付けない。
-func sendRoute(h http.Handler, method, path string, body *string) *httptest.ResponseRecorder {
+// accept の値は、1つずつ Accept の行にする。
+func sendRoute(h http.Handler, method, path string, body *string, accept ...string) *httptest.ResponseRecorder {
 	var reader io.Reader
 	if body != nil {
 		reader = strings.NewReader(*body)
@@ -878,17 +922,28 @@ func sendRoute(h http.Handler, method, path string, body *string) *httptest.Resp
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Cookie", "XSRF-TOKEN="+routeCSRF)
 	req.Header.Set("X-XSRF-TOKEN", routeCSRF)
+	for _, a := range accept {
+		req.Header.Add("Accept", a)
+	}
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 	return rec
 }
 
-// resumeRoute は、経歴書の26の操作の1つの、仕様書の経路への要求と、経歴書の処理の呼び出しである。
+// resumeRoute は、経歴書の28の操作の1つの、仕様書の経路への要求と、経歴書の処理の呼び出しである。
 type resumeRoute struct {
 	name, method, path, body, call string
 }
 
-// resumeRoutes は、経歴書の26の操作の要求を、resumeOps と同じ名前で返す。
+// accept は、要求の Accept の行である。設定を付けない出力は、画面と同じ Accept の行を付けて送る。
+func (rt resumeRoute) accept() []string {
+	if rt.name == "ExportResume" {
+		return []string{screenMarkdownAccept}
+	}
+	return nil
+}
+
+// resumeRoutes は、経歴書の28の操作の要求を、resumeOps と同じ名前で返す。
 func resumeRoutes() []resumeRoute {
 	user := handlerUserID.String()
 	base := "/api/resumes/" + testResumeID
@@ -906,6 +961,11 @@ func resumeRoutes() []resumeRoute {
 		{
 			"UpdateResumeBasic", http.MethodPut, base + "/basic", `{"date":"2026-11-14"}`,
 			"UpdateResumeBasic(" + user + ", " + testResumeID + `, {"date":"2026-11-14"})`,
+		},
+		{"ExportResume", http.MethodGet, base + "/export", "", "ExportResume(" + user + ", " + testResumeID + ", markdown)"},
+		{
+			"ExportResumeWithSettings", http.MethodPost, base + "/export", `{"format":"pdf"}`,
+			"ExportResumeWithSettings(" + user + ", " + testResumeID + `, {"format":"pdf"})`,
 		},
 	}
 	segments := map[string]string{
@@ -935,7 +995,7 @@ func resumeRoutes() []resumeRoute {
 	return routes
 }
 
-// TestResumeRoutes_Wired は、New に ResumeHandlers を渡すと、仕様書の経路への26の操作の要求が経歴書の受け口に届き、
+// TestResumeRoutes_Wired は、New に ResumeHandlers を渡すと、仕様書の経路への28の操作の要求が経歴書の受け口に届き、
 // 受け口の答えで答えることを確かめる(要件1の受入基準2)。
 func TestResumeRoutes_Wired(t *testing.T) {
 	wants := map[string]wantResponse{}
@@ -943,8 +1003,8 @@ func TestResumeRoutes_Wired(t *testing.T) {
 		wants[op.name] = op.want
 	}
 	routes := resumeRoutes()
-	if len(routes) != 26 || len(wants) != 26 {
-		t.Fatalf("操作の数 = 経路 %d、受け口 %d, want 26", len(routes), len(wants))
+	if len(routes) != 28 || len(wants) != 28 {
+		t.Fatalf("操作の数 = 経路 %d、受け口 %d, want 28", len(routes), len(wants))
 	}
 	for _, rt := range routes {
 		t.Run(rt.name, func(t *testing.T) {
@@ -953,7 +1013,7 @@ func TestResumeRoutes_Wired(t *testing.T) {
 				t.Fatalf("操作 %s が resumeOps に無い", rt.name)
 			}
 			svc := newFakeResumes()
-			rec := sendRoute(resumeServer(t, svc, handlerUserID), rt.method, rt.path, &rt.body)
+			rec := sendRoute(resumeServer(t, svc, handlerUserID), rt.method, rt.path, &rt.body, rt.accept()...)
 			if rec.Code != want.status || rec.Body.String() != want.body {
 				t.Errorf("応答 = %d %s, want %d %s", rec.Code, rec.Body.String(), want.status, want.body)
 			}
@@ -965,12 +1025,12 @@ func TestResumeRoutes_Wired(t *testing.T) {
 	}
 }
 
-// TestResumeRoutes_Unimplemented は、New に ResumeHandlers を渡さなければ、マスタと経歴書の26の操作の要求に、
+// TestResumeRoutes_Unimplemented は、New に ResumeHandlers を渡さなければ、マスタと経歴書の28の操作の要求に、
 // 今と同じ未実装の答えを返すことを確かめる。
 func TestResumeRoutes_Unimplemented(t *testing.T) {
 	handler := resumeServer(t, nil, handlerUserID)
 	for _, rt := range resumeRoutes() {
-		rec := sendRoute(handler, rt.method, rt.path, &rt.body)
+		rec := sendRoute(handler, rt.method, rt.path, &rt.body, rt.accept()...)
 		if rec.Code != http.StatusNotImplemented || rec.Body.String() != `{"message":"未実装です。"}` {
 			t.Errorf("%s の応答 = %d %s, want 501 と未実装の本文", rt.name, rec.Code, rec.Body.String())
 		}
@@ -1212,4 +1272,191 @@ func startResumeDB(t *testing.T) *pgxpool.Pool {
 		t.Fatalf("マイグレーションを流せません: %v", err)
 	}
 	return pool
+}
+
+// screenMarkdownAccept は、画面が設定を付けない出力で送る Accept の行である。
+const screenMarkdownAccept = "text/markdown, application/json"
+
+// fakeExportBody は、偽の処理が返す出力の本文である。受け口が本文を読まずに書くことを確かめるため、UTF-8 として
+// 読めないバイトを入れる。
+const fakeExportBody = "%PDF-1.7\n\x00\xff出力"
+
+// withAccept は、authRequestMiddleware が Accept の行 lines を入れた context を返す。
+func withAccept(ctx context.Context, lines ...string) context.Context {
+	return context.WithValue(ctx, authRequestKey{}, authRequestInfo{accept: lines})
+}
+
+// exportAcceptCase は、設定を付けない出力の Accept の行と、Go 版が選ぶ形式である。want が空なら 406 で答える。
+// accept が nil なら Accept の行を付けない。
+type exportAcceptCase struct {
+	name   string
+	accept []string
+	want   resume.ExportFormat
+}
+
+// javaExportFormat は、Java 版の ExportResumeController の形式の選び方を写したものである。Accept の1行の字の並びに
+// application/pdf が含まれれば PDF、含まれず text/markdown が含まれれば Markdown を選び、どちらも無ければ空を返す。
+// Accept の行が無いときは、空の字の並びとして読む。
+func javaExportFormat(t *testing.T, accept []string) resume.ExportFormat {
+	t.Helper()
+	if len(accept) > 1 {
+		t.Fatalf("Java 版の読み方は Accept の1行で比べる: %q", accept)
+	}
+	line := strings.Join(accept, "")
+	switch {
+	case strings.Contains(line, "application/pdf"):
+		return resume.ExportPDF
+	case strings.Contains(line, "text/markdown"):
+		return resume.ExportMarkdown
+	}
+	return ""
+}
+
+// TestExportHandlers_AcceptSelectsFormat は、設定を付けない出力の受け口が、Accept の行を型の並びとして読み、型が
+// application/pdf の値があれば PDF、無くて型が text/markdown の値があれば Markdown を選んで処理を呼ぶことを確かめる
+// (要件1の受入基準1)。どちらも無いときと、Accept の行を読めないときは、経歴書を読まずに 406 と
+// 「対応していない形式が指定されました。」で答える。sameAsJava の行は Java 版と同じ形式を選ぶ。cb059 の行は、
+// 変えた動きの一覧の CB-059 の、Java 版と違う読み方になる行で、Java 版と違う形式を選ぶ(要件1の受入基準2)。
+// goOnly の行は、Accept の行が2つある要求で、Go 版は行をすべて読む。
+func TestExportHandlers_AcceptSelectsFormat(t *testing.T) {
+	sameAsJava := []exportAcceptCase{
+		{"画面の Markdown", []string{screenMarkdownAccept}, resume.ExportMarkdown},
+		{"PDF", []string{"application/pdf, application/json"}, resume.ExportPDF},
+		{"PDF だけ", []string{"application/pdf"}, resume.ExportPDF},
+		{"Markdown が先でも PDF", []string{"text/markdown, application/pdf"}, resume.ExportPDF},
+		{"引数の付いた Markdown", []string{"text/markdown;charset=utf-8"}, resume.ExportMarkdown},
+		{"q が0の PDF", []string{"application/pdf;q=0"}, resume.ExportPDF},
+		{"前後に空白", []string{"  application/pdf  "}, resume.ExportPDF},
+		{"Accept が無い", nil, ""},
+		{"空の Accept", []string{""}, ""},
+		{"*/*", []string{"*/*"}, ""},
+		{"application/json だけ", []string{"application/json"}, ""},
+		{"application/*", []string{"application/*"}, ""},
+		{"text/*", []string{"text/*"}, ""},
+	}
+	cb059 := []exportAcceptCase{
+		{"大文字の PDF", []string{"APPLICATION/PDF"}, resume.ExportPDF},
+		{"大文字の混じる Markdown", []string{"Text/Markdown"}, resume.ExportMarkdown},
+		{"application/pdf で始まる別の型", []string{"application/pdfa"}, ""},
+		{"application/pdf で終わる別の型", []string{"x-application/pdf"}, ""},
+		{"text/markdown で始まる別の型", []string{"text/markdown-x"}, ""},
+		{"引数の値に書いた PDF", []string{`text/plain;note="application/pdf"`}, ""},
+		{"読めない型の付いた PDF", []string{"application/pdf, application"}, ""},
+		{"読めない型の付いた Markdown", []string{"text/markdown, @"}, ""},
+		{"51の型", []string{strings.Repeat("text/plain, ", 50) + "application/pdf"}, ""},
+	}
+	goOnly := []exportAcceptCase{
+		{"2行目の PDF", []string{"text/plain", "application/pdf"}, resume.ExportPDF},
+		{"2行目の Markdown", []string{"application/json", "text/markdown"}, resume.ExportMarkdown},
+		{"2行目が読めない", []string{"application/pdf", "@"}, ""},
+	}
+	for _, c := range sameAsJava {
+		if got := javaExportFormat(t, c.accept); got != c.want {
+			t.Errorf("%s: Java 版の形式 = %q, want %q(Java 版と同じ読み方の行)", c.name, got, c.want)
+		}
+	}
+	for _, c := range cb059 {
+		if got := javaExportFormat(t, c.accept); got == c.want {
+			t.Errorf("%s: Java 版の形式 = %q が Go 版と同じ(CB-059 の行は Java 版と違う読み方の行)", c.name, got)
+		}
+	}
+	user := handlerUserID.String()
+	notAcceptable := jsonWant(http.StatusNotAcceptable, `{"message":"対応していない形式が指定されました。","errors":{}}`)
+	cases := append(append(append([]exportAcceptCase{}, sameAsJava...), cb059...), goOnly...)
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			f := newFakeResumes()
+			resp, err := newResumeHandlers(f, false).ExportResume(
+				withAccept(loggedIn(), c.accept...), gen.ExportResumeRequestObject{ResumeId: testResumeID},
+			)
+			got := handled(t, resp, err)
+			if c.want == "" {
+				checkResponse(t, c.name, got, notAcceptable)
+				checkResumeCalls(t, c.name, f)
+				return
+			}
+			checkResponse(t, c.name, got, wantResponse{status: http.StatusOK, contentType: "application/pdf", body: fakeExportBody})
+			checkResumeCalls(t, c.name, f, "ExportResume("+user+", "+testResumeID+", "+string(c.want)+")")
+		})
+	}
+}
+
+// TestExportHandlers_SuccessHeaders は、出力の2つの受け口が、処理が返した出力を、状態の番号 200 と、出力の
+// Content-Type と、出し方とファイル名から作った Content-Disposition と、出力の本文で答えることを確かめる
+// (要件1の受入基準1)。
+func TestExportHandlers_SuccessHeaders(t *testing.T) {
+	ops := map[string]func(ctx context.Context, h *resumeHandlers) (any, error){
+		"ExportResume": func(ctx context.Context, h *resumeHandlers) (any, error) {
+			return h.ExportResume(withAccept(ctx, "application/pdf, application/json"), gen.ExportResumeRequestObject{ResumeId: testResumeID})
+		},
+		"ExportResumeWithSettings": func(ctx context.Context, h *resumeHandlers) (any, error) {
+			return h.ExportResumeWithSettings(ctx, gen.ExportResumeWithSettingsRequestObject{ResumeId: testResumeID, Body: bodyOf(`{}`)})
+		},
+	}
+	exports := []resume.Export{
+		{Body: []byte(fakeExportBody), ContentType: "application/pdf", FileName: `職務 "経歴" \書.pdf`, Inline: true},
+		{Body: []byte(fakeExportBody), ContentType: "application/pdf", FileName: "resume.pdf"},
+		{Body: []byte("# 経歴書\n"), ContentType: "text/markdown;charset=utf-8", FileName: "経歴書.md"},
+	}
+	kinds := map[bool]string{true: "inline;", false: "attachment;"}
+	for name, call := range ops {
+		for _, e := range exports {
+			label := fmt.Sprintf("%s(%s, inline=%v)", name, e.FileName, e.Inline)
+			f := newFakeResumes()
+			f.export = e
+			resp, err := call(loggedIn(), newResumeHandlers(f, false))
+			if err != nil {
+				t.Fatalf("%s が誤りを返した: %v", label, err)
+			}
+			r, ok := resp.(authResponse)
+			if !ok {
+				t.Fatalf("%s の答えの型 = %T, want authResponse", label, resp)
+			}
+			rec := httptest.NewRecorder()
+			if err := r.write(rec); err != nil {
+				t.Fatalf("%s の答えを書けない: %v", label, err)
+			}
+			if rec.Code != http.StatusOK {
+				t.Errorf("%s の状態の番号 = %d, want 200", label, rec.Code)
+			}
+			if got := rec.Header().Values("Content-Type"); !reflect.DeepEqual(got, []string{e.ContentType}) {
+				t.Errorf("%s の Content-Type = %q, want %q", label, got, e.ContentType)
+			}
+			want := formatContentDisposition(e.Inline, e.FileName)
+			if !strings.HasPrefix(want, kinds[e.Inline]) {
+				t.Fatalf("%s の期待する Content-Disposition = %q の出し方が違う", label, want)
+			}
+			if got := rec.Header().Values("Content-Disposition"); !reflect.DeepEqual(got, []string{want}) {
+				t.Errorf("%s の Content-Disposition = %q, want %q", label, got, want)
+			}
+			if rec.Body.String() != string(e.Body) {
+				t.Errorf("%s の本文 = %q, want %q", label, rec.Body.String(), e.Body)
+			}
+		}
+	}
+}
+
+// TestExportHandlers_RejectWithoutJSONAccept は、設定を付けた出力で、本文が断る条件に当たる要求に、Accept の行に
+// application/json が無いときも、画面と同じ Accept の行のときと同じく、400 と、断る文言を入れた JSON の本文で答える
+// ことを確かめる(要件1の受入基準2、変えた動きの一覧の CB-060)。Java 版は、application/json の無い Accept の行には
+// 401 と空の本文で答える。処理は本物の *resume.Service で、本文を経歴書より先に確かめるので、データベースを読まない。
+func TestExportHandlers_RejectWithoutJSONAccept(t *testing.T) {
+	h := resumeServer(t, resume.New(resume.Deps{}), handlerUserID)
+	path := "/api/resumes/" + testResumeID + "/export"
+	body := `{"format":"pdf","disposition":"inline"}`
+	screen := sendRoute(h, http.MethodPost, path, &body, "application/pdf, application/json")
+	if screen.Code != http.StatusBadRequest || screen.Header().Get("Content-Type") != "application/json" ||
+		!strings.HasPrefix(screen.Body.String(), `{"message":"`) {
+		t.Fatalf("画面と同じ Accept の答え = %d %q %s, want 400 と JSON の本文",
+			screen.Code, screen.Header().Get("Content-Type"), screen.Body.String())
+	}
+	accepts := [][]string{{"application/pdf"}, {"text/markdown"}, {"application/pdf, text/markdown"}, {"image/*"}, nil}
+	for _, accept := range accepts {
+		rec := sendRoute(h, http.MethodPost, path, &body, accept...)
+		if rec.Code != screen.Code || rec.Header().Get("Content-Type") != screen.Header().Get("Content-Type") ||
+			rec.Body.String() != screen.Body.String() {
+			t.Errorf("Accept %q の答え = %d %q %s, want %d %q %s", accept, rec.Code, rec.Header().Get("Content-Type"),
+				rec.Body.String(), screen.Code, screen.Header().Get("Content-Type"), screen.Body.String())
+		}
+	}
 }

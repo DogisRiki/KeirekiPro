@@ -308,3 +308,65 @@ func TestCrossRoute_ResumeSteps(t *testing.T) {
 		}
 	}
 }
+
+// exportCrossFiles は、出力の操作の、版をまたいで確かめる筋書きのファイルである。
+var exportCrossFiles = []string{"cross-export.yaml"}
+
+// exportStep は、出力の操作の段かを返す。版に送る、経路が /export で終わる段である。
+func exportStep(step Step) bool {
+	return step.Kind() == StepVersion && strings.HasSuffix(step.Request.Path, "/export")
+}
+
+// TestCrossRoute_ExportSteps は、出力の操作の版をまたぐ筋書きを読み、Java 版から Go 版の向きと Go 版から Java 版の向きの
+// それぞれで、出力の2つの段(設定を付けない出力と設定を付けた出力)が、その前の、経歴書か項目を変える段(出力の段でない、
+// GET でない、版に送る段)と違う版に送られることを確かめる。段の to: other が外れると、経歴書を保存した版と同じ版で出力する
+// ことになり、一方の版が保存した経歴書をもう一方の版が出力できるかを確かめなくなるためである。
+// 筋書きのファイルが無いときと、出力の段が GET と POST の1つずつでないときは失敗する。
+func TestCrossRoute_ExportSteps(t *testing.T) {
+	dir := filepath.Join("..", "scenarios", "export")
+	for _, file := range exportCrossFiles {
+		if _, err := os.Stat(filepath.Join(dir, file)); err != nil {
+			t.Errorf("版をまたぐ筋書き %s がありません: %v", file, err)
+		}
+	}
+	scenarios, err := LoadScenarios(dir, ModeCross)
+	if err != nil {
+		t.Fatalf("LoadScenarios: %v", err)
+	}
+	if len(scenarios) == 0 {
+		t.Fatalf("%s に、版をまたぐ動かし方の筋書きがありません", dir)
+	}
+	for _, s := range scenarios {
+		methods := map[string]int{}
+		for _, step := range s.Steps {
+			if exportStep(step) {
+				methods[step.Request.Method]++
+			}
+		}
+		if methods["GET"] != 1 || methods["POST"] != 1 || len(methods) != 2 {
+			t.Errorf("筋書き %s の出力の段 = %v, want GET と POST の1つずつ", s.Name, methods)
+		}
+		for _, direction := range []string{CrossJavaToGo, CrossGoToJava} {
+			route, err := CrossRoute(s, direction)
+			if err != nil {
+				t.Errorf("CrossRoute(%s, %s): %v", s.Name, direction, err)
+				continue
+			}
+			changed := -1
+			for i, step := range s.Steps {
+				switch {
+				case exportStep(step):
+					switch {
+					case changed < 0:
+						t.Errorf("筋書き %s の出力の段「%s」の前に、経歴書か項目を変える段がありません", s.Name, step.Name)
+					case route[i] == "" || route[i] == route[changed]:
+						t.Errorf("筋書き %s の向き %s で、出力の段「%s」が、その前の変える段「%s」と同じ版 %s に送られます",
+							s.Name, direction, step.Name, s.Steps[changed].Name, route[changed])
+					}
+				case resumeChangingStep(step):
+					changed = i
+				}
+			}
+		}
+	}
+}

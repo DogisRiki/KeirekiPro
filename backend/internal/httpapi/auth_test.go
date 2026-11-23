@@ -132,6 +132,38 @@ func TestAuthResponses_StatusBodyCookies(t *testing.T) {
 	}
 }
 
+// TestAuthResponses_ContentDisposition は、出力の2つの操作の応答が、Content-Disposition の欄の値を Content-Disposition の
+// ヘッダに書き、状態の番号と Content-Type と本文も書くことを確かめる(要件1の受入基準1)。欄が空の応答は、このヘッダを書かない。
+func TestAuthResponses_ContentDisposition(t *testing.T) {
+	const disposition = `attachment; filename="____.pdf"; filename*=UTF-8''%E8%81%B7%E5%8B%99.pdf`
+	r := authResponse{status: http.StatusOK, contentType: "application/pdf", contentDisposition: disposition, body: []byte("%PDF-1.7")}
+	for op, visit := range map[string]func(http.ResponseWriter) error{
+		"ExportResume":             r.VisitExportResumeResponse,
+		"ExportResumeWithSettings": r.VisitExportResumeWithSettingsResponse,
+	} {
+		rec := httptest.NewRecorder()
+		if err := visit(rec); err != nil {
+			t.Fatalf("%s の応答を書けない: %v", op, err)
+		}
+		res := rec.Result()
+		_ = res.Body.Close()
+		if got := res.Header.Values("Content-Disposition"); !reflect.DeepEqual(got, []string{disposition}) {
+			t.Errorf("%s の Content-Disposition = %q, want %q", op, got, disposition)
+		}
+		if res.StatusCode != http.StatusOK || res.Header.Get("Content-Type") != "application/pdf" || rec.Body.String() != "%PDF-1.7" {
+			t.Errorf("%s の応答 = %d %q %q", op, res.StatusCode, res.Header.Get("Content-Type"), rec.Body.String())
+		}
+	}
+
+	rec := httptest.NewRecorder()
+	if err := authJSON(http.StatusBadRequest, map[string]string{"message": "x"}).VisitExportResumeResponse(rec); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := rec.Result().Header["Content-Disposition"]; ok {
+		t.Errorf("欄が空の応答が Content-Disposition を書いた: %q", rec.Result().Header.Values("Content-Disposition"))
+	}
+}
+
 // TestAuthResponses_ErrorBodies は、*auth.Error を、Java 版の AppExceptionHandler と同じ状態の番号と本文と Cookie に
 // 変えることを確かめる(要件1.1、1.4)。本文は {message, errors} か、409 のときだけ {message, errors, kind} の順で書き、
 // Jackson と同じく < > & を逃がさない。操作の相手の利用者が居ない 401 だけ、accessToken と refreshToken を消す Cookie を
@@ -914,17 +946,21 @@ func TestAuthOIDCHandlers_RedirectURIPort80(t *testing.T) {
 	}
 }
 
-// TestAuthOIDCHandlers_MiddlewareOnlyOIDC は、要求の Host と Accept を context に入れる中間処理が、Google と GitHub の
-// 2つの操作のときだけ値を入れることを確かめる。
-func TestAuthOIDCHandlers_MiddlewareOnlyOIDC(t *testing.T) {
+// TestAuthRequestMiddleware_Operations は、要求の Host と Accept を context に入れる中間処理が、3つの操作のときだけ
+// 値を入れることを確かめる(要件1の受入基準1)。3つの操作は、Google と GitHub のログインの開始と戻り先の操作と、設定を
+// 付けない出力の操作である。設定を付けない出力は、Accept の行で形式を選ぶ。設定を付けた出力は Accept の行を見ないので、
+// 値を入れない。
+func TestAuthRequestMiddleware_Operations(t *testing.T) {
 	r := httptest.NewRequest(http.MethodGet, "/", http.NoBody)
 	r.Host = "compat.test"
 	r.Header.Add("Accept", "text/plain")
 	r.Header.Add("Accept", "application/json")
 	for op, want := range map[string]authRequestInfo{
-		"StartOidcAuthorization": {host: "compat.test", accept: []string{"text/plain", "application/json"}},
-		"HandleOidcCallback":     {host: "compat.test", accept: []string{"text/plain", "application/json"}},
-		"Login":                  {},
+		"StartOidcAuthorization":   {host: "compat.test", accept: []string{"text/plain", "application/json"}},
+		"HandleOidcCallback":       {host: "compat.test", accept: []string{"text/plain", "application/json"}},
+		"ExportResume":             {host: "compat.test", accept: []string{"text/plain", "application/json"}},
+		"ExportResumeWithSettings": {},
+		"Login":                    {},
 	} {
 		var got authRequestInfo
 		next := func(ctx context.Context, _ http.ResponseWriter, _ *http.Request, _ any) (any, error) {

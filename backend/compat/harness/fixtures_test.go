@@ -41,7 +41,8 @@ const (
 )
 
 // fixtureDB は、表の形を適用し、users/ と resumes/ のすべての SQL のファイルを読み込んだデータベースにつなぐ。
-func fixtureDB(t *testing.T) *pgx.Conn {
+// extraDirs を渡すと、そのフォルダの SQL のファイルを、resumes/ のあとに順に読み込む。
+func fixtureDB(t *testing.T, extraDirs ...string) *pgx.Conn {
 	t.Helper()
 	ctx := t.Context()
 	container, err := postgres.Run(ctx, postgresImage,
@@ -70,6 +71,11 @@ func fixtureDB(t *testing.T) *pgx.Conn {
 	}
 	if err := LoadFixtures(ctx, conn, fixtureFiles(t, "resumes", ".sql")); err != nil {
 		t.Fatalf("経歴書の初めのデータを読み込めません: %v", err)
+	}
+	for _, dir := range extraDirs {
+		if err := LoadFixtures(ctx, conn, fixtureFiles(t, dir, ".sql")); err != nil {
+			t.Fatalf("%s の初めのデータを読み込めません: %v", dir, err)
+		}
 	}
 	db, err := pgx.Connect(ctx, conn)
 	if err != nil {
@@ -302,8 +308,17 @@ func TestFixtures_AllLoadable(t *testing.T) {
 		}
 		dir, ext := path.Dir(name), path.Ext(name)
 		switch {
-		case (dir == "users" || dir == "resumes") && ext == ".sql":
+		case (dir == "users" || dir == "resumes" || dir == "export") && ext == ".sql":
 			// 下のデータベースの確かめで読み込む
+		case dir == "export" && ext == ".json":
+			// 出力の操作の筋書きが送る要求の本文。断る条件を確かめる本文もあるので、JSON として読めることだけを確かめる
+			data, err := readFixture(name)
+			if err != nil {
+				return err
+			}
+			if !json.Valid(data) {
+				t.Errorf("%s: JSON として読めません", name)
+			}
 		case dir == "resumes" && ext == ".json":
 			s := readExportSettings(t, name)
 			if s.Format != "pdf" || s.PdfSettings.FontSizes.Title == 0 || s.PdfSettings.TableHeaderColor.Hex == "" {
@@ -339,8 +354,28 @@ func TestFixtures_AllLoadable(t *testing.T) {
 		t.Fatalf("fixtures/ を読めません: %v", err)
 	}
 
-	db := fixtureDB(t)
+	// export/ の SQL は、resumes/many-pages.sql の経歴書に項目を足すので、users/ と resumes/ のあとに読み込む
+	db := fixtureDB(t, "export")
 	ctx := t.Context()
+
+	// 出力の操作の筋書きは、次の経歴書を出力するので、どれも Java 版の ResumeExportRuleCheckService の出力の前提を満たす
+	t.Run("出力する経歴書は出力の前提を満たす", func(t *testing.T) {
+		for _, id := range []string{
+			"00000000-0000-4000-8000-000000000201", // many-pages.sql に export.sql が自己PR を足したもの
+			"00000000-0000-4000-8000-000000000601", // export.sql の項目の少ない経歴書
+			"00000000-0000-4000-8000-000000000701", // export.sql の記号の経歴書
+		} {
+			n := queryInt(t, db, `SELECT count(*) FROM resumes r
+				WHERE r.id = $1 AND btrim(r.name) <> '' AND r.date IS NOT NULL
+				  AND btrim(coalesce(r.last_name, '')) <> '' AND btrim(coalesce(r.first_name, '')) <> ''
+				  AND EXISTS (SELECT 1 FROM careers c WHERE c.resume_id = r.id)
+				  AND EXISTS (SELECT 1 FROM projects p WHERE p.resume_id = r.id)
+				  AND EXISTS (SELECT 1 FROM self_promotions s WHERE s.resume_id = r.id)`, id)
+			if n != 1 {
+				t.Errorf("経歴書 %s が無いか、出力の前提を満たしません", id)
+			}
+		}
+	})
 
 	t.Run("パスワードを持つ利用者は決まったパスワードでログインでき、持たない利用者は連携でログインでき、どの利用者も USER の役割とログインの状態の世代の行を持つ", func(t *testing.T) {
 		// メールアドレスもパスワードも持たない利用者は、空の文字として読む(users/users-ops.sql の Google だけの利用者)

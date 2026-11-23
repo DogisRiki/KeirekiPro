@@ -246,10 +246,17 @@ func (s *Session) expandJSON(step Step, where string, v any) (any, error) {
 // requestBody は、段 step の本文と、その本文の Content-Type を返す。本文が無ければ nil を返す。
 // json は、{名前} を置き換えてから JSON にする。multipart は、multipartBody で組み立てる。
 // body_file は、fixtures/images の下のファイルをそのまま本文にし、Content-Type は筋書きのヘッダに任せて空を返す。
+// json_file は、fixtures の下の JSON のファイルを、{名前} を置き換えずにそのまま本文にし、Content-Type を application/json にする。
 func (s *Session) requestBody(step Step) ([]byte, string, error) {
 	switch {
 	case len(step.Request.Multipart) > 0:
 		return s.multipartBody(step)
+	case step.Request.JSONFile != "":
+		b, err := readFixture(step.Request.JSONFile)
+		if err != nil {
+			return nil, "", fmt.Errorf("harness: 段 %s の json_file %q を読めません: %w", step.Name, step.Request.JSONFile, err)
+		}
+		return b, "application/json", nil
 	case step.Request.BodyFile != "":
 		b, err := readImageFixture(step.Request.BodyFile)
 		if err != nil {
