@@ -7,7 +7,7 @@
 # -----------------------------------------------------------------------------
 # 組み立ての工程
 # -----------------------------------------------------------------------------
-FROM golang:1.27.4-trixie@sha256:b54b2639de8c1bfe538ec5ffc45f29b1932235ac5f6d63c059853646677112d9 AS builder
+FROM golang:1.27.4-trixie@sha256:f18c3d73a184fb0582828510722e723b63a93f7188d11dd223d9be6f6880e65d AS builder
 
 WORKDIR /src
 COPY go.mod go.sum ./
@@ -17,7 +17,7 @@ RUN CGO_ENABLED=0 go build -tags compat -trimpath -ldflags="-s -w" -o /out/fakea
 # -----------------------------------------------------------------------------
 # 実行の工程
 # -----------------------------------------------------------------------------
-FROM gcr.io/distroless/static-debian13:nonroot@sha256:aafe993665bf6200db38a02c11a9351e782a84b6a45e7f33b6695638c88e3931
+FROM gcr.io/distroless/static-debian13:nonroot@sha256:8ce6dd87e9823c5b48dcfb2c8604714ccb351ce59607327bcc4957448da279b5
 
 COPY --from=builder /out/fakeaws /fakeaws
 EXPOSE 4566
