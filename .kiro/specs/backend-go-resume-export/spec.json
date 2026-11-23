@@ -1,0 +1,41 @@
+{
+  "feature_name": "backend-go-resume-export",
+  "created_at": "2026-11-22T07:06:49Z",
+  "updated_at": "2026-11-23T08:20:20Z",
+  "language": "ja",
+  "issue": 773,
+  "phase": "tasks-generated",
+  "review_model": "opus",
+  "approvals": {
+    "requirements": {
+      "generated": true,
+      "approved": true,
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-11-23T04:50:37Z"
+    },
+    "design": {
+      "generated": true,
+      "approved": true,
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-11-23T07:44:15Z"
+    },
+    "tasks": {
+      "generated": true,
+      "approved": true,
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-11-23T08:20:20Z"
+    }
+  },
+  "kept_approval_fixes": [
+    {
+      "no": 1,
+      "kind": "fix",
+      "stage": "design",
+      "found_in": "tasks",
+      "finding_ids": ["T1-1-7"],
+      "fixed_at": "2026-11-23T08:04:24Z",
+      "review_cycle": 1,
+      "review_round": 2
+    }
+  ]
+}
