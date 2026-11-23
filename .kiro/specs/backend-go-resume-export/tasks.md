@@ -10,7 +10,7 @@
   - 受入基準とテストの対応: Claude は、この小タスクで確認に使う道具を作り、この小タスクでは受入基準を直接は確かめない。初期のデータは、小タスク1.2 の答えの控えと、4つ目の大きなまとまりの結合テストと、6つ目の大きなまとまりの筋書きが使う
   - _要件: 5.1_
 
-- [ ] 1.2 Java 版の答えを正解のファイルに控える
+- [x] 1.2 Java 版の答えを正解のファイルに控える
 
   Claude は、Java 版の答えの正解のファイルの節のとおりに、main の Java 版を試作用のコンテナで動かす。Claude は、Java 版を、Java 版と Go 版を比べる検査と同じ `docker/backend/Dockerfile.prod` のイメージで組み立て、`backend/compat/harness/versions.go` の `JavaEnv` が Java 版に渡す環境変数と同じ名前の環境変数で起動する。dev のプロファイルの Java 版は、データベースと Redis のつなぎ先を、開発環境の localstack の秘密の値 `keirekipro/rds` と `keirekipro/redis` から読む。この2つの秘密の値は、データベース `keireki_pro` と Redis の DB 0 を指す。そのため、Claude は、Spring の設定を上書きする2つの環境変数を足して、Java 版に渡す。Claude は、環境変数 `SPRING_DATASOURCE_URL` に `keireki_proto` を指す URL を入れ、環境変数 `SPRING_DATA_REDIS_DATABASE` に 7 を入れる。Spring Boot は、同じ設定が環境変数と取り込んだ秘密の値の両方にあるときは、環境変数の値を使う。そのため、Java 版は、この2つの環境変数の値でデータベースと Redis につなぐ。Spring Boot のこの順は、公式の文書 https://docs.spring.io/spring-boot/reference/features/external-config.html に書かれている。Claude は、localstack の秘密の値 `keirekipro/rds` と `keirekipro/redis` を書き換えない。Claude は、起動したあと、要求を送る前に、Java 版の `/actuator/env` で `spring.datasource.url` が `keireki_proto` を指し、`spring.data.redis.database` が 7 であることを確かめる。こうして、Claude は、所有者の開発のデータベース `keireki_pro` と Redis の DB 0 に触れない。Claude は、`keireki_proto` を作ってマイグレーションを流し、`users/basic.sql` と、`resumes/` の `many-pages.sql` `long-text.sql` `fonts.sql` `empty.sql` と、小タスク1.1 の `export/export.sql` を入れる。Claude は、ログインと CSRF の値の付け方を、Java 版と Go 版を比べる検査の `backend/compat/harness/capture.go` の手順に合わせる。
 
@@ -268,6 +268,8 @@
 - 開発環境のイメージは Java 版の4つのフォントのファイルを置かないので、Claude は、PDF の見た目を、本番のイメージで動かす Java 版と Go 版を比べる検査(`make compat`)で確かめる
 - Java 版と Go 版を比べる検査は、小タスク6.1 と6.2 の筋書きで、Java 版の PDF と Go 版の PDF を比べる。2つの PDF の違いが PDF を比べる部品の許す幅を超えたら、Claude は、許す幅を広げずに止まり、所有者に報告する。置き換えの spec の要件8の受入基準2が、同じ動きにできない違いが見つかったら止まると決めたためである
 - Claude は、変えた動きの一覧 `changed-behaviors.yaml` の項目を、番号の順に並べる
+- 小タスク1.2 で控えた `filenames.json` の項目のうち、空白だけの名前と空の名前は、Java 版がファイル名を作る前に出力の前提の検査で断るので、`status` が 400 で、`fileName` の代わりに `response` を持つ。Claude は、`TestSanitizeFileName_MatchesJava` で、`status` が 200 の項目だけをファイル名で比べ、400 の項目は出力の前提の検査のテストで扱う
+- `filenames.json` の、UTF-16 で255を超える名前のファイル名の末尾の `?` は、Java 版が UTF-16 の255で切って半分に割れた絵文字を、ヘッダを作るときに UTF-8 で `?` に替えたものである。`fileName` は、Content-Disposition の `filename*=` を読んだ値で、拡張子を含む
 
 ## 完了条件(全タスク共通)
 
