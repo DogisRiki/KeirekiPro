@@ -35,7 +35,7 @@
   - 受入基準とテストの対応: 要件1の受入基準2のうち、Java 版と答えが変わる要求を変えた動きの一覧に載せることと、要件2の受入基準4のうち、PDF の3つの違いを変えた動きの一覧に載せることは、`changed-behaviors.yaml` の CB-056 から CB-061 の文と、`match_test.go` の `TestLoadChangedBehaviors_CB005HasNoMatch` と `TestLoadChangedBehaviors_RequiredFields` で確かめる。Go 版の答えが一覧のとおりであることは、一覧の項目ごとに設計が決めたテストで確かめる。CB-056 から CB-058 は小タスク2.2 と2.3 の `pdfcmp_test.go`、CB-059 と CB-060 は小タスク5.2 の `resumes_test.go`、CB-061 は小タスク3.5 の `exportbody_test.go` である
   - _要件: 1.2, 2.4_
 
-- [ ] 2. 確認に使う道具を広げる
+- [x] 2. 確認に使う道具を広げる
 - [x] 2.1 筋書きの要求と期待の欄を足す (並行可)
 
   Claude は、Java 版と Go 版を比べる検査の広げ方の節のとおりに、`backend/compat/harness` の筋書きの形を広げる。Claude は、要求の `json_file` を `scenario.go` と `capture.go` に、期待の `body_contains` を `scenario.go` と `steps.go` に足す。Claude は、期待の `content_type` を、版に送る段でも書けるように、`validateVersionBody` の断る条件から外し、`checkStepExpect` で確かめる。`scenario_test.go` の `TestScenarioValidate_UserFields` の場合「版に送る段の expect の content_type」は、今の断る条件で筋書きが断られることを期待するので、この変更のあとに失敗する。そのため、Claude は、この場合を `TestScenarioValidate_UserFields` から外し、版に送る段の `content_type` を書いた筋書きが断られずに読めることを確かめる場合として、`TestExpectContentType_VersionStep` に移す。Claude は、移した場合のアサーションを消さず、期待だけを替える。
@@ -62,7 +62,7 @@
   - _要件: 2.4, 5.5_
   - _対象の部品: PDF を比べる部品_
 
-- [ ] 2.3 PDF を比べる部品の、行の組と折り返しのまとまりと色の比べ方を決め直す
+- [x] 2.3 PDF を比べる部品の、行の組と折り返しのまとまりと色の比べ方を決め直す
 
   Claude は、PDF を比べる部品の節のとおりに、`pdfcmp.go` の行の位置と高さの比べ方を、行の組と折り返しのまとまりで比べる形に決め直す。Claude は、今の語を出てくる順で組にして比べる `compareWords` を、行の組の比べ方に置き換えて消す。Claude は、色の集まりの取り方を、白でなく字の箱の外にある9画素以上の色の集まりにし、折り返しのまとまりが無ければ頁ごとに、あれば文書の全体で比べる。Claude は、`pdfcmp.go` の30行目にある許す幅のコメントが指す先を、この spec の design.md の PDF を比べる部品の節に直す。
 
@@ -270,6 +270,8 @@
 - Claude は、変えた動きの一覧 `changed-behaviors.yaml` の項目を、番号の順に並べる
 - 小タスク1.2 で控えた `filenames.json` の項目のうち、空白だけの名前と空の名前は、Java 版がファイル名を作る前に出力の前提の検査で断るので、`status` が 400 で、`fileName` の代わりに `response` を持つ。Claude は、`TestSanitizeFileName_MatchesJava` で、`status` が 200 の項目だけをファイル名で比べ、400 の項目は出力の前提の検査のテストで扱う
 - `filenames.json` の、UTF-16 で255を超える名前のファイル名の末尾の `?` は、Java 版が UTF-16 の255で切って半分に割れた絵文字を、ヘッダを作るときに UTF-8 で `?` に替えたものである。`fileName` は、Content-Disposition の `filename*=` を読んだ値で、拡張子を含む
+- PDF を比べる部品は、design.md の「減った行の高さ」を、それぞれの版のまとまりが1つの頁にあるときは、Java 版のまとまりの上の端から下の端までの高さから Go 版の同じ高さを引いた値として読む。行が1行減ると、下の行は行の箱の高さではなく行の間の隙間を含む行の送りの幅だけ上がるためである。まとまりが頁をまたぐときは、減った Java 版の行の箱の高さの合計を使う。design の文と字のとおりではないので、Claude は、この食い違いと理由を PR の本文に書く
+- PDF を比べる部品は、design.md のとおり、余分な上へのずれを、Java 版でまとまりと同じ頁にある、まとまりより下の行にだけ許す。前の頁の折り返しで Go 版の行が減って改頁の位置が変わると、あとの頁に残った行が1行の送りの幅だけ上がり、「行の位置」の違いになる。要件5の受入基準5の3つ目の箇条と要件2の受入基準4の4つ目の動きに届かない design の穴である。Claude は、小タスク6.1 と6.2 の比べる検査でこの違いが出たら、許す幅を広げずに止まり、所有者に報告する
 
 ## 完了条件(全タスク共通)
 

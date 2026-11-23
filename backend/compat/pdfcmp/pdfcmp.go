@@ -33,11 +33,11 @@ import (
 	"golang.org/x/text/unicode/norm"
 )
 
-// 許す違いの大きさ。design.md の「pdfcmp」の表のとおりにする。
+// 許す違いの大きさ。.kiro/specs/backend-go-resume-export/design.md の「PDF を比べる部品(pdfcmp)」の節の表のとおりにする。
 const (
-	// PositionTolerance は、語の箱の上下左右の端のずれとして許す大きさ(pt)である。
+	// PositionTolerance は、組にした行の左の端と上の端のずれとして許す大きさ(pt)である。
 	PositionTolerance = 2.0
-	// HeightTolerance は、語の箱の高さ(文字の大きさ)の違いとして許す大きさ(pt)である。
+	// HeightTolerance は、行の高さ(文字の大きさ)の違いとして許す大きさ(pt)である。
 	HeightTolerance = 0.35
 	// ColorTolerance は、表の色の R、G、B のそれぞれの違いとして許す大きさである。
 	ColorTolerance = 2
@@ -54,12 +54,10 @@ const (
 	KindFont      = "フォント"
 	KindDocText   = "文書の字の並び"
 	KindFontColor = "フォントと色"
-	KindWordPos   = "語の位置"
+	KindLinePos   = "行の位置"
+	KindWrap      = "折り返し"
 	KindFontSize  = "文字の大きさ"
 	KindColor     = "表の色"
-	// KindText は、ページごとの字の違いの種類である。部品は、ページごとの字を比べなくなったので、この種類の違いを作らない。
-	// 改頁の位置の違いを確かめるテストが、この名前を使う。行の組で改頁の位置の違いを見つける比べ方にしたら消す。
-	KindText = "ページの文字"
 )
 
 const (
@@ -68,7 +66,7 @@ const (
 	// minBoxPixels は、表の色の箱として数える最小の画素の数である。1画素の幅の罫線を拾い、
 	// 語の箱の外にはみ出した字形のかけらを拾わないための大きさである。
 	minBoxPixels = 9
-	// maxDetailDiffs は、Describe が説明に書く違いの数の上限である。ずれた PDF では語の違いが多くなるためである。
+	// maxDetailDiffs は、Describe が説明に書く違いの数の上限である。ずれた PDF では行の違いが多くなるためである。
 	maxDetailDiffs = 30
 	// describeTimeout は、Describe が1組の PDF を比べるのに待つ長さである。
 	describeTimeout = 2 * time.Minute
@@ -142,13 +140,10 @@ func Compare(ctx context.Context, java, goPDF []byte) (Result, error) {
 }
 
 // word は、pdftotext -bbox-layout の1つの語である。位置の単位は pt で、ページの左上を原点にする。
+// 語の箱は、行の字をつなぐことと、表の色の集まりを探すときに字の画素を除くことに使う。
 type word struct {
 	text                   string
 	xMin, yMin, xMax, yMax float64
-}
-
-func (w word) describe() string {
-	return fmt.Sprintf("「%s」 左 %.2f 上 %.2f 右 %.2f 下 %.2f", w.text, w.xMin, w.yMin, w.xMax, w.yMax)
 }
 
 // line は、pdftotext -bbox-layout の1つの行である。位置の単位は pt で、ページの左上を原点にする。
@@ -520,38 +515,38 @@ func compareDocs(j, g doc) Result {
 	add := func(kind string, page int, java, goVer string) {
 		r.Diffs = append(r.Diffs, Diff{Kind: kind, Page: page, Java: java, Go: goVer})
 	}
-	if len(j.sizes) != len(g.sizes) {
-		add(KindPages, 0, strconv.Itoa(len(j.sizes)), strconv.Itoa(len(g.sizes)))
-	}
 	if !slices.Equal(j.fonts, g.fonts) {
 		add(KindFont, 0, strings.Join(j.fonts, ", "), strings.Join(g.fonts, ", "))
 	}
-	textDiffs, sameText := compareDocText(j.lines, g.lines)
+	// 全体の字の並びと、フォントと色ごとの字の数は、折り返しのまとまりがあっても比べる
+	textDiffs, js, gs := compareDocText(j.lines, g.lines)
 	r.Diffs = append(r.Diffs, textDiffs...)
 	r.Diffs = append(r.Diffs, compareFontColors(j.fontColors, g.fontColors)...)
+	groups, pairDiffs := pairLines(js, gs)
+	r.Diffs = append(r.Diffs, pairDiffs...)
+	lineDiffs, wrapped := compareLines(groups)
+	r.Diffs = append(r.Diffs, lineDiffs...)
+	// 折り返しのまとまりがあれば、行が次の頁に送られるので、頁の数の違いを許す
+	if !wrapped && len(j.sizes) != len(g.sizes) {
+		add(KindPages, 0, strconv.Itoa(len(j.sizes)), strconv.Itoa(len(g.sizes)))
+	}
 	for i := range min(len(j.sizes), len(g.sizes)) {
-		page := i + 1
 		js, gs := j.sizes[i], g.sizes[i]
 		if exceeds(js.width, gs.width, PageSizeTolerance) || exceeds(js.height, gs.height, PageSizeTolerance) {
-			add(KindPageSize, page, js.raw, gs.raw)
+			add(KindPageSize, i+1, js.raw, gs.raw)
 		}
-		// 字の並びが違う文書では、語の組がずれるので、語の位置と大きさを比べない
-		if sameText && i < len(j.words) && i < len(g.words) {
-			for _, d := range compareWords(j.words[i], g.words[i]) {
-				add(d.Kind, page, d.Java, d.Go)
-			}
+	}
+	// 色の集まりは、折り返しのまとまりが無ければ頁ごとに、あれば文書の全体で比べる。折り返しで、表が次の頁に送られるためである
+	jb, gb := colorBoxes(j), colorBoxes(g)
+	if wrapped {
+		for _, d := range compareColors(slices.Concat(jb...), slices.Concat(gb...)) {
+			add(KindColor, 0, d.Java, d.Go)
 		}
-		if i < len(j.pages) && i < len(g.pages) {
-			var jw, gw []word
-			if i < len(j.words) {
-				jw = j.words[i]
-			}
-			if i < len(g.words) {
-				gw = g.words[i]
-			}
-			for _, d := range compareBoxes(findBoxes(j.pages[i], jw), findBoxes(g.pages[i], gw)) {
-				add(KindColor, page, d.Java, d.Go)
-			}
+		return r
+	}
+	for i := range min(len(jb), len(gb)) {
+		for _, d := range compareColors(jb[i], gb[i]) {
+			add(KindColor, i+1, d.Java, d.Go)
 		}
 	}
 	return r
@@ -598,11 +593,13 @@ func findColumn(cols []column, x float64) (int, bool) {
 	return best, best >= 0 && bestDist <= ColumnTolerance+epsilon
 }
 
-// textSeq は、列、ページ、上からの位置の順に並べた行の字をつないだものである。ends[k] は、lines[k] の字の終わりの位置である。
+// textSeq は、列、ページ、上からの位置の順に並べた行の字をつないだものである。ends[k] は、lines[k] の字の終わりの位置で、
+// cols[k] は、lines[k] の列の番号である。
 type textSeq struct {
 	text  string
 	lines []line
 	ends  []int
+	cols  []int
 }
 
 // orderLines は、行を列、ページ、上からの位置の順に並べ、直した字をつなぐ。cols は、行ごとの列の番号である。
@@ -633,6 +630,7 @@ func orderLines(lines []line, cols []int) textSeq {
 		b.WriteString(lines[k].norm)
 		s.lines = append(s.lines, lines[k])
 		s.ends = append(s.ends, b.Len())
+		s.cols = append(s.cols, cols[k])
 	}
 	s.text = b.String()
 	return s
@@ -650,8 +648,8 @@ func (s textSeq) lineAt(pos int) string {
 // compareDocText は、2つの版の文書の全体の行を、Java 版の行で決めた列、ページ、上からの位置の順につなぎ、字の並びを比べる。
 // 列でまとめるのは、表の列の字が1行にまとまる順が2つの版で違うためである。どの列にも入らない Go 版の行は、1行ずつ違いにし、
 // 字の並びの比べでは最も近い列に置く。字の並びが違えば、最初に違う字を含む行を、両方の版について書く。
-// sameSeq は、つないだ字の並びが同じかを返す。
-func compareDocText(j, g []line) (diffs []Diff, sameSeq bool) {
+// js と gs は、行を組にする比べ方に使う、2つの版の並べた行である。
+func compareDocText(j, g []line) (diffs []Diff, js, gs textSeq) {
 	cols := javaColumns(j)
 	jc := make([]int, len(j))
 	for k, l := range j {
@@ -664,9 +662,9 @@ func compareDocText(j, g []line) (diffs []Diff, sameSeq bool) {
 			diffs = append(diffs, Diff{Kind: KindDocText, Java: "(入る列がありません)", Go: fmt.Sprintf("%s 左 %.2f", l.describe(), l.xMin)})
 		}
 	}
-	js, gs := orderLines(j, jc), orderLines(g, gc)
+	js, gs = orderLines(j, jc), orderLines(g, gc)
 	if js.text == gs.text {
-		return diffs, true
+		return diffs, js, gs
 	}
 	pos := 0
 	for pos < len(js.text) && pos < len(gs.text) && js.text[pos] == gs.text[pos] {
@@ -676,7 +674,179 @@ func compareDocText(j, g []line) (diffs []Diff, sameSeq bool) {
 	for pos > 0 && pos < len(js.text) && !utf8.RuneStart(js.text[pos]) {
 		pos--
 	}
-	return append(diffs, Diff{Kind: KindDocText, Java: js.lineAt(pos), Go: gs.lineAt(pos)}), false
+	return append(diffs, Diff{Kind: KindDocText, Java: js.lineAt(pos), Go: gs.lineAt(pos)}), js, gs
+}
+
+// lineGroup は、2つの版の行の組か、折り返しのまとまりである。j と g に、それぞれの版の行を、並べた順に入れる。
+// 行の組では、j と g に1行ずつ入る。
+type lineGroup struct {
+	j, g []line
+}
+
+func (m lineGroup) wrap() bool {
+	return len(m.j) != 1 || len(m.g) != 1
+}
+
+// pairLines は、列、ページ、上からの位置の順に並べた2つの版の行を、前から順に、字が同じ行どうしで組にする。
+// 組にならない行は、同じ列で続く行をそれぞれつないだ字が同じになるまで足して、折り返しのまとまりにする。
+// まとまりにできなければ、そこから後ろの行の対応が決まらないので、組にするのをやめる。字の並びが違えば、その違いは
+// compareDocText が書く。字の並びが同じなのにまとまりにできないのは、まとまりが列をまたぐときで、そのときは折り返しの違いを返す。
+func pairLines(js, gs textSeq) ([]lineGroup, []Diff) {
+	var groups []lineGroup
+	a, b := 0, 0
+	for a < len(js.lines) && b < len(gs.lines) {
+		if js.lines[a].norm == gs.lines[b].norm {
+			groups = append(groups, lineGroup{j: js.lines[a : a+1], g: gs.lines[b : b+1]})
+			a, b = a+1, b+1
+			continue
+		}
+		m, n, ok := wrapGroup(js, gs, a, b)
+		if !ok {
+			if js.text != gs.text {
+				return groups, nil
+			}
+			return groups, []Diff{{
+				Kind: KindWrap, Page: js.lines[a].page,
+				Java: js.lines[a].describe() + " から同じ列の行をつないでも、Go 版と字がそろいません",
+				Go:   gs.lines[b].describe() + " から同じ列の行をつないでも、Java 版と字がそろいません",
+			}}
+		}
+		groups = append(groups, lineGroup{j: js.lines[a : a+m], g: gs.lines[b : b+n]})
+		a, b = a+m, b+n
+	}
+	return groups, nil
+}
+
+// wrapGroup は、Java 版の a 番目と Go 版の b 番目の行から、同じ列で続く行をそれぞれつなぎ、字が同じになる行の数 m と n を返す。
+// 短いほうの版の行を1行ずつ足す。片方の字がもう片方の字の始まりでなくなるか、列が変わるか、行が尽きれば、ok を false にする。
+func wrapGroup(js, gs textSeq, a, b int) (m, n int, ok bool) {
+	col := js.cols[a]
+	if gs.cols[b] != col {
+		return 0, 0, false
+	}
+	jt, gt := js.lines[a].norm, gs.lines[b].norm
+	m, n = 1, 1
+	for jt != gt {
+		switch {
+		case strings.HasPrefix(gt, jt):
+			if a+m >= len(js.lines) || js.cols[a+m] != col {
+				return 0, 0, false
+			}
+			jt += js.lines[a+m].norm
+			m++
+		case strings.HasPrefix(jt, gt):
+			if b+n >= len(gs.lines) || gs.cols[b+n] != col {
+				return 0, 0, false
+			}
+			gt += gs.lines[b+n].norm
+			n++
+		default:
+			return 0, 0, false
+		}
+	}
+	return m, n, true
+}
+
+// compareLines は、行の組と折り返しのまとまりの位置と高さを比べる。wrapped は、受け入れた折り返しのまとまりがあるかである。
+//   - 組になった行は、左の端と上の端が PositionTolerance 以内、高さが HeightTolerance 以内でなければならない
+//   - 折り返しのまとまりは、Go 版の行の数が Java 版の行の数以下で、まとまりの行の高さが、Java 版の同じ順の行の高さと
+//     HeightTolerance 以内のときだけ受け入れる。まとまりの最初の行の位置は、組になった行と同じに比べる
+//   - 受け入れたまとまりで Go 版の行が減ったときは、Java 版の同じ頁で、まとまりの最初の行より下にある行は、
+//     上に向かってだけ、減った行の高さ(lostHeight)の合計まで余分にずれてよい
+//   - 受け入れたまとまりが無ければ、組になった行の頁が違うことを違いとする。あれば、頁の違う行の縦の位置を比べない
+func compareLines(groups []lineGroup) (diffs []Diff, wrapped bool) {
+	var accepted []lineGroup
+	for _, m := range groups {
+		if !m.wrap() {
+			diffs = append(diffs, compareHeight(m.j[0], m.g[0])...)
+			continue
+		}
+		if len(m.g) > len(m.j) {
+			diffs = append(diffs, Diff{
+				Kind: KindWrap, Page: m.j[0].page,
+				Java: fmt.Sprintf("%s から %d 行", m.j[0].describe(), len(m.j)),
+				Go:   fmt.Sprintf("%s から %d 行", m.g[0].describe(), len(m.g)),
+			})
+			continue
+		}
+		heightDiffs := make([]Diff, 0, len(m.g))
+		for k := range m.g {
+			heightDiffs = append(heightDiffs, compareHeight(m.j[k], m.g[k])...)
+		}
+		diffs = append(diffs, heightDiffs...)
+		if len(heightDiffs) == 0 {
+			accepted = append(accepted, m)
+		}
+	}
+	wrapped = len(accepted) > 0
+	for _, m := range groups {
+		if m.wrap() && len(m.g) > len(m.j) {
+			continue
+		}
+		jl, gl := m.j[0], m.g[0]
+		slack := 0.0
+		for _, w := range accepted {
+			if top := w.j[0]; top.page == jl.page && jl.yMin > top.yMin+epsilon {
+				slack += lostHeight(w)
+			}
+		}
+		if moved(jl, gl, slack, wrapped) {
+			diffs = append(diffs, Diff{
+				Kind: KindLinePos, Page: jl.page,
+				Java: fmt.Sprintf("%s 左 %.2f 上 %.2f", jl.describe(), jl.xMin, jl.yMin),
+				Go:   fmt.Sprintf("%s 左 %.2f 上 %.2f", gl.describe(), gl.xMin, gl.yMin),
+			})
+		}
+	}
+	return diffs, wrapped
+}
+
+// moved は、組にした Java 版の行 jl と Go 版の行 gl の位置が、許す幅を超えて違うかを返す。
+// slack は、上に向かってだけ余分に許すずれである。wrapped が true なら、頁の違う行の縦の位置を比べない。
+func moved(jl, gl line, slack float64, wrapped bool) bool {
+	if exceeds(jl.xMin, gl.xMin, PositionTolerance) {
+		return true
+	}
+	if jl.page != gl.page {
+		return !wrapped
+	}
+	// 位置は頁の左上を原点にするので、上に向かうずれは負になる
+	dy := gl.yMin - jl.yMin
+	return dy > PositionTolerance+epsilon || dy < -(PositionTolerance+slack)-epsilon
+}
+
+// compareHeight は、Java 版の行 jl と Go 版の行 gl の高さを比べ、HeightTolerance を超えて違えば違いを返す。
+func compareHeight(jl, gl line) []Diff {
+	jh, gh := jl.yMax-jl.yMin, gl.yMax-gl.yMin
+	if !exceeds(jh, gh, HeightTolerance) {
+		return nil
+	}
+	return []Diff{{
+		Kind: KindFontSize, Page: jl.page,
+		Java: fmt.Sprintf("%s 高さ %.2f", jl.describe(), jh),
+		Go:   fmt.Sprintf("%s 高さ %.2f", gl.describe(), gh),
+	}}
+}
+
+// lostHeight は、折り返しのまとまりで Go 版の行が減った分の高さを返す。
+// 減った行の高さには、行の箱の高さに加えて行の間の隙間も入れる。行が減ると、下の行は行の間の隙間の分も上がるためである。
+// そのため、まとまりの行がそれぞれの版で1つの頁にあれば、Java 版のまとまりの上の端から下の端までの高さと、Go 版の高さの差にする。
+// まとまりが頁をまたげば、上の端から下の端までの高さを測れないので、Java 版の最後の行から減った行の数だけ、行の箱の高さを足す。
+func lostHeight(m lineGroup) float64 {
+	lost := len(m.j) - len(m.g)
+	if lost <= 0 {
+		return 0
+	}
+	jTop, jBottom := m.j[0], m.j[len(m.j)-1]
+	gTop, gBottom := m.g[0], m.g[len(m.g)-1]
+	if jTop.page == jBottom.page && gTop.page == gBottom.page {
+		return max(0, (jBottom.yMax-jTop.yMin)-(gBottom.yMax-gTop.yMin))
+	}
+	sum := 0.0
+	for _, l := range m.j[len(m.j)-lost:] {
+		sum += l.yMax - l.yMin
+	}
+	return sum
 }
 
 // compareFontColors は、フォントの名前と色の組ごとの字の数を比べ、数が違う組を、組の名前の順に1つずつ違いにする。
@@ -697,45 +867,67 @@ func compareFontColors(j, g map[string]int) []Diff {
 	return diffs
 }
 
-// compareWords は、1つのページの語を、出てくる順で組にし、箱の端のずれと高さの違いを比べる。
-func compareWords(j, g []word) []Diff {
-	if len(j) != len(g) {
-		return []Diff{{Kind: KindWordPos, Java: fmt.Sprintf("語の数 %d", len(j)), Go: fmt.Sprintf("語の数 %d", len(g))}}
-	}
-	var diffs []Diff
-	for k := range j {
-		a, b := j[k], g[k]
-		if exceeds(a.xMin, b.xMin, PositionTolerance) || exceeds(a.yMin, b.yMin, PositionTolerance) ||
-			exceeds(a.xMax, b.xMax, PositionTolerance) || exceeds(a.yMax, b.yMax, PositionTolerance) {
-			diffs = append(diffs, Diff{Kind: KindWordPos, Java: a.describe(), Go: b.describe()})
-		}
-		if exceeds(a.yMax-a.yMin, b.yMax-b.yMin, HeightTolerance) {
-			diffs = append(diffs, Diff{
-				Kind: KindFontSize,
-				Java: fmt.Sprintf("「%s」 高さ %.2f", a.text, a.yMax-a.yMin),
-				Go:   fmt.Sprintf("「%s」 高さ %.2f", b.text, b.yMax-b.yMin),
-			})
-		}
-	}
-	return diffs
-}
-
 func exceeds(a, b, tolerance float64) bool {
 	return math.Abs(a-b) > tolerance+epsilon
 }
 
 // box は、表の見出しや罫線の箱である。ページの画像で、白でない同じ色の画素がつながった広がりを1つの箱とする。
+// page は、箱のあるページの番号で、1 から数える。
 type box struct {
+	page                   int
 	color                  [3]uint8
 	minX, minY, maxX, maxY int
 }
 
 func (b box) describe() string {
-	return fmt.Sprintf("箱 (%d,%d)-(%d,%d) の色 #%02X%02X%02X", b.minX, b.minY, b.maxX, b.maxY, b.color[0], b.color[1], b.color[2])
+	return fmt.Sprintf("ページ %d の箱 (%d,%d)-(%d,%d) の色 #%02X%02X%02X", b.page, b.minX, b.minY, b.maxX, b.maxY, b.color[0], b.color[1], b.color[2])
 }
 
-func (b box) center() (float64, float64) {
-	return float64(b.minX+b.maxX) / 2, float64(b.minY+b.maxY) / 2
+// colorBoxes は、文書のページごとに、白でなく、字の箱の外にある、minBoxPixels 以上の画素の色の箱を集める。
+func colorBoxes(d doc) [][]box {
+	pages := make([][]box, len(d.pages))
+	for i, img := range d.pages {
+		var words []word
+		if i < len(d.words) {
+			words = d.words[i]
+		}
+		pages[i] = findBoxes(img, words)
+		for k := range pages[i] {
+			pages[i][k].page = i + 1
+		}
+	}
+	return pages
+}
+
+// compareColors は、2つの版の箱の色の集まりを比べる。片方の版の色に、R、G、B のそれぞれで ColorTolerance 以内の色の箱が
+// もう片方の版に無ければ、その色を違いにする。箱の位置と数は比べない。2つの版で罫線の描き方が違い、箱の割れ方が違うためである。
+func compareColors(j, g []box) []Diff {
+	j, g = distinctColors(j), distinctColors(g)
+	var diffs []Diff
+	for _, a := range j {
+		if !slices.ContainsFunc(g, func(b box) bool { return colorClose(a.color, b.color) }) {
+			diffs = append(diffs, Diff{Kind: KindColor, Java: a.describe(), Go: "(この色の箱がありません)"})
+		}
+	}
+	for _, b := range g {
+		if !slices.ContainsFunc(j, func(a box) bool { return colorClose(a.color, b.color) }) {
+			diffs = append(diffs, Diff{Kind: KindColor, Java: "(この色の箱がありません)", Go: b.describe()})
+		}
+	}
+	return diffs
+}
+
+// distinctColors は、箱を、色ごとに最初の1つだけ残す。
+func distinctColors(boxes []box) []box {
+	seen := map[[3]uint8]bool{}
+	var out []box
+	for _, b := range boxes {
+		if !seen[b.color] {
+			seen[b.color] = true
+			out = append(out, b)
+		}
+	}
+	return out
 }
 
 // findBoxes は、ページの画像から、語の箱の画素を除き、白でない同じ色の画素が上下左右でつながった広がりを箱として集める。
@@ -795,40 +987,6 @@ func findBoxes(img image.Image, words []word) []box {
 		}
 	}
 	return boxes
-}
-
-// compareBoxes は、Java 版の箱のそれぞれに、中心が最も近い Go 版の箱を組にし、色の R、G、B のそれぞれの違いを比べる。
-// 組にならない箱は、片方の版にしか無い箱として違いにする。
-func compareBoxes(j, g []box) []Diff {
-	used := make([]bool, len(g))
-	var diffs []Diff
-	for _, a := range j {
-		best, bestDist := -1, math.Inf(1)
-		ax, ay := a.center()
-		for k, b := range g {
-			if used[k] {
-				continue
-			}
-			bx, by := b.center()
-			if d := (ax-bx)*(ax-bx) + (ay-by)*(ay-by); d < bestDist {
-				best, bestDist = k, d
-			}
-		}
-		if best < 0 {
-			diffs = append(diffs, Diff{Kind: KindColor, Java: a.describe(), Go: "(箱がありません)"})
-			continue
-		}
-		used[best] = true
-		if !colorClose(a.color, g[best].color) {
-			diffs = append(diffs, Diff{Kind: KindColor, Java: a.describe(), Go: g[best].describe()})
-		}
-	}
-	for k, b := range g {
-		if !used[k] {
-			diffs = append(diffs, Diff{Kind: KindColor, Java: "(箱がありません)", Go: b.describe()})
-		}
-	}
-	return diffs
 }
 
 func colorClose(a, b [3]uint8) bool {

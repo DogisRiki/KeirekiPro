@@ -4,6 +4,7 @@ package pdfcmp
 
 import (
 	"context"
+	"fmt"
 	"slices"
 	"strings"
 	"testing"
@@ -23,6 +24,18 @@ func compare(t *testing.T, java, goPDF []byte) Result {
 func hasDiff(r Result, kind string, page int) bool {
 	for _, d := range r.Diffs {
 		if d.Kind == kind && d.Page == page {
+			return true
+		}
+	}
+	return false
+}
+
+// hasLineOnOtherPage は、Java 版の javaPage ページの行 s が、Go 版で goPage ページにある「行の位置」の違いがあるかを返す。
+func hasLineOnOtherPage(r Result, javaPage int, s string, goPage int) bool {
+	for _, d := range r.Diffs {
+		if d.Kind == KindLinePos && d.Page == javaPage &&
+			strings.Contains(d.Java, fmt.Sprintf("ページ %d の行「%s」", javaPage, s)) &&
+			strings.Contains(d.Go, fmt.Sprintf("ページ %d の行「%s」", goPage, s)) {
 			return true
 		}
 	}
@@ -61,10 +74,10 @@ func TestCompare_Rejects2_5ptShift(t *testing.T) {
 		"上に 2.5pt": twoLines(72, 702.5),
 		"下に 2.5pt": twoLines(72, 697.5),
 	} {
-		t.Run(name+"ずれた語を止める", func(t *testing.T) {
+		t.Run(name+"ずれた行を止める", func(t *testing.T) {
 			r := compare(t, java, makePDF(t, font, shifted))
-			if !hasDiff(r, KindWordPos, 1) {
-				t.Errorf("1ページ目に語の位置の違いがあるはずですが、%+v", r.Diffs)
+			if !hasDiff(r, KindLinePos, 1) {
+				t.Errorf("1ページ目に行の位置の違いがあるはずですが、%+v", r.Diffs)
 			}
 		})
 	}
@@ -73,7 +86,7 @@ func TestCompare_Rejects2_5ptShift(t *testing.T) {
 		java := makePDF(t, font, testPage{content: text(12, 72, 700, "I")})
 		goPDF := makePDF(t, font, testPage{content: text(12.3, 72, 700, "I")})
 		r := compare(t, java, goPDF)
-		if !hasDiff(r, KindFontSize, 1) || hasDiff(r, KindWordPos, 1) {
+		if !hasDiff(r, KindFontSize, 1) || hasDiff(r, KindLinePos, 1) {
 			t.Errorf("文字の大きさの違いだけがあるはずですが、%+v", r.Diffs)
 		}
 	})
@@ -111,8 +124,9 @@ func TestCompare_RejectsPageBreakDiff(t *testing.T) {
 		java := makePDF(t, font, testPage{content: a + b}, testPage{content: c})
 		goPDF := makePDF(t, font, testPage{content: a}, testPage{content: b + c})
 		r := compare(t, java, goPDF)
-		if !hasDiff(r, KindText, 1) || !hasDiff(r, KindText, 2) {
-			t.Errorf("1ページ目と2ページ目に文字の違いがあるはずですが、%+v", r.Diffs)
+		// 折り返しのまとまりが無いので、組になった「Bravo」の行の頁の違いを違いとする
+		if !hasLineOnOtherPage(r, 1, "Bravo", 2) {
+			t.Errorf("1ページ目の「Bravo」の行が Go 版で2ページ目にある違いがあるはずですが、%+v", r.Diffs)
 		}
 	})
 	t.Run("ページの数が違う PDF を止める", func(t *testing.T) {
@@ -278,6 +292,121 @@ func TestCompare_TwoColumnOrder(t *testing.T) {
 		}
 		if !found {
 			t.Errorf("どの列にも入らない行の違いがあるはずですが、%+v", r.Diffs)
+		}
+	})
+}
+
+// wrappedThree は、「Alpha Bravo」と「Charlie」の2行に折り返した段落と、20pt 空けた「After」の行を書くページを返す。
+// 段落の行の間は 20pt である。
+func wrappedThree() testPage {
+	return testPage{content: text(12, 72, 700, "Alpha Bravo") + text(12, 72, 680, "Charlie") + text(12, 72, 640, "After")}
+}
+
+// unwrapped は、wrappedThree の段落を1行に書き、「After」の行を y に書くページを返す。
+func unwrapped(afterY float64) testPage {
+	return testPage{content: text(12, 72, 700, "Alpha Bravo Charlie") + text(12, 72, afterY, "After")}
+}
+
+func TestCompare_AllowsFewerWrappedLines(t *testing.T) {
+	t.Run("同じ字の段落を Go 版で1行少なく折り返した PDF を止めない", func(t *testing.T) {
+		// Go 版の「After」の行は、減った1行の分の 20pt だけ上がる
+		java := makePDF(t, font, wrappedThree())
+		if r := compare(t, java, makePDF(t, font, unwrapped(660))); !r.Same() {
+			t.Errorf("違いが無いはずですが、%+v", r.Diffs)
+		}
+	})
+	t.Run("折り返しで行が減り、次の頁の行が前の頁に上がった PDF を止めない", func(t *testing.T) {
+		java := makePDF(t, font,
+			testPage{content: text(12, 72, 700, "Alpha Bravo") + text(12, 72, 680, "Charlie")},
+			testPage{content: text(12, 72, 700, "Delta")})
+		goPDF := makePDF(t, font, testPage{content: text(12, 72, 700, "Alpha Bravo Charlie") + text(12, 72, 680, "Delta")})
+		if r := compare(t, java, goPDF); !r.Same() {
+			t.Errorf("違いが無いはずですが、%+v", r.Diffs)
+		}
+	})
+}
+
+func TestCompare_RejectsMoreWrappedLines(t *testing.T) {
+	java := makePDF(t, font, unwrapped(680))
+	goPDF := makePDF(t, font, testPage{content: text(12, 72, 700, "Alpha Bravo") + text(12, 72, 680, "Charlie") + text(12, 72, 660, "After")})
+	r := compare(t, java, goPDF)
+	if !hasDiff(r, KindWrap, 1) {
+		t.Errorf("1ページ目に折り返しの違いがあるはずですが、%+v", r.Diffs)
+	}
+}
+
+func TestCompare_RejectsOverShiftAfterWrap(t *testing.T) {
+	java := makePDF(t, font, wrappedThree())
+	for name, afterY := range map[string]float64{
+		// 減った行の分の 20pt と、許す 2pt を足した 22pt より 1pt 大きく上がる
+		"減った行の高さより大きく上がった行を止める": 663,
+		// 下に向かっては、減った行の分のずれを許さない
+		"下に 2pt を超えてずれた行を止める": 637,
+	} {
+		t.Run(name, func(t *testing.T) {
+			r := compare(t, java, makePDF(t, font, unwrapped(afterY)))
+			found := false
+			for _, d := range r.Diffs {
+				if d.Kind == KindLinePos && d.Page == 1 && strings.Contains(d.Java, "After") {
+					found = true
+				}
+			}
+			if !found {
+				t.Errorf("1ページ目の「After」の行に行の位置の違いがあるはずですが、%+v", r.Diffs)
+			}
+		})
+	}
+}
+
+func TestCompare_RejectsPageBreakDiffWithoutWrap(t *testing.T) {
+	java := makePDF(t, font, testPage{content: text(12, 72, 700, "Alpha") + text(12, 72, 680, "Bravo") + text(12, 72, 660, "Charlie")})
+	goPDF := makePDF(t, font,
+		testPage{content: text(12, 72, 700, "Alpha") + text(12, 72, 680, "Bravo")},
+		testPage{content: text(12, 72, 660, "Charlie")})
+	r := compare(t, java, goPDF)
+	if !hasDiff(r, KindPages, 0) {
+		t.Errorf("ページの数の違いがあるはずですが、%+v", r.Diffs)
+	}
+	if !hasLineOnOtherPage(r, 1, "Charlie", 2) {
+		t.Errorf("1ページ目の「Charlie」の行が Go 版で2ページ目にある違いがあるはずですが、%+v", r.Diffs)
+	}
+}
+
+func TestCompare_RejectsColorSetDiff(t *testing.T) {
+	gray, blue, red := rect(200, 200, 200, 300, 100, 50, 20), rect(0, 0, 255, 400, 100, 50, 20), rect(255, 0, 0, 300, 200, 50, 20)
+	line := text(12, 72, 700, "One")
+	t.Run("Go 版に無い色の箱を止める", func(t *testing.T) {
+		r := compare(t, makePDF(t, font, testPage{content: line + gray + blue}), makePDF(t, font, testPage{content: line + gray}))
+		if len(r.Diffs) != 1 || !hasDiff(r, KindColor, 1) || !strings.Contains(r.Diffs[0].Java, "#0000FF") ||
+			!strings.Contains(r.Diffs[0].Go, "箱がありません") {
+			t.Errorf("1ページ目に Go 版に青の箱が無い違いだけがあるはずですが、%+v", r.Diffs)
+		}
+	})
+	t.Run("Java 版に無い色の箱を止める", func(t *testing.T) {
+		r := compare(t, makePDF(t, font, testPage{content: line + gray}), makePDF(t, font, testPage{content: line + gray + red}))
+		if len(r.Diffs) != 1 || !hasDiff(r, KindColor, 1) || !strings.Contains(r.Diffs[0].Java, "箱がありません") ||
+			!strings.Contains(r.Diffs[0].Go, "#FF0000") {
+			t.Errorf("1ページ目に Java 版に赤の箱が無い違いだけがあるはずですが、%+v", r.Diffs)
+		}
+	})
+	t.Run("折り返しのまとまりが無ければ、色の集まりを頁ごとに比べる", func(t *testing.T) {
+		two := text(12, 72, 700, "Two")
+		java := makePDF(t, font, testPage{content: line + gray}, testPage{content: two + blue})
+		goPDF := makePDF(t, font, testPage{content: line + blue}, testPage{content: two + gray})
+		if r := compare(t, java, goPDF); !hasDiff(r, KindColor, 1) || !hasDiff(r, KindColor, 2) {
+			t.Errorf("1ページ目と2ページ目に表の色の違いがあるはずですが、%+v", r.Diffs)
+		}
+	})
+	t.Run("折り返しのまとまりがあれば、色の集まりを文書の全体で比べる", func(t *testing.T) {
+		two := text(12, 72, 700, "Two")
+		java := makePDF(t, font,
+			testPage{content: text(12, 72, 700, "Alpha Bravo") + text(12, 72, 680, "Charlie") + gray},
+			testPage{content: two + blue})
+		goPDF := makePDF(t, font,
+			testPage{content: text(12, 72, 700, "Alpha Bravo Charlie") + blue},
+			testPage{content: two + gray})
+		if r := compare(t, java, goPDF); !r.Same() {
+			t.Errorf("違いが無いはずですが、%+v", r.Diffs)
 		}
 	})
 }
