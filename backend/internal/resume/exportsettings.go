@@ -59,6 +59,12 @@ type exportRGBInput struct {
 	Blue  *int
 }
 
+// 次の2つは、PDF のひな形の CSS に入れるフォントの名前である。Java 版の ResumePdfExportSettings が選ぶ2つの値と同じである。
+const (
+	cssFontSansJP  = "Noto Sans JP"
+	cssFontSerifJP = "Noto Serif JP"
+)
+
 var (
 	minFontSize = big.NewRat(6, 1)
 	maxFontSize = big.NewRat(72, 1)
@@ -68,7 +74,7 @@ var (
 // defaultPDFSettings は、設定を付けない出力の既定の設定を返す(ResumePdfExportSettings.defaults)。
 func defaultPDFSettings() pdfSettings {
 	return pdfSettings{
-		FontFamily:             "Noto Sans JP",
+		FontFamily:             cssFontSansJP,
 		TitleFontSize:          16,
 		DateFontSize:           10,
 		FullNameFontSize:       10,
@@ -117,9 +123,9 @@ func toCSSFontFamily(font *string) (string, bool) {
 	}
 	switch *font {
 	case "NotoSansJP":
-		return "Noto Sans JP", true
+		return cssFontSansJP, true
 	case "NotoSerifJP":
-		return "Noto Serif JP", true
+		return cssFontSerifJP, true
 	}
 	return "", false
 }

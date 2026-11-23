@@ -132,7 +132,7 @@
   - 受入基準とテストの対応: 要件2の受入基準2のうち、利用者が書いた `<` `>` `&` `"` `'` を Java 版と同じ形に書き換えることは、`exporttemplate_test.go` の `TestRenderMarkdown_Escapes` で確かめる。出力のモデルの日付と期間の書き方と、作業の工程の並びと、技術スタックの並びと、値の無い欄の扱いは、`exportmodel_test.go` の `TestExportModel_Formats` で確かめる。Markdown の全体が Java 版と1バイトも違わないことは、小タスク4.4 の結合テストで確かめる
   - _要件: 2.2_
 
-- [ ] 4.2 PDF の HTML のひな形を作る
+- [x] 4.2 PDF の HTML のひな形を作る
 
   Claude は、出力のモデルとひな形の節のとおりに、`backend/internal/resume/templates/resume.html.tmpl` に PDF の HTML のひな形を写し、試作で決めた CSS を足す。Claude は、`exporttemplate.go` に `renderPDFHTML` を作る。写す元は、Java 版の `templates/resume/pdf/simple.html` である。
   - 完了の確かめ方: `go test ./internal/resume/ -run TestRenderPDFHTML` が通る
