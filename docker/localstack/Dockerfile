@@ -8,4 +8,4 @@
 # 必要になった。非商用利用は無料枠(Hobby)の対象で費用はかからないが、
 # LOCALSTACK_AUTH_TOKEN を docker/localstack/.env.local に設定しないと
 # 起動時に exit 55 で終了する。取得手順は初期セットアップ手順を参照。
-FROM localstack/localstack:2026.10.7@sha256:96102ee38f6b84792711c86f5244f8f438277ff090cf7eb75deba82513f94aa8
+FROM localstack/localstack:2026.10.8@sha256:be800da7b2f20deeebb1a4fef113ff4fc7fa28871cac4de5036a1ac69e22b6dc
