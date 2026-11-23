@@ -80,7 +80,7 @@
   - _依存: 2.2_
 
 - [ ] 3. 本文と設定と出力の前提とファイル名を扱う部品を作る
-- [ ] 3.1 PDF の設定の既定の値と直し方を作る (並行可)
+- [x] 3.1 PDF の設定の既定の値と直し方を作る (並行可)
 
   Claude は、PDF の設定の値の節のとおりに、`backend/internal/resume/exportsettings.go` に、`defaultPDFSettings` と `normalizePDFSettings` と、直す前の設定の値の型 `exportPDFSettingsInput` と、直したあとの型 `pdfSettings` を作る。写す元は、Java 版の `ResumePdfExportSettings` である。
   - 完了の確かめ方: `go test ./internal/resume/ -run TestExportSettings` が通る
