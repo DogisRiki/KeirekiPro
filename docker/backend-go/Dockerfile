@@ -8,7 +8,7 @@
 #   - Docker の CLI: 比べる検査と結合テストが dind の Docker を使う
 #   - chromium と fonts-noto-cjk: PDF を作る部品の単体テストと、開発サーバの PDF の出力
 # Go のモジュールとビルドのキャッシュは /cache に置き、compose のボリューム backend-go-cache を差し込む。
-FROM docker:29-cli@sha256:2357639ad1ea7d0194134bf3292622fd4e562483966ed674e5d7c945b5f3b28d AS docker-cli
+FROM docker:29-cli@sha256:34507eb5069d8be82c95dd3b6987d4250fd5fee49b82e2509b7d7a7030740d6d AS docker-cli
 
 FROM golang:1.27.4-trixie@sha256:b54b2639de8c1bfe538ec5ffc45f29b1932235ac5f6d63c059853646677112d9
 
