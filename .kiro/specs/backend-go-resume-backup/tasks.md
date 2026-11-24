@@ -106,7 +106,7 @@
   - _依存: 3.2_
 
 - [ ] 4. Service の書き出しと戻しを作る
-- [ ] 4.1 Service の書き出しのメソッドを作る
+- [x] 4.1 Service の書き出しのメソッドを作る
 
   Claude は、Service の書き出しの節のとおりに、`backend/internal/resume/backup.go` に、`BackupResume` と、バックアップのファイルの型 `bkFile` と `bkResume` と6つの欄の項目の型と、日時と日付の書き方を作る。写す元は、Java 版の `BackupResumeUseCase` と `BackupResumeResponse` である。`BackupResume` は、経歴書を `GetResume` で読み、小タスク3.1 の `JavaJSON` で書き、出力の spec の `Export` と `sanitizeFileName` で結果を返す。Claude は、`service.go` の28の操作と書いたコメントを30にする。
   - 完了の確かめ方: `go test ./internal/resume/ -run TestBackup` が通る
@@ -267,6 +267,7 @@
 - Java 版の Jackson の版は 3.1.7 である(Spring Boot 4.1.2)。Claude は、Jackson の動きを確かめるときは、jackson-core の 3.1.7 のタグのコードを読む。小タスク3.4 の `readRestoreFile` は、本文を丸ごと出力の spec の `numbersWithinLimit` に渡さず、`parseJTree` で作った値の木の数を1つずつ渡す。Jackson は最初の値のあとに続く字を読まないので、本文を丸ごと渡すと、読まない字の中の長い数まで確かめてしまうためである。頭の BOM は `parseJTree` が読み飛ばす
 - 同じ名前の欄が2つある本文を、Java 版の Jackson は、前の値も読み、あとの値を使う。前の値を読めなければ、本文を読めない(400「入力エラーがあります。」)。小タスク3.4 の `readRestoreFile` も同じにした。design.md の「あとの値を使う」は、前の値を読まないことではない
 - 真偽の欄に数が書かれているとき、Java 版の Jackson は、整数の書き方の数だけを読み、0 でなければ真とする。`1.0` `1e0` `-0.0` のような小数の書き方の数は読めない値とする。小タスク3.4 の `readRestoreFile` も同じにした。design.md の「数は 0 でなければ真とする」は、整数の書き方の数のことである
+- `backend/internal/httpapi` の resumes.go、server.go、resumeresponses.go、resumes_test.go のコメントは、まだ操作の数を28と書いている。小タスク4.1 は `internal/resume` の service.go のコメントだけを30にした。Claude は、小タスク5.1 で受け口を足すときに、これらのコメントも30にする
 
 ## 完了条件(全タスク共通)
 

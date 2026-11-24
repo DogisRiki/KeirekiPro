@@ -29,11 +29,11 @@ type PDFRenderer interface {
 
 // Export は、出力の結果である。HTTP の受け口は、この値から答えのヘッダと本文を書く。
 type Export struct {
-	// Body は、PDF か Markdown のバイトである。
+	// Body は、PDF か Markdown かバックアップのファイルのバイトである。
 	Body []byte
 	// ContentType は、答えの Content-Type である。
 	ContentType string
-	// FileName は、経歴書の名前から作った名前に、.pdf か .md を付けたファイル名である。
+	// FileName は、経歴書の名前から作った名前に、.pdf か .md か _backup.json を付けたファイル名である。
 	FileName string
 	// Inline は、設定を付けた出力で出し方が inline のとき真である。
 	Inline bool
