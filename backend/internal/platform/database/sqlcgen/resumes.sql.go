@@ -368,6 +368,18 @@ func (q *Queries) ExistsResumeName(ctx context.Context, arg ExistsResumeNamePara
 	return exists, err
 }
 
+const existsUser = `-- name: ExistsUser :one
+SELECT EXISTS (SELECT 1 FROM users WHERE id = $1)
+`
+
+// 利用者が居るかを調べる。退会すると利用者の行が消えるので、退会した利用者には false を返す。
+func (q *Queries) ExistsUser(ctx context.Context, id pgtype.UUID) (bool, error) {
+	row := q.db.QueryRow(ctx, existsUser, id)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const getResume = `-- name: GetResume :one
 SELECT
     id,

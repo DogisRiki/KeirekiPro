@@ -42,7 +42,7 @@
   - _要件: 1.1_
   - _対象の部品: 仕様書の変更_
 
-- [ ] 1.5 利用者が居るかを調べる問い合わせを足す (並行可)
+- [x] 1.5 利用者が居るかを調べる問い合わせを足す (並行可)
 
   Claude は、利用者が居るかの問い合わせの節のとおりに、`backend/db/queries/resumes.sql` に問い合わせ `ExistsUser` を足し、`make generate` で sqlc の生成したコードを作り直す。Claude は、`backend/internal/resume/store.go` に `userExists` を足す。
   - 完了の確かめ方: `make generate-check` が通る。`go test ./internal/resume/ -run TestStoreIntegration_UserExists` が通る
