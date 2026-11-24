@@ -57,8 +57,8 @@
   - 受入基準とテストの対応: 要件3の受入基準2のうち、項目の並びの違いを変えた動きの一覧に載せることと、要件5の受入基準3のうち、答えを変えた要求を変えた動きの一覧に1つずつ載せることは、`changed-behaviors.yaml` の CB-062 から CB-066 の文と、`match_test.go` に足す `TestChangedBehaviors_BackupItems` で確かめる。このテストの手本は、`TestChangedBehaviors_UserItems` と `TestChangedBehaviors_OwnerDecidedItems` である。このテストは、`changed-behaviors.yaml` を読み、CB-062 の match が `backupResume` の `$.resume.careers[*]` と `$.resume.projects[*]` と `$.resume.certifications[*]` の `order_only` であることと、CB-062 の「画面に影響が無い理由」が所有者の受け入れを書いていることと、CB-063 から CB-066 が `group: 5` で match を持たないことを確かめる。変えた動きの一覧の項目の数は、`TestLoadChangedBehaviors_CB005HasNoMatch` で確かめる。Go 版の答えが一覧のとおりであることは、CB-062 は小タスク4.2 の `backup_integration_test.go`、CB-063 から CB-066 は小タスク4.5 の `restore_integration_test.go` で確かめる
   - _要件: 3.2, 5.3, 6.3_
 
-- [ ] 2. 確認に使う道具を広げる
-- [ ] 2.1 筋書きの要求に json_capture の欄を足す
+- [x] 2. 確認に使う道具を広げる
+- [x] 2.1 筋書きの要求に json_capture の欄を足す
 
   Claude は、Java 版と Go 版を比べる検査の広げ方の節のとおりに、`backend/compat/harness/scenario.go` の `Request` に `JSONCapture` の欄(`yaml:"json_capture"`)を足し、`validateKind` の `hasRequest` と `validateVersionBody` にこの欄を足す。Claude は、`validateJSONFile` を手本に `validateJSONCapture` を足し、`json` と `json_file` と `multipart` と `body_file` と同時に書かれていないことと、絶対の URL の段に書かれていないことを確かめる。Claude は、`capture.go` の `requestBody` に、取り出した値の字をそのまま本文にし、Content-Type を `application/json` にして送る場合を足す。送る時点で値の名前が取り出されていなければ、harness は、段の名前と値の名前を誤りに書いて、その段を失敗にする。
   - 完了の確かめ方: `go test -tags compat ./compat/harness/ -run 'TestLoadScenarios|TestCapture|TestScenarioValidate'` が通る。2つ目の大きなまとまりの最後のタスクなので、大きなまとまりの最後のタスクで verify のスキルを流すと決めた完了条件の2つ目のとおり、`/verify-backend` も通る
