@@ -679,7 +679,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ResumeBackup'
+              $ref: '#/components/schemas/RestoreResumeRequest'
       responses:
         '201':
           $ref: '#/components/responses/ResumeInfoCreated'
@@ -2405,6 +2405,12 @@ components:
           type: string
         content:
           type: string
+    RestoreResumeRequest:
+      type: object
+      x-go-type: json.RawMessage
+      description: |
+        復元の要求の本文。形は `ResumeBackup` と同じ(Java の `RestoreResumeRequest`)。
+        生成したコードは本文を読まずに受け口へ渡し、受け口が Java 版と同じ決まりで読む。
     ResumeBackup:
       type: object
       description: |
