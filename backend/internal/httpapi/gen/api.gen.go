@@ -4870,6 +4870,20 @@ func (response RestoreResume403JSONResponse) VisitRestoreResumeResponse(w http.R
 	return err
 }
 
+type RestoreResume404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response RestoreResume404JSONResponse) VisitRestoreResumeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type RestoreResume500JSONResponse struct {
 	InternalServerErrorJSONResponse
 }
