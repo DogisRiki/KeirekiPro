@@ -210,7 +210,7 @@
   - _要件: 5.1, 5.2, 5.3, 6.1, 6.3, 8.3_
   - _依存: 6.1_
 
-- [ ] 6.4 版をまたいで確かめる筋書きを書いて通す
+- [x] 6.4 版をまたいで確かめる筋書きを書いて通す
 
   Claude は、まず、版をまたいで確かめる筋書きの送り先を確かめるテスト `TestCrossRoute_BackupSteps` を `backend/compat/harness/cross_test.go` に作る。手本は `TestCrossRoute_ExportSteps` である。このテストは、`cross-backup.yaml` が無ければ失敗する。Claude は、次に、バックアップの操作の筋書きの節のとおりに、`cross-backup.yaml` を5つの段で書く。
   - 完了の確かめ方: `go test -tags compat -run TestCrossRoute_BackupSteps ./compat/harness/` が通る。`make compat-cross` が、Java 版から Go 版の向きと Go 版から Java 版の向きで通る
