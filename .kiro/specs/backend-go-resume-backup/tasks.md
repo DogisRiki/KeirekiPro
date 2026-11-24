@@ -19,7 +19,7 @@
   - 受入基準とテストの対応: Claude は、この小タスクで確認に使う道具を作り、この小タスクでは受入基準を直接は確かめない。本文のファイルは、小タスク1.3 の答えの控えと、6つ目の大きなまとまりの筋書きが使う
   - _要件: 6.1_
 
-- [ ] 1.3 Java 版の答えを正解のファイルに控える
+- [x] 1.3 Java 版の答えを正解のファイルに控える
 
   Claude は、Java 版の答えの正解のファイルの節のとおりに、main の Java 版を試作用のコンテナで動かす。Claude は、Java 版のイメージを `docker/backend/Dockerfile.prod` で作り、コンテナを compose のネットワーク `keirekipro_my-network` につなぐ。Claude は、開発環境の localstack が動いていることを確かめ、`postgresql` のコンテナにデータベース `kp_backup_proto` を作ってから、`SPRING_PROFILES_ACTIVE` を `dev` に、`SPRING_DATASOURCE_URL` を `jdbc:postgresql://postgresql:5432/kp_backup_proto` に、`SPRING_DATA_REDIS_DATABASE` を `7` にして Java 版を起動する。Claude は、要求を送る前に、Java 版の `/actuator/env` で、`spring.datasource.url` が `kp_backup_proto` を指し、`spring.data.redis.database` が 7 であることを確かめる。こうして、Claude は、所有者の開発のデータベース `keireki_pro` と Redis の DB 0 に触れない。Claude は、ログインと、偽の送信の検査に使う CSRF の値の付け方を、Java 版と Go 版を比べる検査の `backend/compat/harness/send.go` の `prepareVersionRequest` に合わせる。`prepareVersionRequest` は、要求の Host を `compat.test` にし、ログインで受け取った Cookie を付け、Cookie の `XSRF-TOKEN` の値を `X-XSRF-TOKEN` のヘッダに写す。
 

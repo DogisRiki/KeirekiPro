@@ -201,7 +201,8 @@ func decodeStrict(data []byte, v any) error {
 // checkBackup は、name のバックアップのファイルが、ファイルの名前どおりの形かを確かめる。
 // basic.json は正しいバックアップ、wrong-version.json は版の違うバックアップ、
 // no-resume.json は resume を含まないバックアップ、broken.json は JSON として読めないバックアップである。
-// java- で始まるファイルは Java 版が書き出したバックアップで、basic.json と同じく確かめる。
+// java- で始まるファイルは Java 版が書き出したバックアップで、basic.json と同じく確かめる。ただし、Java 版は項目の無い欄を省くので、
+// すべての欄に項目があることは確かめない。
 // reject- と lax- と malformed- で始まるファイルは、戻しで断る条件、Java 版の戻しが確かめない決まり、
 // 形の誤りを確かめる要求の本文なので、JSON として読めることだけを確かめる。
 func checkBackup(t *testing.T, name string, data []byte) {
@@ -209,8 +210,9 @@ func checkBackup(t *testing.T, name string, data []byte) {
 	var b backupFile
 	err := decodeStrict(data, &b)
 	base := path.Base(name)
+	javaFile := strings.HasPrefix(base, "java-")
 	switch {
-	case strings.HasPrefix(base, "java-"):
+	case javaFile:
 		base = "basic.json"
 	case strings.HasPrefix(base, "reject-") || strings.HasPrefix(base, "lax-") || strings.HasPrefix(base, "malformed-"):
 		if !json.Valid(data) {
@@ -236,8 +238,8 @@ func checkBackup(t *testing.T, name string, data []byte) {
 			t.Fatalf("%s: 版が 1.0 の正しいバックアップのはずですが、版 %q、エラー %v", name, b.Version, err)
 		}
 		r := b.Resume
-		if len(r.Careers) == 0 || len(r.Projects) == 0 || len(r.Certifications) == 0 ||
-			len(r.Portfolios) == 0 || len(r.SnsPlatforms) == 0 || len(r.SelfPromotions) == 0 {
+		if !javaFile && (len(r.Careers) == 0 || len(r.Projects) == 0 || len(r.Certifications) == 0 ||
+			len(r.Portfolios) == 0 || len(r.SnsPlatforms) == 0 || len(r.SelfPromotions) == 0) {
 			t.Errorf("%s: すべての項目を持つはずです", name)
 		}
 		// Java 版は、経歴書の日付を LocalDate(年月日)で、職歴と案件と資格の日付を YearMonth(年月)で読む

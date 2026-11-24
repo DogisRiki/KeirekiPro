@@ -129,6 +129,90 @@
   - 経歴書を読み出すときと同じ順に並べる方式: 90件のうち83件で、本文のバイトが Java 版と同じだった。違った7件は、上の1つ目と2つ目に当たる経歴書で、項目の並びのほかは同じだった。Go 版の API で項目を足したり直したりした経歴書では、Java 版で同じ手順を行ったときと同じ並びになった
 - どちらの方式でも、戻した経歴書と、画面と PDF に出る項目の並びは変わらない。Java 版と Go 版は、戻すときに項目を経歴書を読み出すときと同じ順に並べ替えて入れ、画面と PDF は経歴書を読み出すときの順に並べるためである。並びの違いが出るのは、利用者がバックアップのファイルをテキストエディタで開いたときだけである
 
+### 正解のファイルを作るために送った要求(実装の小タスク1.3)
+
+- Claude は、2026-11-24 に、main の Java 版(origin/main の f1840280)を試作用のコンテナで動かし、`users/basic.sql`、`resumes/fonts.sql`、`backup/backup.sql` の順に入れたデータベース `kp_backup_proto` に向けて、次の要求を送った。Claude は、要求を送る前に、Java 版の `/actuator/env` で、データベースの URL が `kp_backup_proto` を指し、Redis の DB の番号が 7 であることを確かめた
+- Claude は、要求を、Java 版と Go 版を比べる検査と同じく、Host を `compat.test` にし、ログインで受け取った Cookie を付けて送った。Claude は、GET でない要求に、Cookie の `XSRF-TOKEN` の値を `X-XSRF-TOKEN` のヘッダに写して付けた。これは、筋書きの段の `csrf: true` に当たる。書き出しの要求の Accept は、画面と同じく `application/json` にした
+- 小タスク6.1 は、`export.yaml` と `export-added.yaml` に、次の要求を同じ順で書く。`{createdID}` と `{resumeID}` は、経歴書を作る要求の答えの `id` である。`{careerID}` のような項目の ID は、`get-resume` の答えの各欄から、1件目に足した項目を名前で探して取り出した
+- `java-created.json` と `java-added.json` の経歴書の日付は、経歴書を作った日の 2026-11-24 である。Java 版は、名前だけを送って作った経歴書の日付を、作った日にするためである
+- Java 版が書き出した `java-added.json` と `java-edited.json` では、項目は足した順に並ばなかった。職歴とプロジェクトと資格は年月の新しい順に、ポートフォリオと SNS と自己PR は名前の順に並んだ
+
+```text
+## java-created.json(user1)
+- create-resume: POST /api/resumes
+  {"resumeName":"APIで作ったバックアップの経歴書"}
+- backup-created: GET /api/resumes/{createdID}/backup
+  → java-created.json に保存
+## java-added.json と java-edited.json(user1)
+- create-resume: POST /api/resumes
+  {"resumeName":"項目を足したバックアップの経歴書"}
+- create-career-1: POST /api/resumes/{resumeID}/careers
+  {"companyName":"株式会社ウエスト","startDate":"2019-04","endDate":"2022-03","isActive":false}
+- create-career-2: POST /api/resumes/{resumeID}/careers
+  {"companyName":"株式会社アルファ","startDate":"2010-04","endDate":"2013-03","isActive":false}
+- create-career-3: POST /api/resumes/{resumeID}/careers
+  {"companyName":"株式会社ミドル","startDate":"2014-04","endDate":"2018-03","isActive":false}
+- create-project-1: POST /api/resumes/{resumeID}/projects
+  {"companyName":"株式会社ウエスト","startDate":"2019-06","endDate":"2021-12","isActive":false,"name":"在庫の案件","overview":"倉庫の在庫を数える仕組みを作った。","teamComp":"全体8名","role":"設計と開発","achievement":"在庫の差を減らした。","requirements":false,"basicDesign":true,"detailedDesign":true,"implementation":true,"integrationTest":true,"systemTest":true,"maintenance":false,"frontendLanguages":["TypeScript"],"frontendFrameworks":["React"],"frontendLibraries":[],"frontendBuildTools":[],"frontendPackageManagers":[],"frontendLinters":[],"frontendFormatters":[],"frontendTestingTools":[],"backendLanguages":["Go"],"backendFrameworks":[],"backendBuildTools":[],"backendPackageManagers":[],"backendLinters":[],"backendFormatters":[],"backendTestingTools":[],"ormTools":[],"auth":[],"clouds":["AWS"],"operatingSystems":[],"containers":[],"databases":["PostgreSQL"],"webServers":[],"ciCdTools":[],"iacTools":[],"monitoringTools":[],"loggingTools":[],"sourceControls":[],"projectManagements":[],"communicationTools":[],"documentationTools":[],"apiDevelopmentTools":[],"designTools":[],"editors":[],"developmentEnvironments":[]}
+- create-project-2: POST /api/resumes/{resumeID}/projects
+  {"companyName":"株式会社アルファ","startDate":"2010-06","endDate":"2012-12","isActive":false,"name":"会計の案件","overview":"会計の帳簿を作る仕組みを直した。","teamComp":"全体4名","role":"開発","achievement":"締めの日数を短くした。","requirements":false,"basicDesign":false,"detailedDesign":false,"implementation":true,"integrationTest":true,"systemTest":false,"maintenance":false,"frontendLanguages":[],"frontendFrameworks":[],"frontendLibraries":[],"frontendBuildTools":[],"frontendPackageManagers":[],"frontendLinters":[],"frontendFormatters":[],"frontendTestingTools":[],"backendLanguages":["Java"],"backendFrameworks":["Spring"],"backendBuildTools":[],"backendPackageManagers":[],"backendLinters":[],"backendFormatters":[],"backendTestingTools":[],"ormTools":[],"auth":[],"clouds":[],"operatingSystems":[],"containers":[],"databases":["Oracle"],"webServers":[],"ciCdTools":[],"iacTools":[],"monitoringTools":[],"loggingTools":[],"sourceControls":[],"projectManagements":[],"communicationTools":[],"documentationTools":[],"apiDevelopmentTools":[],"designTools":[],"editors":[],"developmentEnvironments":[]}
+- create-project-3: POST /api/resumes/{resumeID}/projects
+  {"companyName":"株式会社ミドル","startDate":"2015-01","endDate":"2017-12","isActive":false,"name":"物流の案件","overview":"配送の順を決める仕組みを作った。","teamComp":"全体6名","role":"リーダー","achievement":"配送の時間を短くした。","requirements":true,"basicDesign":true,"detailedDesign":true,"implementation":true,"integrationTest":true,"systemTest":true,"maintenance":true,"frontendLanguages":[],"frontendFrameworks":[],"frontendLibraries":[],"frontendBuildTools":[],"frontendPackageManagers":[],"frontendLinters":[],"frontendFormatters":[],"frontendTestingTools":[],"backendLanguages":["Python"],"backendFrameworks":[],"backendBuildTools":[],"backendPackageManagers":[],"backendLinters":[],"backendFormatters":[],"backendTestingTools":[],"ormTools":[],"auth":[],"clouds":[],"operatingSystems":[],"containers":[],"databases":[],"webServers":[],"ciCdTools":[],"iacTools":[],"monitoringTools":[],"loggingTools":[],"sourceControls":["Git"],"projectManagements":[],"communicationTools":[],"documentationTools":[],"apiDevelopmentTools":[],"designTools":[],"editors":[],"developmentEnvironments":[]}
+- create-certification-1: POST /api/resumes/{resumeID}/certifications
+  {"name":"B 応用情報技術者","date":"2019-10"}
+- create-certification-2: POST /api/resumes/{resumeID}/certifications
+  {"name":"A 基本情報技術者","date":"2012-04"}
+- create-certification-3: POST /api/resumes/{resumeID}/certifications
+  {"name":"C 情報処理安全確保支援士","date":"2016-10"}
+- create-portfolio-1: POST /api/resumes/{resumeID}/portfolios
+  {"name":"B 家計簿のアプリ","overview":"家計を記録するアプリ","techStack":"React, Go","link":"https://example.com/b"}
+- create-portfolio-2: POST /api/resumes/{resumeID}/portfolios
+  {"name":"A 日記のアプリ","overview":"日記を書くアプリ","techStack":"Vue","link":"https://example.com/a"}
+- create-portfolio-3: POST /api/resumes/{resumeID}/portfolios
+  {"name":"C 天気のアプリ","overview":"天気を見るアプリ","techStack":"Swift","link":"https://example.com/c"}
+- create-sns-platform-1: POST /api/resumes/{resumeID}/sns-platforms
+  {"name":"B Qiita","link":"https://qiita.com/example"}
+- create-sns-platform-2: POST /api/resumes/{resumeID}/sns-platforms
+  {"name":"A GitHub","link":"https://github.com/example"}
+- create-sns-platform-3: POST /api/resumes/{resumeID}/sns-platforms
+  {"name":"C Zenn","link":"https://zenn.dev/example"}
+- create-self-promotion-1: POST /api/resumes/{resumeID}/self-promotions
+  {"title":"B 設計の力","content":"読みやすい設計を考えられる。"}
+- create-self-promotion-2: POST /api/resumes/{resumeID}/self-promotions
+  {"title":"A 粘り強さ","content":"難しい不具合も最後まで調べる。"}
+- create-self-promotion-3: POST /api/resumes/{resumeID}/self-promotions
+  {"title":"C 学ぶ習慣","content":"毎週新しい技術を試す。"}
+- backup-added: GET /api/resumes/{resumeID}/backup
+  → java-added.json に保存
+- get-resume: GET /api/resumes/{resumeID}
+  (この答えから、各欄で1件目に足した項目の ID を取り出す: careers の 株式会社ウエスト、projects の 在庫の案件、certifications の B 応用情報技術者、portfolios の B 家計簿のアプリ、snsPlatforms の B Qiita、selfPromotions の B 設計の力)
+- update-basic: PUT /api/resumes/{resumeID}/basic
+  {"resumeName":"項目を直したバックアップの経歴書","date":"2026-05-01","lastName":"鈴木","firstName":"次郎"}
+- update-career: PUT /api/resumes/{resumeID}/careers/{careerID}
+  {"companyName":"株式会社イースト","startDate":"2023-04","endDate":null,"isActive":true}
+- update-project: PUT /api/resumes/{resumeID}/projects/{projectID}
+  {"companyName":"株式会社イースト","startDate":"2023-06","endDate":null,"isActive":true,"name":"在庫の案件の作り直し","overview":"在庫の仕組みを新しい基盤で作り直している。","teamComp":"全体10名","role":"設計の取りまとめ","achievement":"移行の手順を決めた。","requirements":true,"basicDesign":true,"detailedDesign":true,"implementation":false,"integrationTest":false,"systemTest":false,"maintenance":false,"frontendLanguages":["TypeScript"],"frontendFrameworks":[],"frontendLibraries":[],"frontendBuildTools":[],"frontendPackageManagers":[],"frontendLinters":[],"frontendFormatters":[],"frontendTestingTools":[],"backendLanguages":["Go","Rust"],"backendFrameworks":[],"backendBuildTools":[],"backendPackageManagers":[],"backendLinters":[],"backendFormatters":[],"backendTestingTools":[],"ormTools":[],"auth":[],"clouds":["AWS"],"operatingSystems":[],"containers":[],"databases":[],"webServers":[],"ciCdTools":[],"iacTools":[],"monitoringTools":[],"loggingTools":[],"sourceControls":[],"projectManagements":[],"communicationTools":[],"documentationTools":[],"apiDevelopmentTools":[],"designTools":[],"editors":[],"developmentEnvironments":[]}
+- update-certification: PUT /api/resumes/{resumeID}/certifications/{certificationID}
+  {"name":"D データベーススペシャリスト","date":"2021-04"}
+- update-portfolio: PUT /api/resumes/{resumeID}/portfolios/{portfolioID}
+  {"name":"D 地図のアプリ","overview":"地図を見るアプリ","techStack":"Kotlin","link":"https://example.com/d"}
+- update-sns-platform: PUT /api/resumes/{resumeID}/sns-platforms/{snsPlatformID}
+  {"name":"D X","link":"https://x.com/example"}
+- update-self-promotion: PUT /api/resumes/{resumeID}/self-promotions/{selfPromotionID}
+  {"title":"D 伝える力","content":"考えを短く伝えられる。"}
+- backup-edited: GET /api/resumes/{resumeID}/backup
+  → java-edited.json に保存
+```
+
+### 正解のファイルを控えたときの答え(実装の小タスク1.3)
+
+- Claude は、上と同じ Java 版に、`restore.json` の 423 の本文を user2 で戻した。控えた答えは、201 が 171 件、400 が 231 件、500 が 21 件だった。201 の 171 件には、次の箇条の、名前に対になっていないサロゲートを含む本文の2回目の戻しの答えを含む。500 の答えは、各欄の要素に null を入れた本文、`resume` が無いか null の本文、リンクが 256 字以上の本文だった。項目の値に対になっていないサロゲートを含む本文の答えは 201 だった。これらは、上の試作の記録の結果と同じだったので、Claude は、要件8の受入基準2のとおりに止まることはしなかった
+- 名前に対になっていないサロゲートを含む本文は、ほかの本文を控え終えてから user2 で2回続けて戻した。1回目も2回目も 201 で、2回目の戻しは名前の重なりの誤りにならなかった
+- Claude は、上と同じ Java 版に、`backup-unsent.json` の 25 の要求を送った。Java 版の答えは次のとおりだった。Java 版と Go 版の答えが違う要求は、小タスク5.2 で変えた動きの一覧に足す
+  - 書き出しで Accept に `application/json` の無い要求(Accept が無い、`*/*`、`text/plain`、`text/html`、`application/xml`、`application/octet-stream`、`application/*`、`application/problem+json`)には、どれも 200 で、Content-Type を `application/json` にしてバックアップのファイルを返した
+  - 戻しで本文が JSON として読めない要求(空、`{` だけ、JSON でない語、途中で切れた本文、引用符が `'` の本文、UTF-8 として読めない字を含む本文)には、400 と「入力エラーがあります。」で答えた。本文の頭に BOM を付けた本文は、JSON として読み、201 で戻した
+  - 戻しで Content-Type のヘッダが JSON でない要求(ヘッダが無い、`text/plain`、`application/x-www-form-urlencoded`、`application/xml`、`application/octet-stream`、`text/json`、`multipart/form-data`)には、500 と「予期せぬエラーが発生しました。」で答えた。`application/problem+json`、`application/json; charset=UTF-8`、`APPLICATION/JSON` には、201 で戻した
+
 ## 設計の段階で調べたこと
 
 - 機能の種類: 今の Go 版の `internal/resume` と `internal/httpapi` と、比べる検査の harness に足す拡張である。Claude は、軽い調べ方(design-discovery-light)で、足す先の作りと、手本にする今のコードを調べた。新しい外部のライブラリと外部の API は使わないので、外部の資料は調べていない
