@@ -77,7 +77,7 @@
   - _要件: 3.1, 3.3_
   - _対象の部品: JSON の書き手_
 
-- [ ] 3.2 対になっていないサロゲートを保って JSON を読む読み手を作る (並行可)
+- [x] 3.2 対になっていないサロゲートを保って JSON を読む読み手を作る (並行可)
 
   Claude は、JSON の読み手の節のとおりに、`backend/internal/resume/jtree.go` に `parseJTree` を作る。`parseJTree` は、本文の最初の JSON の値を、オブジェクト、並び、文字列、数、真偽、`null` の6つの種類の値の木にし、数を JSON に書かれた字のまま持つ。
   - 完了の確かめ方: `go test ./internal/resume/ -run TestParseJTree` が通る
@@ -264,6 +264,7 @@
 - 小タスク1.4 と1.5 は、どちらも `make generate` で生成したコードを作り直す。2つの小タスクが作り直す対象は別々で、小タスク1.4 は仕様書から作る `internal/httpapi/gen` を、小タスク1.5 は sqlc の `internal/platform/database/sqlcgen` を対象にする。ただし、`make generate` は両方を作り直す。そのため、2つの小タスクを並行に進めるときは、Claude は、あとに終えた小タスクで `make generate-check` をもう一度流す
 - Claude は、`backup/backup.sql` の経歴書 801 から 805 を、Java 版の戻しの値の決まりに通る値で書く。Java 版が書き出したファイルを戻す筋書きは、すべての要求に 201 を期待するためである。経歴書の名前に禁じた9字を入れるときは、名前に改行か U+2028 のような行の区切りの字を混ぜる。Java 版の禁じた字の検査は、行の区切りの字を含む名前を確かめないため、その名前は戻しで断られない。姓と名には、かな、漢字、英字だけを入れ、リンクには `<` `>` `"` を入れない
 - Claude の Write と Edit のツールは、ファイルの中身に書いたサロゲートの組の番号(例: `\uD83D\uDE00`)と U+2028 と U+2029 の番号を、番号のままにせずに字に変えて書くことがある。Claude は、テストに番号の字の並びを書いたら、書いたあとに grep で番号のままかを確かめ、字に変わっていれば perl で逆斜線を `\x5c` と書いて書き直す
+- Java 版の Jackson の版は 3.1.7 である(Spring Boot 4.1.2)。Claude は、Jackson の動きを確かめるときは、jackson-core の 3.1.7 のタグのコードを読む。小タスク3.4 の `readRestoreFile` は、出力の spec の `numbersWithinLimit` に本文を渡す前に、頭の BOM を外す。Go の encoding/json は BOM を読み飛ばさず、BOM の付いた本文を読めない本文とするためである
 
 ## 完了条件(全タスク共通)
 
