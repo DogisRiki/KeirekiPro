@@ -1,6 +1,6 @@
 # タスク
 
-- [ ] 1. バックアップの操作の土台を作る
+- [x] 1. バックアップの操作の土台を作る
 - [x] 1.1 バックアップの経歴書の初期のデータを書く
 
   Claude は、初期のデータとバックアップのファイルの節のとおりに、`backend/compat/fixtures/backup/backup.sql` に、user1 の経歴書 801 から 805 を書く。Claude は、経歴書 801 から 804 の各欄の項目を1件以下にし、ポートフォリオと SNS と自己PR の項目の名前を、`fonts.sql` と同じく、名前の頭の英大文字(`A ` と `B `)で順が決まる名前にする。Claude は、経歴書 805 の6つの欄に3件ずつの項目を、経歴書を読み出すときの順と違う順に入れる。
@@ -50,7 +50,7 @@
   - _要件: 5.3_
   - _対象の部品: 利用者が居るかの問い合わせ_
 
-- [ ] 1.6 変えた動きの一覧に、設計で決まったバックアップの違いを足す
+- [x] 1.6 変えた動きの一覧に、設計で決まったバックアップの違いを足す
 
   Claude は、変えた動きの一覧に載せる違いの節のとおりに、CB-062 から CB-066 の5つの違いを、`backend/compat/changed-behaviors.yaml` の末尾に `group: 5` で足す。Claude は、CB-062 の「画面に影響が無い理由」に、バックアップのファイルの中の6つの欄の項目の並びが変わることと、「所有者が 2026-11-24 に受け入れた(requirements の承認)」と書き、match を `backupResume` の `$.resume.careers[*]` と `$.resume.projects[*]` と `$.resume.certifications[*]` の `order_only` にする。Claude は、CB-063 から CB-066 に match を書かず、「画面に影響が無い理由」に、退会してすでに居ない利用者はどちらの答えでも戻しを終えられないことを書き、コメントに、Java 版と Go 版を比べる検査はこの要求を送らないことと、Go 版の答えは `restore_integration_test.go` が確かめることを書く。Claude は、`backend/compat/harness/match_test.go` の `TestLoadChangedBehaviors_CB005HasNoMatch` の期待する数を、5つ増やす。画面が送らない要求の違い(CB-067 から)は、Go 版の受け口の答えが決まる小タスク5.2 で足す。
   - 完了の確かめ方: `go test -tags compat ./compat/harness/ -run 'TestLoadChangedBehaviors|TestChangedBehaviors|TestMatch'` が通る。1つ目の大きなまとまりの最後のタスクなので、大きなまとまりの最後のタスクで verify のスキルを流すと決めた完了条件の2つ目のとおり、`/verify-backend` も通る
