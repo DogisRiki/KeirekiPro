@@ -39,7 +39,7 @@ Claude は、まとまりの状態と段階の行を、その状態にした PR 
 | 利用者 | #771 | `.kiro/specs/backend-go-users` | 比べる検査に通った |
 | マスタと経歴書 | #772 | `.kiro/specs/backend-go-master-resumes` | 比べる検査に通った |
 | 出力 | #773 | `.kiro/specs/backend-go-resume-export` | 比べる検査に通った |
-| バックアップ | #774 | 未定 | 未着手 |
+| バックアップ | #774 | `.kiro/specs/backend-go-resume-backup` | 作り終えた |
 
 - spec の列には、まとまりの spec を作ったときに `.kiro/specs/<名前>` を書く
 - 認証のまとまりの spec で、Claude は、ログインした開発者の要求がログインの状態の検査を通ることを、未実装の答えに変わることで確かめた。ログインした開発者への応答が返ることは、利用者のまとまりの spec で確かめた
