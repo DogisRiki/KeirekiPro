@@ -833,3 +833,67 @@
   go: 404 と「対象の職務経歴書データが存在しません。」で答える
   画面に影響が無い理由: 退会してすでに居ない利用者は、どちらの答えでも戻しを終えられない。Go 版の 404 は、退会してすでに居ない利用者の書き出しに両方の版が返す答えと同じである
   # match を書かない。比べる検査はこの要求を送らない。Go 版の答えは internal/resume/restore_integration_test.go が確かめる。
+
+- id: CB-067
+  group: 5
+  変えた動き: 本文の頭に BOM を付けた、経歴書の戻しの要求
+  java: BOM を読み飛ばして本文を JSON として読み、201 で戻す
+  go: 本文を JSON として読めないとして、400 と「入力エラーがあります。」で答える
+  画面に影響が無い理由: 画面は、利用者が選んだファイルを JSON として読んでから本文を作り直して送るので、本文の頭に BOM を付けない。所有者が 2026-11-24 に決めた(requirements の承認)
+  # match を書かない。比べる検査はこの要求を送らない。Go 版の答えは internal/httpapi/resumes_test.go が確かめる。
+
+- id: CB-068
+  group: 5
+  変えた動き: Content-Type のヘッダが無い、経歴書の戻しの要求
+  java: 500 と「予期せぬエラーが発生しました。」で答える
+  go: Content-Type のヘッダを見ずに本文を JSON として読み、201 で戻す
+  画面に影響が無い理由: 画面は、戻しの要求の Content-Type のヘッダを application/json にして送る。所有者が 2026-11-24 に決めた(requirements の承認)
+  # match を書かない。比べる検査はこの要求を送らない。Go 版の答えは internal/httpapi/resumes_test.go が確かめる。
+
+- id: CB-069
+  group: 5
+  変えた動き: Content-Type のヘッダが text/plain の、経歴書の戻しの要求
+  java: 500 と「予期せぬエラーが発生しました。」で答える
+  go: Content-Type のヘッダを見ずに本文を JSON として読み、201 で戻す
+  画面に影響が無い理由: 画面は、戻しの要求の Content-Type のヘッダを application/json にして送る。所有者が 2026-11-24 に決めた(requirements の承認)
+  # match を書かない。比べる検査はこの要求を送らない。Go 版の答えは internal/httpapi/resumes_test.go が確かめる。
+
+- id: CB-070
+  group: 5
+  変えた動き: Content-Type のヘッダが application/x-www-form-urlencoded の、経歴書の戻しの要求
+  java: 500 と「予期せぬエラーが発生しました。」で答える
+  go: Content-Type のヘッダを見ずに本文を JSON として読み、201 で戻す
+  画面に影響が無い理由: 画面は、戻しの要求の Content-Type のヘッダを application/json にして送る。所有者が 2026-11-24 に決めた(requirements の承認)
+  # match を書かない。比べる検査はこの要求を送らない。Go 版の答えは internal/httpapi/resumes_test.go が確かめる。
+
+- id: CB-071
+  group: 5
+  変えた動き: Content-Type のヘッダが application/xml の、経歴書の戻しの要求
+  java: 500 と「予期せぬエラーが発生しました。」で答える
+  go: Content-Type のヘッダを見ずに本文を JSON として読み、201 で戻す
+  画面に影響が無い理由: 画面は、戻しの要求の Content-Type のヘッダを application/json にして送る。所有者が 2026-11-24 に決めた(requirements の承認)
+  # match を書かない。比べる検査はこの要求を送らない。Go 版の答えは internal/httpapi/resumes_test.go が確かめる。
+
+- id: CB-072
+  group: 5
+  変えた動き: Content-Type のヘッダが application/octet-stream の、経歴書の戻しの要求
+  java: 500 と「予期せぬエラーが発生しました。」で答える
+  go: Content-Type のヘッダを見ずに本文を JSON として読み、201 で戻す
+  画面に影響が無い理由: 画面は、戻しの要求の Content-Type のヘッダを application/json にして送る。所有者が 2026-11-24 に決めた(requirements の承認)
+  # match を書かない。比べる検査はこの要求を送らない。Go 版の答えは internal/httpapi/resumes_test.go が確かめる。
+
+- id: CB-073
+  group: 5
+  変えた動き: Content-Type のヘッダが text/json の、経歴書の戻しの要求
+  java: 500 と「予期せぬエラーが発生しました。」で答える
+  go: Content-Type のヘッダを見ずに本文を JSON として読み、201 で戻す
+  画面に影響が無い理由: 画面は、戻しの要求の Content-Type のヘッダを application/json にして送る。所有者が 2026-11-24 に決めた(requirements の承認)
+  # match を書かない。比べる検査はこの要求を送らない。Go 版の答えは internal/httpapi/resumes_test.go が確かめる。
+
+- id: CB-074
+  group: 5
+  変えた動き: Content-Type のヘッダが multipart/form-data の、経歴書の戻しの要求
+  java: 500 と「予期せぬエラーが発生しました。」で答える
+  go: Content-Type のヘッダを見ずに本文を JSON として読み、201 で戻す
+  画面に影響が無い理由: 画面は、戻しの要求の Content-Type のヘッダを application/json にして送る。所有者が 2026-11-24 に決めた(requirements の承認)
+  # match を書かない。比べる検査はこの要求を送らない。Go 版の答えは internal/httpapi/resumes_test.go が確かめる。

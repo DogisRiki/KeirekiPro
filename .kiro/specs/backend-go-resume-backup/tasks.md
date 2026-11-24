@@ -174,7 +174,7 @@
   - _要件: 1.1, 3.4_
   - _依存: 1.4, 4.1, 4.4_
 
-- [ ] 5.2 画面が送らない要求への答えを Java 版の正解と照らし、違いを一覧に足す
+- [x] 5.2 画面が送らない要求への答えを Java 版の正解と照らし、違いを一覧に足す
 
   Claude は、`resumes_test.go` に、小タスク1.3 で控えた `backup-unsent.json` の要求ごとに Go 版の受け口の答えを Java 版の答えと比べるテストを足す。Claude は、Java 版と答えが違う要求ごとに、変えた動きの一覧に載せる違いの節のとおりに、CB-067 から番号を振った違いを `changed-behaviors.yaml` に `group: 5` で足し、テストの中の表に、その要求と番号を書く。Claude は、足した違いに match を書かず、コメントに、Java 版と Go 版を比べる検査はこの要求を送らないことと、Go 版の答えは `resumes_test.go` が確かめることを書く。Claude は、`match_test.go` の `TestLoadChangedBehaviors_CB005HasNoMatch` の期待する数を、足した違いの数だけ増やす。違う要求が無ければ、Claude は違いを足さず、そのことを小タスク7.2 で PR の本文に書く。
   - 完了の確かめ方: `go test ./internal/httpapi/ -run TestBackupHandlers_UnsentRequests` が通る。`go test -tags compat ./compat/harness/ -run 'TestLoadChangedBehaviors|TestChangedBehaviors'` が通る。5つ目の大きなまとまりの最後のタスクなので、大きなまとまりの最後のタスクで verify のスキルを流すと決めた完了条件の2つ目のとおり、`/verify-backend` も通る
