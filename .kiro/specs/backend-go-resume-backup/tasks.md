@@ -105,7 +105,7 @@
   - _要件: 1.1, 2.2, 4.6_
   - _依存: 3.2_
 
-- [ ] 4. Service の書き出しと戻しを作る
+- [x] 4. Service の書き出しと戻しを作る
 - [x] 4.1 Service の書き出しのメソッドを作る
 
   Claude は、Service の書き出しの節のとおりに、`backend/internal/resume/backup.go` に、`BackupResume` と、バックアップのファイルの型 `bkFile` と `bkResume` と6つの欄の項目の型と、日時と日付の書き方を作る。写す元は、Java 版の `BackupResumeUseCase` と `BackupResumeResponse` である。`BackupResume` は、経歴書を `GetResume` で読み、小タスク3.1 の `JavaJSON` で書き、出力の spec の `Export` と `sanitizeFileName` で結果を返す。Claude は、`service.go` の28の操作と書いたコメントを30にする。
@@ -160,7 +160,7 @@
   - _要件: 1.1, 2.1, 2.2, 4.2, 4.4, 4.5, 4.6, 5.3_
   - _依存: 1.3, 1.6_
 
-- [ ] 5. 書き出しと戻しの受け口をつなぐ
+- [x] 5. 書き出しと戻しの受け口をつなぐ
 - [x] 5.1 2つの受け口を作り、経路につなぐ
 
   Claude は、戻しと書き出しの受け口の節のとおりに、`backend/internal/httpapi/resumes.go` の `ResumeService` に2つのメソッドを足し、`BackupResume` と `RestoreResume` の受け口を作る。Claude は、`resumeresponses.go` に `_ gen.BackupResumeResponseObject = authResponse{}` と `_ gen.RestoreResumeResponseObject = authResponse{}` と2つの `Visit` の関数を足す。Claude は、`server.go` の `Options` の `ResumeHandlers` のコメントと `resumeOperations` と、`resumes.go` と `resumeresponses.go` の28の操作と書いたコメントを、30の操作にする。Claude は、`resumes_test.go` の、28の操作を期待するテストの期待とコメントを30にする。
@@ -227,7 +227,7 @@
   - _依存: 1.3_
 
 - [ ] 7. API の説明画面で確かめて、記録を書く
-- [ ] 7.1 API の説明画面で書き出しと戻しを確かめる
+- [x] 7.1 API の説明画面で書き出しと戻しを確かめる
 
   Claude は、この作業フォルダの最上位から compose の `backend-go` を作り直して起動し、この作業フォルダのコードを動かす。Claude は、API の説明画面での確認の節のとおりに、開発環境の compose の `api-docs`(ポート 8082)を Playwright で開き、2つの操作の答えを確かめる。Claude は、確かめた結果を、`/ship` で作るこの spec の PR の本文に書く。
   - 完了の確かめ方: 書き出しの「Try it out」が、200 と `application/json` と attachment の Content-Disposition で答える。経歴書を消してから、書き出した本文を戻しの本文に入れた戻しの「Try it out」が、201 で答える
