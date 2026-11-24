@@ -161,7 +161,7 @@
   - _依存: 1.3, 1.6_
 
 - [ ] 5. 書き出しと戻しの受け口をつなぐ
-- [ ] 5.1 2つの受け口を作り、経路につなぐ
+- [x] 5.1 2つの受け口を作り、経路につなぐ
 
   Claude は、戻しと書き出しの受け口の節のとおりに、`backend/internal/httpapi/resumes.go` の `ResumeService` に2つのメソッドを足し、`BackupResume` と `RestoreResume` の受け口を作る。Claude は、`resumeresponses.go` に `_ gen.BackupResumeResponseObject = authResponse{}` と `_ gen.RestoreResumeResponseObject = authResponse{}` と2つの `Visit` の関数を足す。Claude は、`server.go` の `Options` の `ResumeHandlers` のコメントと `resumeOperations` と、`resumes.go` と `resumeresponses.go` の28の操作と書いたコメントを、30の操作にする。Claude は、`resumes_test.go` の、28の操作を期待するテストの期待とコメントを30にする。
 

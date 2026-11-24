@@ -16,6 +16,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -270,6 +271,14 @@ func (f *fakeResumes) ExportResumeWithSettings(
 	return f.exportAnswer("ExportResumeWithSettings", userID.String(), resumeID, string(body))
 }
 
+func (f *fakeResumes) BackupResume(_ context.Context, userID uuid.UUID, resumeID string) (resume.Export, error) {
+	return f.exportAnswer("BackupResume", userID.String(), resumeID)
+}
+
+func (f *fakeResumes) RestoreResume(_ context.Context, userID uuid.UUID, body []byte) (resume.Resume, error) {
+	return f.answer("RestoreResume", userID.String(), string(body))
+}
+
 func (f *fakeResumes) CreateCareer(_ context.Context, userID uuid.UUID, resumeID string, body []byte) (resume.Resume, error) {
 	return f.answer("CreateCareer", userID.String(), resumeID, string(body))
 }
@@ -466,7 +475,7 @@ func itemOps() []itemOp {
 	}
 }
 
-// resumeOps は、経歴書の受け口の28の操作である。本文は、受け口が読まずに処理へ渡すことを確かめるため、JSON として
+// resumeOps は、経歴書の受け口の30の操作である。本文は、受け口が読まずに処理へ渡すことを確かめるため、JSON として
 // 誤った文字も含めて、操作ごとに違う文字にする。
 func resumeOps() []resumeOp {
 	user := handlerUserID.String()
@@ -559,6 +568,22 @@ func resumeOps() []resumeOp {
 			calls: []string{"ExportResumeWithSettings(" + user + ", " + testResumeID + `, {"format":"pdf"} 余り)`},
 			want:  exportWant,
 		},
+		{
+			name: "BackupResume", needsLogin: true,
+			call: func(ctx context.Context, h *resumeHandlers) (any, error) {
+				return h.BackupResume(ctx, gen.BackupResumeRequestObject{ResumeId: testResumeID})
+			},
+			calls: []string{"BackupResume(" + user + ", " + testResumeID + ")"},
+			want:  exportWant,
+		},
+		{
+			name: "RestoreResume", needsLogin: true,
+			call: func(ctx context.Context, h *resumeHandlers) (any, error) {
+				return h.RestoreResume(ctx, gen.RestoreResumeRequestObject{Body: bodyOf(`{"version":"1.0"} 余り`)})
+			},
+			calls: []string{"RestoreResume(" + user + `, {"version":"1.0"} 余り)`},
+			want:  createdWant,
+		},
 	}
 	for _, it := range itemOps() {
 		createBody := `{"create":"` + it.name + `"}`
@@ -615,7 +640,7 @@ func checkResumeCalls(t *testing.T, name string, f *fakeResumes, want ...string)
 	}
 }
 
-// TestResumeHandlers_SuccessResponses は、経歴書の受け口の28の操作が、受け口の節の表のとおりの状態の番号と本文で答える
+// TestResumeHandlers_SuccessResponses は、経歴書の受け口の30の操作が、受け口の節の表のとおりの状態の番号と本文で答える
 // ことを確かめる(要件1の受入基準1)。マスタは 200 と名前の並びか4つの大分類、一覧は 200 と id と名前と日時の並び、
 // 作成と項目の作成は 201 と経歴書、取得と更新は 200 と経歴書、削除は 204 と空の本文で答える。受け口は、ログインした
 // 利用者の ID と、経路の値と、本文を読まずにそのまま処理に渡す。処理が *auth.Error を返せば、Java 版の
@@ -623,8 +648,8 @@ func checkResumeCalls(t *testing.T, name string, f *fakeResumes, want ...string)
 // context に無いときは、処理を呼ばずに errNoLoginUser を返す。
 func TestResumeHandlers_SuccessResponses(t *testing.T) {
 	ops := resumeOps()
-	if len(ops) != 28 {
-		t.Fatalf("操作の数 = %d, want 28", len(ops))
+	if len(ops) != 30 {
+		t.Fatalf("操作の数 = %d, want 30", len(ops))
 	}
 	business := auth.ErrBusiness("業務の誤りの文言")
 	for _, op := range ops {
@@ -841,7 +866,7 @@ func TestResumeHandlers_UnreadableItemID(t *testing.T) {
 	}
 }
 
-// TestResumeResponses_AllOperationsWrite は、経歴書の28の操作の応答のインタフェースのどのメソッドで書いても、状態の番号と、
+// TestResumeResponses_AllOperationsWrite は、経歴書の30の操作の応答のインタフェースのどのメソッドで書いても、状態の番号と、
 // Content-Type と、本文を書くことを確かめる。
 func TestResumeResponses_AllOperationsWrite(t *testing.T) {
 	r := authJSON(http.StatusCreated, map[string]string{"a": "<&>"})
@@ -875,9 +900,11 @@ func TestResumeResponses_AllOperationsWrite(t *testing.T) {
 		"DeleteSelfPromotion":      r.VisitDeleteSelfPromotionResponse,
 		"ExportResume":             r.VisitExportResumeResponse,
 		"ExportResumeWithSettings": r.VisitExportResumeWithSettingsResponse,
+		"BackupResume":             r.VisitBackupResumeResponse,
+		"RestoreResume":            r.VisitRestoreResumeResponse,
 	}
-	if len(visits) != 28 {
-		t.Fatalf("メソッドの数 = %d, want 28", len(visits))
+	if len(visits) != 30 {
+		t.Fatalf("メソッドの数 = %d, want 30", len(visits))
 	}
 	for name, visit := range visits {
 		checkResponse(t, name, recordResponse(t, visit), want)
@@ -930,7 +957,7 @@ func sendRoute(h http.Handler, method, path string, body *string, accept ...stri
 	return rec
 }
 
-// resumeRoute は、経歴書の28の操作の1つの、仕様書の経路への要求と、経歴書の処理の呼び出しである。
+// resumeRoute は、経歴書の30の操作の1つの、仕様書の経路への要求と、経歴書の処理の呼び出しである。
 type resumeRoute struct {
 	name, method, path, body, call string
 }
@@ -943,7 +970,7 @@ func (rt resumeRoute) accept() []string {
 	return nil
 }
 
-// resumeRoutes は、経歴書の28の操作の要求を、resumeOps と同じ名前で返す。
+// resumeRoutes は、経歴書の30の操作の要求を、resumeOps と同じ名前で返す。
 func resumeRoutes() []resumeRoute {
 	user := handlerUserID.String()
 	base := "/api/resumes/" + testResumeID
@@ -966,6 +993,11 @@ func resumeRoutes() []resumeRoute {
 		{
 			"ExportResumeWithSettings", http.MethodPost, base + "/export", `{"format":"pdf"}`,
 			"ExportResumeWithSettings(" + user + ", " + testResumeID + `, {"format":"pdf"})`,
+		},
+		{"BackupResume", http.MethodGet, base + "/backup", "", "BackupResume(" + user + ", " + testResumeID + ")"},
+		{
+			"RestoreResume", http.MethodPost, "/api/resumes/restore", `{"version":"1.0"}`,
+			"RestoreResume(" + user + `, {"version":"1.0"})`,
 		},
 	}
 	segments := map[string]string{
@@ -995,7 +1027,7 @@ func resumeRoutes() []resumeRoute {
 	return routes
 }
 
-// TestResumeRoutes_Wired は、New に ResumeHandlers を渡すと、仕様書の経路への28の操作の要求が経歴書の受け口に届き、
+// TestResumeRoutes_Wired は、New に ResumeHandlers を渡すと、仕様書の経路への30の操作の要求が経歴書の受け口に届き、
 // 受け口の答えで答えることを確かめる(要件1の受入基準2)。
 func TestResumeRoutes_Wired(t *testing.T) {
 	wants := map[string]wantResponse{}
@@ -1003,8 +1035,8 @@ func TestResumeRoutes_Wired(t *testing.T) {
 		wants[op.name] = op.want
 	}
 	routes := resumeRoutes()
-	if len(routes) != 28 || len(wants) != 28 {
-		t.Fatalf("操作の数 = 経路 %d、受け口 %d, want 28", len(routes), len(wants))
+	if len(routes) != 30 || len(wants) != 30 {
+		t.Fatalf("操作の数 = 経路 %d、受け口 %d, want 30", len(routes), len(wants))
 	}
 	for _, rt := range routes {
 		t.Run(rt.name, func(t *testing.T) {
@@ -1025,7 +1057,7 @@ func TestResumeRoutes_Wired(t *testing.T) {
 	}
 }
 
-// TestResumeRoutes_Unimplemented は、New に ResumeHandlers を渡さなければ、マスタと経歴書の28の操作の要求に、
+// TestResumeRoutes_Unimplemented は、New に ResumeHandlers を渡さなければ、マスタと経歴書の30の操作の要求に、
 // 今と同じ未実装の答えを返すことを確かめる。
 func TestResumeRoutes_Unimplemented(t *testing.T) {
 	handler := resumeServer(t, nil, handlerUserID)
@@ -1458,5 +1490,93 @@ func TestExportHandlers_RejectWithoutJSONAccept(t *testing.T) {
 			t.Errorf("Accept %q の答え = %d %q %s, want %d %q %s", accept, rec.Code, rec.Header().Get("Content-Type"),
 				rec.Body.String(), screen.Code, screen.Header().Get("Content-Type"), screen.Body.String())
 		}
+	}
+}
+
+// TestBackupHandlers_BackupResponse は、書き出しの受け口が、処理が返したバックアップのファイルを、状態の番号 200 と、
+// application/json と、attachment の Content-Disposition と、ファイルの本文で答えることを確かめる(要件1の受入基準1)。
+// Content-Disposition のファイル名は、出力の受け口と同じく、処理が経歴書の名前から作ったファイル名から、Java 版と
+// 同じ規則で作る(要件3の受入基準4)。受け口は Accept の行を見ないので、Accept の行に application/json が無くても、
+// 同じ答えを返す。
+func TestBackupHandlers_BackupResponse(t *testing.T) {
+	names := []string{"職務経歴書_backup.json", `職務 "経歴" \書<&>_backup.json`, "resume_backup.json"}
+	accepts := [][]string{nil, {"application/json"}, {"text/html"}, {"application/pdf", "text/markdown"}}
+	body := `{"version":"1.0","exportedAt":"2026-11-24T00:00:00Z","resume":{"resumeName":"<&>"}}`
+	for _, name := range names {
+		want := formatContentDisposition(false, name)
+		if !strings.HasPrefix(want, "attachment;") {
+			t.Fatalf("期待する Content-Disposition = %q の出し方が attachment でない", want)
+		}
+		for _, accept := range accepts {
+			label := fmt.Sprintf("%s(Accept %q)", name, accept)
+			f := newFakeResumes()
+			f.export = resume.Export{Body: []byte(body), ContentType: "application/json", FileName: name}
+			resp, err := newResumeHandlers(f, false).BackupResume(
+				withAccept(loggedIn(), accept...), gen.BackupResumeRequestObject{ResumeId: testResumeID},
+			)
+			if err != nil {
+				t.Fatalf("%s が誤りを返した: %v", label, err)
+			}
+			r, ok := resp.(authResponse)
+			if !ok {
+				t.Fatalf("%s の答えの型 = %T, want authResponse", label, resp)
+			}
+			rec := httptest.NewRecorder()
+			if err := r.write(rec); err != nil {
+				t.Fatalf("%s の答えを書けない: %v", label, err)
+			}
+			if rec.Code != http.StatusOK {
+				t.Errorf("%s の状態の番号 = %d, want 200", label, rec.Code)
+			}
+			if got := rec.Header().Values("Content-Type"); !reflect.DeepEqual(got, []string{"application/json"}) {
+				t.Errorf("%s の Content-Type = %q, want application/json", label, got)
+			}
+			if got := rec.Header().Values("Content-Disposition"); !reflect.DeepEqual(got, []string{want}) {
+				t.Errorf("%s の Content-Disposition = %q, want %q", label, got, want)
+			}
+			if rec.Body.String() != body {
+				t.Errorf("%s の本文 = %q, want %q", label, rec.Body.String(), body)
+			}
+			checkResumeCalls(t, label, f, "BackupResume("+handlerUserID.String()+", "+testResumeID+")")
+		}
+	}
+}
+
+// TestBackupHandlers_RestoreResponse は、戻しの受け口が、処理が戻した経歴書を、状態の番号 201 と、application/json と、
+// JavaJSON で書いた経歴書の答えの本文で答えることを確かめる(要件1の受入基準1)。経歴書の名前と項目の字に、対に
+// なっていないサロゲートがあるときも、Java 版と同じく、U+FFFD に置き換えずに番号で書く。
+func TestBackupHandlers_RestoreResponse(t *testing.T) {
+	lone := fullResume()
+	lone.Name = "経歴\xed\xa0\x80書<&>"
+	lone.Careers[0].CompanyName = "会社\xed\xb0\x80"
+	cases := []struct {
+		name     string
+		r        resume.Resume
+		want     string
+		contains []string
+	}{
+		{name: "経歴書", r: fullResume(), want: fullResumeJSON},
+		{
+			name: "対になっていないサロゲートを含む経歴書", r: lone, want: string(resume.JavaJSON(newResumeBody(lone))),
+			contains: []string{`"resumeName":"経歴\uD800書<&>"`, `"companyName":"会社\uDC00"`},
+		},
+	}
+	for _, c := range cases {
+		f := newFakeResumes()
+		f.resume = c.r
+		resp, err := newResumeHandlers(f, false).RestoreResume(
+			loggedIn(), gen.RestoreResumeRequestObject{Body: bodyOf(`{"version":"1.0"}`)},
+		)
+		got := handled(t, resp, err)
+		checkResponse(t, c.name, got, jsonWant(http.StatusCreated, c.want))
+		for _, s := range c.contains {
+			if !strings.Contains(got.body, s) {
+				t.Errorf("%s の本文 %s に %s が無い", c.name, got.body, s)
+			}
+		}
+		if strings.ContainsRune(got.body, utf8.RuneError) {
+			t.Errorf("%s の本文 %s に U+FFFD がある", c.name, got.body)
+		}
+		checkResumeCalls(t, c.name, f, "RestoreResume("+handlerUserID.String()+`, {"version":"1.0"})`)
 	}
 }
