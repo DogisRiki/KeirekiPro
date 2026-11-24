@@ -1,0 +1,58 @@
+# バックアップの戻しで、Java 版の戻しが確かめない決まりに当たるファイルを戻す筋書き(要件4の受入基準5、要件6の受入基準1と2)。
+# user2 が、期間の重なる2件の職歴を持つファイル、1900 年より前の年月を持つファイル、工程の無いファイル、姓と名の両方が無い
+# ファイル、自己PR を6件持つファイル、256文字以上のリンクを持つファイルを、fixtures/backups/ から json_file で1つずつ戻す。
+# 256文字以上のリンクのファイルには、Java 版も Go 版も 500 で答える。ほかのファイルは 201 で戻る。
+# 戻しの段には csrf: true を付ける。
+name: backup-lax
+group: 5
+fixtures: [users/basic.sql, backup/backup.sql]
+modes: [compare]
+steps:
+  - name: login-user2
+    request:
+      method: POST
+      path: /api/auth/login
+      json: {email: user2@example.com, password: Passw0rd!}
+    expect: {status: 200}
+  - name: restore-overlap
+    request:
+      method: POST
+      path: /api/resumes/restore
+      csrf: true
+      json_file: backups/lax-overlap.json
+    expect: {status: 201}
+  - name: restore-before-1900
+    request:
+      method: POST
+      path: /api/resumes/restore
+      csrf: true
+      json_file: backups/lax-before-1900.json
+    expect: {status: 201}
+  - name: restore-no-process
+    request:
+      method: POST
+      path: /api/resumes/restore
+      csrf: true
+      json_file: backups/lax-no-process.json
+    expect: {status: 201}
+  - name: restore-no-names
+    request:
+      method: POST
+      path: /api/resumes/restore
+      csrf: true
+      json_file: backups/lax-no-names.json
+    expect: {status: 201}
+  - name: restore-many-self-promotions
+    request:
+      method: POST
+      path: /api/resumes/restore
+      csrf: true
+      json_file: backups/lax-many-self-promotions.json
+    expect: {status: 201}
+  - name: restore-long-link
+    request:
+      method: POST
+      path: /api/resumes/restore
+      csrf: true
+      json_file: backups/lax-long-link.json
+    expect: {status: 500}

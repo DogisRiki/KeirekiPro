@@ -1,0 +1,137 @@
+# バックアップの戻しで、断る条件に当たるファイルを戻す筋書き(要件4の受入基準1から6、要件6の受入基準1と2)。
+# 断る条件ごとに、その条件に当たるファイルを fixtures/backups/ から json_file で送る。送るファイルは次の6つの組である。
+#   - ファイルの版の誤り: wrong-version.json と、ファイルの版が書かれていない reject-no-version.json(user1)
+#   - 経歴書の数の上限: 経歴書を上限の50件持つ利用者 500(resumes/resume-limits.sql)が戻す basic.json
+#   - 名前の重なり: user1 が戻す java-401.json。user1 は resumes/fonts.sql の経歴書 401 を同じ名前で持つ
+#   - 値の決まり: 名前の無いファイル、51文字の名前のファイル、姓だけのファイル、終わりの年月が始まりの年月より前のファイル、
+#     https でないリンクのファイル(user1)
+#   - 値を読めない本文: 日付の欄に日付の形でない文字を入れた reject-bad-date.json(user1)
+#   - 確かめる順: 値を読めなくてファイルの版も誤った reject-bad-date-wrong-version.json(user1)、ファイルの版が誤っていて
+#     利用者 500 が戻す wrong-version.json、利用者 500 が戻す、利用者 500 の経歴書と同じ名前の reject-limit-duplicate.json、
+#     user1 が戻す、経歴書 401 と同じ名前で値の決まりも満たさない reject-duplicate-invalid.json
+# Java 版と Go 版を比べる検査は、答えの状態の番号と本文の文言と、要求のあとのデータベースを比べる。断った要求のあとに
+# 経歴書が作られていないことは、データベースの比べ方で確かめる。
+# 戻しの段には csrf: true を付ける。
+name: backup-rejects
+group: 5
+fixtures: [users/basic.sql, resumes/fonts.sql, resumes/resume-limits.sql, backup/backup.sql]
+modes: [compare]
+steps:
+  - name: login-user1
+    request:
+      method: POST
+      path: /api/auth/login
+      json: {email: user1@example.com, password: Passw0rd!}
+    expect: {status: 200}
+  # ファイルの版の誤り
+  - name: restore-wrong-version
+    request:
+      method: POST
+      path: /api/resumes/restore
+      csrf: true
+      json_file: backups/wrong-version.json
+    expect: {status: 400}
+  - name: restore-no-version
+    request:
+      method: POST
+      path: /api/resumes/restore
+      csrf: true
+      json_file: backups/reject-no-version.json
+    expect: {status: 400}
+  # 名前の重なり
+  - name: restore-duplicate-name
+    request:
+      method: POST
+      path: /api/resumes/restore
+      csrf: true
+      json_file: backups/java-401.json
+    expect: {status: 400}
+  # 値の決まり
+  - name: restore-no-name
+    request:
+      method: POST
+      path: /api/resumes/restore
+      csrf: true
+      json_file: backups/reject-no-name.json
+    expect: {status: 400}
+  - name: restore-long-name
+    request:
+      method: POST
+      path: /api/resumes/restore
+      csrf: true
+      json_file: backups/reject-long-name.json
+    expect: {status: 400}
+  - name: restore-last-name-only
+    request:
+      method: POST
+      path: /api/resumes/restore
+      csrf: true
+      json_file: backups/reject-last-name-only.json
+    expect: {status: 400}
+  - name: restore-end-before-start
+    request:
+      method: POST
+      path: /api/resumes/restore
+      csrf: true
+      json_file: backups/reject-end-before-start.json
+    expect: {status: 400}
+  - name: restore-http-link
+    request:
+      method: POST
+      path: /api/resumes/restore
+      csrf: true
+      json_file: backups/reject-http-link.json
+    expect: {status: 400}
+  # 値を読めない本文
+  - name: restore-bad-date
+    request:
+      method: POST
+      path: /api/resumes/restore
+      csrf: true
+      json_file: backups/reject-bad-date.json
+    expect: {status: 400}
+  # 確かめる順: 値を読めない本文と版の誤り、名前の重なりと値の決まり
+  - name: restore-bad-date-wrong-version
+    request:
+      method: POST
+      path: /api/resumes/restore
+      csrf: true
+      json_file: backups/reject-bad-date-wrong-version.json
+    expect: {status: 400}
+  - name: restore-duplicate-invalid
+    request:
+      method: POST
+      path: /api/resumes/restore
+      csrf: true
+      json_file: backups/reject-duplicate-invalid.json
+    expect: {status: 400}
+  # 経歴書を上限の50件持つ利用者 500
+  - name: login-limit-user
+    request:
+      method: POST
+      path: /api/auth/login
+      json: {email: resume-limits@example.com, password: Passw0rd!}
+    expect: {status: 200}
+  # 経歴書の数の上限
+  - name: restore-over-limit
+    request:
+      method: POST
+      path: /api/resumes/restore
+      csrf: true
+      json_file: backups/basic.json
+    expect: {status: 400}
+  # 確かめる順: 版の誤りと数の上限、数の上限と名前の重なり
+  - name: restore-wrong-version-over-limit
+    request:
+      method: POST
+      path: /api/resumes/restore
+      csrf: true
+      json_file: backups/wrong-version.json
+    expect: {status: 400}
+  - name: restore-limit-duplicate
+    request:
+      method: POST
+      path: /api/resumes/restore
+      csrf: true
+      json_file: backups/reject-limit-duplicate.json
+    expect: {status: 400}

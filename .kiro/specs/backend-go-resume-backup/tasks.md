@@ -191,7 +191,7 @@
   - _要件: 1.1, 1.3, 2.1, 2.2, 2.3, 3.1, 3.4, 6.1, 6.2_
   - _依存: 1.3, 1.6, 5.1_
 
-- [ ] 6.2 断る条件と、確かめない決まりと、形の誤ったファイルの筋書きを書く
+- [x] 6.2 断る条件と、確かめない決まりと、形の誤ったファイルの筋書きを書く
 
   Claude は、バックアップの操作の筋書きの節のとおりに、`rejects.yaml` と `lax.yaml` と `malformed.yaml` を書く。3つの筋書きは、小タスク1.2 で置いた `reject-` と `lax-` と `malformed-` で始まるファイルと、今の `wrong-version.json` と `no-resume.json` と `basic.json` を `json_file` で送る。
   - 完了の確かめ方: `go test -tags compat -count=1 -run 'TestCompare_Scenarios/(<3つの筋書きの名前を | でつないだもの>)' ./compat/` が通る
