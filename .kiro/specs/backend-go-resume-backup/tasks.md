@@ -138,7 +138,7 @@
   - _要件: 2.1, 2.2, 4.2, 4.5_
   - _依存: 3.3_
 
-- [ ] 4.4 Service の戻しのメソッドを作る
+- [x] 4.4 Service の戻しのメソッドを作る
 
   Claude は、Service の戻しの節と処理の流れの節の戻しの図のとおりに、`restore.go` に `RestoreResume` を作る。`RestoreResume` は、小タスク3.4 の `readRestoreFile` で本文を読み、`CreateResume` と同じく1つのトランザクションで、値の無い要素を持つ欄、ファイルの版、経歴書の数、経歴書の中身、名前の重なり、値の決まりの順に確かめてから、`insertResume(dbResume(r))` で経歴書と項目を入れる。トランザクションのあとに誤りが `*auth.Error` でなければ、`RestoreResume` は、小タスク1.5 の `userExists` で利用者が居るかを調べ、居なければ `errResumeNotFound` を返す。写す元は、Java 版の `RestoreResumeUseCase` である。
   - 完了の確かめ方: `go test ./internal/resume/ -run 'TestRestoreIntegration_(Order|Owner|NoLeftover)'` が通る

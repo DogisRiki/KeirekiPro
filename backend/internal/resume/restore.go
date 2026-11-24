@@ -1,11 +1,77 @@
 package resume
 
 import (
+	"context"
+	"errors"
 	"strings"
 
 	"github.com/DogisRiki/KeirekiPro/backend/internal/auth"
 	"github.com/google/uuid"
 )
+
+// errRestoreServer は、戻すファイルの経歴書が無いか、6つの欄のどれかの並びに値の無い要素があるときの誤りである。
+// Java 版はサーバの誤りとして 500 で答える。
+var errRestoreServer = errors.New("resume: 戻すファイルの経歴書が無いか、欄の並びに値の無い要素がある")
+
+// RestoreResume は、バックアップのファイルの本文 body から、利用者 userID の経歴書を1件作る。Java 版の RestoreResumeUseCase の写しである。
+// 確かめる順は Java 版と同じく、本文、値の無い要素を持つ欄、ファイルの版、経歴書の数の上限、経歴書の中身、名前の重なり、値の決まりである。
+// 経歴書の数を数えてから経歴書を入れるまでを、CreateResume と同じく1つのトランザクションで行う。
+// トランザクションの誤りが 400 の誤りでなければ、利用者が居るかを調べ、退会して居なければ無い経歴書の誤りを返す。
+// 返す経歴書は、データベースに入れる字に直す前の値である。
+func (s *Service) RestoreResume(ctx context.Context, userID uuid.UUID, body []byte) (Resume, error) {
+	f, ok := readRestoreFile(body)
+	if !ok {
+		return Resume{}, errUnreadableInput()
+	}
+	now := s.deps.Now().In(japanZone)
+	var restored Resume
+	err := inTx(ctx, s.deps.Pool, func(st store) error {
+		if f.nullElement {
+			return errRestoreServer
+		}
+		if f.version == nil || *f.version != backupVersion {
+			return auth.ErrBusiness(MessageUnsupportedBackupVersion)
+		}
+		count, err := st.countResumes(ctx, userID)
+		if err != nil {
+			return err
+		}
+		if e := resumeLimit.check(count); e != nil {
+			return e
+		}
+		if f.resume == nil {
+			return errRestoreServer
+		}
+		// データベースの経歴書の名前は対になっていないサロゲートを含まないので、そのような名前は重ならない
+		if name := f.resume.name; name != nil && toDBText(*name) == *name {
+			if exists, err := st.resumeNameExists(ctx, userID, *name); err != nil {
+				return err
+			} else if exists {
+				return errResumeNameDuplicated()
+			}
+		}
+		r, ok := buildRestored(f.resume, userID)
+		if !ok {
+			return auth.ErrBusiness(MessageInvalidBackupFile)
+		}
+		r.CreatedAt, r.UpdatedAt = now, now
+		if err := st.insertResume(ctx, dbResume(r)); err != nil {
+			return err
+		}
+		restored = r
+		return nil
+	})
+	if err != nil {
+		var ae *auth.Error
+		if !errors.As(err, &ae) {
+			if exists, lookupErr := poolStore(s.deps.Pool).userExists(ctx, userID); lookupErr == nil && !exists {
+				return Resume{}, errResumeNotFound()
+			}
+		}
+		return Resume{}, err
+	}
+	return restored, nil
+}
 
 // buildRestored は、戻すファイルの経歴書 rr から、要求を送った利用者 userID の経歴書を作る。rr の値が、Java 版が戻すときに
 // 経歴書と項目のクラスを作って確かめる値の決まり(RestoreResumeUseCase の 97-138行と、ResumeName、FullName、Period、Link などの
