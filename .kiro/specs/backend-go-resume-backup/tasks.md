@@ -125,7 +125,7 @@
   - _要件: 3.1, 3.2, 3.3, 3.4, 5.1, 5.2, 6.2_
   - _依存: 1.1, 1.3_
 
-- [ ] 4.3 戻しの値の決まりで経歴書を作る部品と、2つの文言を作る
+- [x] 4.3 戻しの値の決まりで経歴書を作る部品と、2つの文言を作る
 
   Claude は、Service の戻しの節のとおりに、`backend/internal/resume/restore.go` に `buildRestored` を作る。写す元は、Java 版の `RestoreResumeUseCase` の 97-138行と、`ResumeName` `FullName` `Period` `Link` などの経歴書と項目のクラスである。`buildRestored` は、長さを小タスク3.3 の `javaLen` で数え、最後に `sortEntries` で項目を並べる。Claude は、文言の定数の節のとおりに、`errors.go` に `MessageUnsupportedBackupVersion` と `MessageInvalidBackupFile` を足す。
   - 完了の確かめ方: `go test ./internal/resume/ -run 'TestBuildRestored|TestErrors'` が通る
