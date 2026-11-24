@@ -85,7 +85,7 @@
   - _要件: 2.1, 4.6_
   - _対象の部品: JSON の読み手_
 
-- [ ] 3.3 UTF-16 の単位で字を数え、データベースに入れる字に直す部品を作る (並行可)
+- [x] 3.3 UTF-16 の単位で字を数え、データベースに入れる字に直す部品を作る (並行可)
 
   Claude は、WTF-8 の扱いの節のとおりに、`backend/internal/resume/wtf8.go` に、`wtf8Units` と `javaLen` と `toDBText` と `dbResume` を作る。`dbResume` は、経歴書と6つの欄の項目のすべての字の欄に `toDBText` を当てる。
   - 完了の確かめ方: `go test ./internal/resume/ -run TestWTF8` が通る
