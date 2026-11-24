@@ -325,8 +325,8 @@ func TestLoadChangedBehaviors_CB005HasNoMatch(t *testing.T) {
 			t.Errorf("%s が一覧にありません", id)
 		}
 	}
-	if len(got) != 61 {
-		t.Errorf("一覧の項目は61のはずですが、%d です", len(got))
+	if len(got) != 74 {
+		t.Errorf("一覧の項目は74のはずですが、%d です", len(got))
 	}
 	// CB-022 は、利用者の操作の筋書きの管理者で違いが出るので match を持つ(TestChangedBehaviors_RefreshTokenRoles で確かめる)
 	for _, id := range []string{
@@ -606,6 +606,65 @@ func TestChangedBehaviors_OwnerDecidedItems(t *testing.T) {
 		}
 		if n == 0 {
 			t.Fatal("「所有者が」と書いた理由が1つもありません")
+		}
+	})
+}
+
+// TestChangedBehaviors_BackupItems は、バックアップの操作の項目のうち、設計で決まった CB-062 から CB-066 を確かめる。
+// CB-062 は、職歴、プロジェクト、資格の項目の並びの、順だけの違いを許し、所有者が受け入れたことを理由に書く。
+// CB-063 から CB-066 は、比べる検査が要求を送らないので match を持たない。
+func TestChangedBehaviors_BackupItems(t *testing.T) {
+	got, err := LoadChangedBehaviors(filepath.Join("..", "changed-behaviors.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	byID := map[string]ChangedBehavior{}
+	for _, b := range got {
+		byID[b.ID] = b
+	}
+	orderOnly := func(path string) Match {
+		return Match{Operation: "backupResume", Target: TargetBody, Path: path, OrderOnly: true}
+	}
+	tests := map[string]Matches{
+		"CB-062": {
+			orderOnly("$.resume.careers[*]"),
+			orderOnly("$.resume.projects[*]"),
+			orderOnly("$.resume.certifications[*]"),
+		},
+	}
+	for n := 63; n <= 66; n++ {
+		tests[fmt.Sprintf("CB-%03d", n)] = nil
+	}
+	for id, want := range tests {
+		t.Run(id, func(t *testing.T) {
+			b, ok := byID[id]
+			if !ok {
+				t.Fatalf("%s が一覧にありません", id)
+			}
+			if b.Group != 5 {
+				t.Errorf("%s の group = %d, want 5", id, b.Group)
+			}
+			if !slices.Equal(b.Matches, want) {
+				t.Errorf("%s の match = %+v, want %+v", id, b.Matches, want)
+			}
+		})
+	}
+
+	t.Run("CB-062 の理由に、6つの欄の項目の並びが変わることと、所有者が 2026-11-24 に受け入れたことが書いてある", func(t *testing.T) {
+		r := byID["CB-062"].Reason
+		for _, w := range []string{"バックアップのファイルの中の6つの欄の項目の並びが変わる", "所有者が 2026-11-24 に受け入れた(requirements の承認)"} {
+			if !strings.Contains(r, w) {
+				t.Errorf("CB-062 の理由 = %q, want 「%s」を含む", r, w)
+			}
+		}
+	})
+
+	t.Run("CB-063 から CB-066 の理由に、退会した利用者はどちらの答えでも戻しを終えられないことが書いてある", func(t *testing.T) {
+		for n := 63; n <= 66; n++ {
+			id := fmt.Sprintf("CB-%03d", n)
+			if r := byID[id].Reason; !strings.Contains(r, "退会してすでに居ない利用者は、どちらの答えでも戻しを終えられない") {
+				t.Errorf("%s の理由 = %q, want 「退会してすでに居ない利用者は、どちらの答えでも戻しを終えられない」を含む", id, r)
+			}
 		}
 	})
 }

@@ -1,4 +1,4 @@
-// Package resume は、マスタと経歴書の28の操作の処理を、Java 版の usecase/resume のユースケースと
+// Package resume は、マスタと経歴書の30の操作の処理を、Java 版の usecase/resume のユースケースと
 // usecase/query の3つのマスタの問い合わせと同じ順で行う。
 // このパッケージは HTTP の要求と応答を扱わない。HTTP の受け口は internal/httpapi が受け持つ。
 package resume
@@ -28,7 +28,7 @@ type Deps struct {
 	PDF PDFRenderer
 }
 
-// Service は、マスタと経歴書の28の操作の処理の入口である。要求をまたぐ状態をメモリに持たず、
+// Service は、マスタと経歴書の30の操作の処理の入口である。要求をまたぐ状態をメモリに持たず、
 // すべてデータベースに置く。
 type Service struct {
 	deps Deps

@@ -201,11 +201,26 @@ func decodeStrict(data []byte, v any) error {
 // checkBackup は、name のバックアップのファイルが、ファイルの名前どおりの形かを確かめる。
 // basic.json は正しいバックアップ、wrong-version.json は版の違うバックアップ、
 // no-resume.json は resume を含まないバックアップ、broken.json は JSON として読めないバックアップである。
+// java- で始まるファイルは Java 版が書き出したバックアップで、basic.json と同じく確かめる。ただし、Java 版は項目の無い欄を省くので、
+// すべての欄に項目があることは確かめない。
+// reject- と lax- と malformed- で始まるファイルは、戻しで断る条件、Java 版の戻しが確かめない決まり、
+// 形の誤りを確かめる要求の本文なので、JSON として読めることだけを確かめる。
 func checkBackup(t *testing.T, name string, data []byte) {
 	t.Helper()
 	var b backupFile
 	err := decodeStrict(data, &b)
-	switch path.Base(name) {
+	base := path.Base(name)
+	javaFile := strings.HasPrefix(base, "java-")
+	switch {
+	case javaFile:
+		base = "basic.json"
+	case strings.HasPrefix(base, "reject-") || strings.HasPrefix(base, "lax-") || strings.HasPrefix(base, "malformed-"):
+		if !json.Valid(data) {
+			t.Errorf("%s: JSON として読めるはずですが、読めません", name)
+		}
+		return
+	}
+	switch base {
 	case "broken.json":
 		if err == nil {
 			t.Errorf("%s: JSON として読めないはずですが、読めました", name)
@@ -223,8 +238,8 @@ func checkBackup(t *testing.T, name string, data []byte) {
 			t.Fatalf("%s: 版が 1.0 の正しいバックアップのはずですが、版 %q、エラー %v", name, b.Version, err)
 		}
 		r := b.Resume
-		if len(r.Careers) == 0 || len(r.Projects) == 0 || len(r.Certifications) == 0 ||
-			len(r.Portfolios) == 0 || len(r.SnsPlatforms) == 0 || len(r.SelfPromotions) == 0 {
+		if !javaFile && (len(r.Careers) == 0 || len(r.Projects) == 0 || len(r.Certifications) == 0 ||
+			len(r.Portfolios) == 0 || len(r.SnsPlatforms) == 0 || len(r.SelfPromotions) == 0) {
 			t.Errorf("%s: すべての項目を持つはずです", name)
 		}
 		// Java 版は、経歴書の日付を LocalDate(年月日)で、職歴と案件と資格の日付を YearMonth(年月)で読む
@@ -308,7 +323,7 @@ func TestFixtures_AllLoadable(t *testing.T) {
 		}
 		dir, ext := path.Dir(name), path.Ext(name)
 		switch {
-		case (dir == "users" || dir == "resumes" || dir == "export") && ext == ".sql":
+		case (dir == "users" || dir == "resumes" || dir == "export" || dir == "backup") && ext == ".sql":
 			// 下のデータベースの確かめで読み込む
 		case dir == "export" && ext == ".json":
 			// 出力の操作の筋書きが送る要求の本文。断る条件を確かめる本文もあるので、JSON として読めることだけを確かめる
@@ -354,8 +369,9 @@ func TestFixtures_AllLoadable(t *testing.T) {
 		t.Fatalf("fixtures/ を読めません: %v", err)
 	}
 
-	// export/ の SQL は、resumes/many-pages.sql の経歴書に項目を足すので、users/ と resumes/ のあとに読み込む
-	db := fixtureDB(t, "export")
+	// export/ の SQL は、resumes/many-pages.sql の経歴書に項目を足すので、users/ と resumes/ のあとに読み込む。
+	// backup/ の SQL は、users/basic.sql の user1 の経歴書を作り、筋書きが resumes/fonts.sql のあとに読み込むので、同じく users/ と resumes/ のあとに読み込む
+	db := fixtureDB(t, "export", "backup")
 	ctx := t.Context()
 
 	// 出力の操作の筋書きは、次の経歴書を出力するので、どれも Java 版の ResumeExportRuleCheckService の出力の前提を満たす

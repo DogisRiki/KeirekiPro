@@ -1,0 +1,34 @@
+# バックアップの書き出しで、無い経歴書とほかの利用者の経歴書の筋書き(要件5の受入基準1と2、要件6の受入基準1)。
+# user1 が、無い経歴書(0000000009ff)に書き出しを送る。user2 が、user1 の経歴書 401(resumes/fonts.sql)に書き出しを送る。
+# どちらも、同じ 404 で答えられることを確かめる。書き出しの Accept は、画面と同じく application/json にする。
+name: backup-not-found-other-user
+group: 5
+fixtures: [users/basic.sql, resumes/fonts.sql]
+modes: [compare]
+steps:
+  - name: login-user1
+    request:
+      method: POST
+      path: /api/auth/login
+      json: {email: user1@example.com, password: Passw0rd!}
+    expect: {status: 200}
+  # 無い経歴書
+  - name: backup-missing
+    request:
+      method: GET
+      path: /api/resumes/00000000-0000-4000-8000-0000000009ff/backup
+      headers: {Accept: application/json}
+    expect: {status: 404, content_type: application/json}
+  - name: login-user2
+    request:
+      method: POST
+      path: /api/auth/login
+      json: {email: user2@example.com, password: Passw0rd!}
+    expect: {status: 200}
+  # ほかの利用者の経歴書
+  - name: backup-other-user
+    request:
+      method: GET
+      path: /api/resumes/00000000-0000-4000-8000-000000000401/backup
+      headers: {Accept: application/json}
+    expect: {status: 404, content_type: application/json}

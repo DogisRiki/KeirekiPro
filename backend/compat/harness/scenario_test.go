@@ -592,3 +592,34 @@ func TestLoadScenarios_JSONFileExclusive(t *testing.T) {
 		}
 	}
 }
+
+func TestLoadScenarios_JSONCaptureExclusive(t *testing.T) {
+	// 前の段で取り出した値の名前を書いた版に送る段は、読める
+	ok := "  - name: send\n    request: {method: POST, path: /x, csrf: true, json_capture: backup}\n"
+	s, err := LoadScenario(writeScenario(t, kindsScenario("compare", ok)))
+	if err != nil {
+		t.Fatalf("json_capture を書いた筋書き: %v", err)
+	}
+	if got := s.Steps[0].Request.JSONCapture; got != "backup" {
+		t.Errorf("request の json_capture = %q", got)
+	}
+
+	const absURL = `    request: {method: PUT, url: "http://localhost:4566/b/k", `
+	for name, tc := range map[string]struct{ step, want string }{
+		"json_capture と json":      {"    request: {method: POST, path: /x, json_capture: backup, json: {a: 1}}\n", "json_capture と json は一緒に書けません"},
+		"json_capture と json_file": {"    request: {method: POST, path: /x, json_capture: backup, json_file: resumes/fonts-NotoSansJP.json}\n", "json_capture と json_file は一緒に書けません"},
+		"json_capture と multipart": {"    request: {method: POST, path: /x, json_capture: backup, multipart: [{name: a, value: v}]}\n", "json_capture と multipart は一緒に書けません"},
+		"json_capture と body_file": {"    request: {method: POST, path: /x, json_capture: backup, body_file: profile.png}\n", "json_capture と body_file は一緒に書けません"},
+		"絶対の URL の段の json_capture": {absURL + "json_capture: backup}\n", "json_capture は、版に送る段にだけ"},
+		"redis の段の json_capture":   {"    request: {json_capture: backup}\n    redis: {del: [k]}\n", "1つだけ"},
+	} {
+		steps := "  - name: bad\n" + tc.step + "  - name: last\n    request: {method: GET, path: /x}\n"
+		_, err := LoadScenario(writeScenario(t, kindsScenario("compare", steps)))
+		if err == nil || !strings.Contains(err.Error(), "段 bad ") || !strings.Contains(err.Error(), tc.want) {
+			t.Errorf("%s: 誤り = %v, want 段 bad の %q を含む誤り", name, err, tc.want)
+		}
+		if err != nil && strings.Contains(err.Error(), "段 last ") {
+			t.Errorf("%s: 正しい段 last も誤りになりました: %v", name, err)
+		}
+	}
+}

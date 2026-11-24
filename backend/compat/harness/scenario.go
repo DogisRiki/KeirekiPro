@@ -171,6 +171,10 @@ type Request struct {
 	// JSONFile は、版に送る段で、本文にそのまま入れて送る、fixtures の下の JSON のファイルの名前(fixtures からのパス)である。
 	// harness は、Content-Type を application/json にして送る。JSON と Multipart と BodyFile と一緒には書けない。
 	JSONFile string `yaml:"json_file"`
+	// JSONCapture は、版に送る段で、前の段の capture で取り出した値の名前である。harness は、その値の字を {名前} を置き換えずに
+	// そのまま本文にし、Content-Type を application/json にして送る。JSON と JSONFile と Multipart と BodyFile と一緒には書けない。
+	// 版をまたいで確かめる筋書きが、一方の版で書き出したファイルを、もう一方の版に戻すときに使う。
+	JSONCapture string `yaml:"json_capture"`
 }
 
 // MultipartPart は、multipart で送る本文の1つの部分である。Value と File のどちらか1つを書く。
@@ -340,7 +344,8 @@ func (s Scenario) validate() error {
 func (s Step) validateKind() []error {
 	hasRequest := s.Request.Method != "" || s.Request.Path != "" || s.Request.URL != "" ||
 		len(s.Request.Headers) > 0 || s.Request.CSRF || s.Request.JSON != nil ||
-		len(s.Request.Multipart) > 0 || s.Request.BodyFile != "" || s.Request.JSONFile != ""
+		len(s.Request.Multipart) > 0 || s.Request.BodyFile != "" || s.Request.JSONFile != "" ||
+		s.Request.JSONCapture != ""
 	kinds := 0
 	for _, has := range []bool{hasRequest, s.Redis != nil, s.Expire != nil} {
 		if has {
@@ -370,7 +375,7 @@ func (s Step) validateKind() []error {
 	}
 }
 
-// validateVersionBody は、版に送る段の本文の欄を確かめる。multipart の部分ごとの欄と json_file を確かめ、
+// validateVersionBody は、版に送る段の本文の欄を確かめる。multipart の部分ごとの欄と json_file と json_capture を確かめ、
 // 絶対の URL の段にだけ書ける request の body_file と、expect の body_file が無いかを確かめる。
 func (s Step) validateVersionBody() []error {
 	var errs []error
@@ -382,6 +387,9 @@ func (s Step) validateVersionBody() []error {
 	}
 	if s.Request.JSONFile != "" {
 		errs = append(errs, s.validateJSONFile()...)
+	}
+	if s.Request.JSONCapture != "" {
+		errs = append(errs, s.validateJSONCapture()...)
 	}
 	if s.Request.BodyFile != "" {
 		errs = append(errs, fmt.Errorf("段 %s の request の body_file は、絶対の URL の段にだけ書けます", s.Name))
@@ -411,6 +419,25 @@ func (s Step) validateJSONFile() []error {
 		errs = append(errs, fmt.Errorf("段 %s の request の json_file %q: %w", s.Name, s.Request.JSONFile, err))
 	case !json.Valid(b):
 		errs = append(errs, fmt.Errorf("段 %s の request の json_file %q を JSON として読めません", s.Name, s.Request.JSONFile))
+	}
+	return errs
+}
+
+// validateJSONCapture は、版に送る段の request の json_capture が、json と json_file と multipart と body_file と
+// 一緒に書かれていないことを確かめる。値の名前が前の段で取り出されているかは、送る時点で requestBody が確かめる。
+func (s Step) validateJSONCapture() []error {
+	var errs []error
+	if s.Request.JSON != nil {
+		errs = append(errs, fmt.Errorf("段 %s の request の json_capture と json は一緒に書けません", s.Name))
+	}
+	if s.Request.JSONFile != "" {
+		errs = append(errs, fmt.Errorf("段 %s の request の json_capture と json_file は一緒に書けません", s.Name))
+	}
+	if len(s.Request.Multipart) > 0 {
+		errs = append(errs, fmt.Errorf("段 %s の request の json_capture と multipart は一緒に書けません", s.Name))
+	}
+	if s.Request.BodyFile != "" {
+		errs = append(errs, fmt.Errorf("段 %s の request の json_capture と body_file は一緒に書けません", s.Name))
 	}
 	return errs
 }
@@ -474,6 +501,9 @@ func (s Step) validateAbsoluteURL() []error {
 	}
 	if s.Request.JSONFile != "" {
 		errs = append(errs, fmt.Errorf("段 %s の request の json_file は、版に送る段にだけ書けます", s.Name))
+	}
+	if s.Request.JSONCapture != "" {
+		errs = append(errs, fmt.Errorf("段 %s の request の json_capture は、版に送る段にだけ書けます", s.Name))
 	}
 	if s.Request.BodyFile != "" {
 		if s.Request.JSON != nil {

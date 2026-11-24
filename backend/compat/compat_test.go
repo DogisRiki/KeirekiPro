@@ -89,8 +89,8 @@ func TestCoverage_Operations(t *testing.T) {
 }
 
 // selfCompare は、比べる検査そのものを確かめる筋書きである。1つ目の段でログインし、偽の送信の検査の Cookie を
-// 2つ目の段で受け取り、3つ目の段で使う。Go 版の経歴書の復元はまだ作られておらず 501 を返すので、ログインの確かめと偽の送信の検査を
-// 通ったことを 501 で確かめる。
+// 2つ目の段で受け取り、3つ目の段で使う。Go 版の経歴書の復元は、ファイルの版の無い本文に 400 で答えるので、
+// ログインの確かめと偽の送信の検査を通ったことを 400 で確かめる。
 const selfCompare = `name: self-compare
 group: 0
 fixtures: [users/basic.sql, resumes/many-pages.sql]
@@ -104,7 +104,7 @@ steps:
     expect: {status: 200, fields: [$.status]}
   - name: restore-with-token
     request: {method: POST, path: /api/resumes/restore, json: {}, csrf: true}
-    expect: {status: 501}
+    expect: {status: 400}
 `
 
 // startSelfCompare は、Go 版のイメージを両方の位置に置いた比べる環境を起動する。
@@ -162,7 +162,7 @@ func TestSelf_OneCharFakeFails(t *testing.T) {
 		t.Errorf("違い = %+v, want 3段目 restore-with-token(restoreResume)の本文の $.message", d)
 	}
 	text := report.String()
-	for _, want := range []string{"未実装です。", "未実装です！", "restoreResume"} {
+	for _, want := range []string{"サポートされていないバックアップバージョンです。", "サポートされていないバックアップバージョンです！", "restoreResume"} {
 		if !strings.Contains(text, want) {
 			t.Errorf("報告に %q がありません:\n%s", want, text)
 		}
@@ -175,7 +175,7 @@ func TestSelf_MatchedDiffPasses(t *testing.T) {
 	cmp.URLs[harness.VersionGo] = oneCharFake(t, cmp.URLs[harness.VersionGo])
 	cmp.Behaviors = []harness.ChangedBehavior{{
 		ID:      "CB-TEST",
-		Matches: harness.Matches{{Operation: "restoreResume", Target: harness.TargetBody, Path: "$.message", Status: http.StatusNotImplemented}},
+		Matches: harness.Matches{{Operation: "restoreResume", Target: harness.TargetBody, Path: "$.message", Status: http.StatusBadRequest}},
 	}}
 
 	report, err := cmp.Run(t.Context(), writeScenario(t, selfCompare))

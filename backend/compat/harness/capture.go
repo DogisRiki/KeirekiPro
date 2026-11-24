@@ -247,6 +247,8 @@ func (s *Session) expandJSON(step Step, where string, v any) (any, error) {
 // json は、{名前} を置き換えてから JSON にする。multipart は、multipartBody で組み立てる。
 // body_file は、fixtures/images の下のファイルをそのまま本文にし、Content-Type は筋書きのヘッダに任せて空を返す。
 // json_file は、fixtures の下の JSON のファイルを、{名前} を置き換えずにそのまま本文にし、Content-Type を application/json にする。
+// json_capture は、前の段の capture で取り出した値の字を、{名前} を置き換えずにそのまま本文にし、Content-Type を application/json にする。
+// 値の名前が取り出されていなければ、段の名前と値の名前を書いた誤りを返し、要求を送らない。
 func (s *Session) requestBody(step Step) ([]byte, string, error) {
 	switch {
 	case len(step.Request.Multipart) > 0:
@@ -257,6 +259,12 @@ func (s *Session) requestBody(step Step) ([]byte, string, error) {
 			return nil, "", fmt.Errorf("harness: 段 %s の json_file %q を読めません: %w", step.Name, step.Request.JSONFile, err)
 		}
 		return b, "application/json", nil
+	case step.Request.JSONCapture != "":
+		v, ok := s.vars[step.Request.JSONCapture]
+		if !ok {
+			return nil, "", fmt.Errorf("harness: 段 %s の json_capture %q を、前の段の capture で取り出していません", step.Name, step.Request.JSONCapture)
+		}
+		return []byte(v), "application/json", nil
 	case step.Request.BodyFile != "":
 		b, err := readImageFixture(step.Request.BodyFile)
 		if err != nil {

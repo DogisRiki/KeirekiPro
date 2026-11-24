@@ -583,3 +583,67 @@ func TestLoadScenarios_ExportPerf(t *testing.T) {
 		}
 	}
 }
+
+// TestLoadScenarios_BackupPerf は、バックアップの操作の筋書きのうち、応答の時間を測る筋書きが、バックアップのまとまり(group 5)で、
+// user1 のログインの段で始まり、書き出しの筋書きは書き出しの段を、戻しの筋書きは戻しの段を、最後の段で送ることを確かめる。
+// 戻しの筋書きは、ログインと、経歴書の一覧を読む段と、一覧の最初の経歴書を消す段のあとに戻しの段を送り、prepare_each を持つ。
+// 同じファイルを続けて戻すと名前の重なりで断られるので、測る回ごとに前の段を送り直して、戻した経歴書を消すためである。
+// 書き出しの筋書きは prepare_each を持たない。2つの筋書きのどちらかが無いときは失敗する。
+func TestLoadScenarios_BackupPerf(t *testing.T) {
+	scenarios, err := LoadScenarios(filepath.Join("..", "scenarios", "backup"), ModePerf)
+	if err != nil {
+		t.Fatalf("LoadScenarios: %v", err)
+	}
+	type want struct {
+		steps       int
+		last        string
+		prepareEach bool
+	}
+	wants := map[string]want{
+		"backup-perf-backup":  {2, "GET /api/resumes/00000000-0000-4000-8000-000000000401/backup", false},
+		"backup-perf-restore": {4, "POST /api/resumes/restore", true},
+	}
+	got := map[string]Scenario{}
+	for _, s := range scenarios {
+		got[s.Name] = s
+	}
+	if len(got) != len(wants) {
+		t.Errorf("測る筋書きの数 = %d, want %d(読んだ筋書きは %v)", len(got), len(wants), slices.Sorted(maps.Keys(got)))
+	}
+	for name, w := range wants {
+		s, ok := got[name]
+		if !ok {
+			t.Errorf("測る筋書き %s がありません", name)
+			continue
+		}
+		if s.Group != 5 {
+			t.Errorf("筋書き %s の group = %d, want 5", name, s.Group)
+		}
+		if len(s.Steps) != w.steps {
+			t.Errorf("筋書き %s の段の数 = %d, want %d", name, len(s.Steps), w.steps)
+			continue
+		}
+		login, last := s.Steps[0], s.Steps[len(s.Steps)-1]
+		if login.Request.Method+" "+login.Request.Path != "POST /api/auth/login" ||
+			jsonField(login.Request.JSON, "email") != "user1@example.com" {
+			t.Errorf("筋書き %s の最初の段 = %s %s %v, want user1@example.com のログイン",
+				name, login.Request.Method, login.Request.Path, login.Request.JSON)
+		}
+		if op := last.Request.Method + " " + last.Request.Path; op != w.last {
+			t.Errorf("筋書き %s の最後の段 = %s, want %s", name, op, w.last)
+		}
+		if s.PrepareEach != w.prepareEach {
+			t.Errorf("筋書き %s の prepare_each = %v, want %v", name, s.PrepareEach, w.prepareEach)
+		}
+	}
+	// 戻しの筋書きは、一覧の最初の経歴書を消してから戻す
+	if s, ok := got["backup-perf-restore"]; ok && len(s.Steps) == 4 {
+		list, del := s.Steps[1], s.Steps[2]
+		if list.Request.Method+" "+list.Request.Path != "GET /api/resumes" {
+			t.Errorf("筋書き backup-perf-restore の2つ目の段 = %s %s, want GET /api/resumes", list.Request.Method, list.Request.Path)
+		}
+		if del.Request.Method != http.MethodDelete || !strings.HasPrefix(del.Request.Path, "/api/resumes/{") {
+			t.Errorf("筋書き backup-perf-restore の3つ目の段 = %s %s, want 一覧から取り出した経歴書の DELETE", del.Request.Method, del.Request.Path)
+		}
+	}
+}

@@ -1,21 +1,27 @@
 package httpapi
 
 import (
+	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"log/slog"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -270,6 +276,14 @@ func (f *fakeResumes) ExportResumeWithSettings(
 	return f.exportAnswer("ExportResumeWithSettings", userID.String(), resumeID, string(body))
 }
 
+func (f *fakeResumes) BackupResume(_ context.Context, userID uuid.UUID, resumeID string) (resume.Export, error) {
+	return f.exportAnswer("BackupResume", userID.String(), resumeID)
+}
+
+func (f *fakeResumes) RestoreResume(_ context.Context, userID uuid.UUID, body []byte) (resume.Resume, error) {
+	return f.answer("RestoreResume", userID.String(), string(body))
+}
+
 func (f *fakeResumes) CreateCareer(_ context.Context, userID uuid.UUID, resumeID string, body []byte) (resume.Resume, error) {
 	return f.answer("CreateCareer", userID.String(), resumeID, string(body))
 }
@@ -466,7 +480,7 @@ func itemOps() []itemOp {
 	}
 }
 
-// resumeOps は、経歴書の受け口の28の操作である。本文は、受け口が読まずに処理へ渡すことを確かめるため、JSON として
+// resumeOps は、経歴書の受け口の30の操作である。本文は、受け口が読まずに処理へ渡すことを確かめるため、JSON として
 // 誤った文字も含めて、操作ごとに違う文字にする。
 func resumeOps() []resumeOp {
 	user := handlerUserID.String()
@@ -559,6 +573,22 @@ func resumeOps() []resumeOp {
 			calls: []string{"ExportResumeWithSettings(" + user + ", " + testResumeID + `, {"format":"pdf"} 余り)`},
 			want:  exportWant,
 		},
+		{
+			name: "BackupResume", needsLogin: true,
+			call: func(ctx context.Context, h *resumeHandlers) (any, error) {
+				return h.BackupResume(ctx, gen.BackupResumeRequestObject{ResumeId: testResumeID})
+			},
+			calls: []string{"BackupResume(" + user + ", " + testResumeID + ")"},
+			want:  exportWant,
+		},
+		{
+			name: "RestoreResume", needsLogin: true,
+			call: func(ctx context.Context, h *resumeHandlers) (any, error) {
+				return h.RestoreResume(ctx, gen.RestoreResumeRequestObject{Body: bodyOf(`{"version":"1.0"} 余り`)})
+			},
+			calls: []string{"RestoreResume(" + user + `, {"version":"1.0"} 余り)`},
+			want:  createdWant,
+		},
 	}
 	for _, it := range itemOps() {
 		createBody := `{"create":"` + it.name + `"}`
@@ -615,7 +645,7 @@ func checkResumeCalls(t *testing.T, name string, f *fakeResumes, want ...string)
 	}
 }
 
-// TestResumeHandlers_SuccessResponses は、経歴書の受け口の28の操作が、受け口の節の表のとおりの状態の番号と本文で答える
+// TestResumeHandlers_SuccessResponses は、経歴書の受け口の30の操作が、受け口の節の表のとおりの状態の番号と本文で答える
 // ことを確かめる(要件1の受入基準1)。マスタは 200 と名前の並びか4つの大分類、一覧は 200 と id と名前と日時の並び、
 // 作成と項目の作成は 201 と経歴書、取得と更新は 200 と経歴書、削除は 204 と空の本文で答える。受け口は、ログインした
 // 利用者の ID と、経路の値と、本文を読まずにそのまま処理に渡す。処理が *auth.Error を返せば、Java 版の
@@ -623,8 +653,8 @@ func checkResumeCalls(t *testing.T, name string, f *fakeResumes, want ...string)
 // context に無いときは、処理を呼ばずに errNoLoginUser を返す。
 func TestResumeHandlers_SuccessResponses(t *testing.T) {
 	ops := resumeOps()
-	if len(ops) != 28 {
-		t.Fatalf("操作の数 = %d, want 28", len(ops))
+	if len(ops) != 30 {
+		t.Fatalf("操作の数 = %d, want 30", len(ops))
 	}
 	business := auth.ErrBusiness("業務の誤りの文言")
 	for _, op := range ops {
@@ -841,7 +871,7 @@ func TestResumeHandlers_UnreadableItemID(t *testing.T) {
 	}
 }
 
-// TestResumeResponses_AllOperationsWrite は、経歴書の28の操作の応答のインタフェースのどのメソッドで書いても、状態の番号と、
+// TestResumeResponses_AllOperationsWrite は、経歴書の30の操作の応答のインタフェースのどのメソッドで書いても、状態の番号と、
 // Content-Type と、本文を書くことを確かめる。
 func TestResumeResponses_AllOperationsWrite(t *testing.T) {
 	r := authJSON(http.StatusCreated, map[string]string{"a": "<&>"})
@@ -875,9 +905,11 @@ func TestResumeResponses_AllOperationsWrite(t *testing.T) {
 		"DeleteSelfPromotion":      r.VisitDeleteSelfPromotionResponse,
 		"ExportResume":             r.VisitExportResumeResponse,
 		"ExportResumeWithSettings": r.VisitExportResumeWithSettingsResponse,
+		"BackupResume":             r.VisitBackupResumeResponse,
+		"RestoreResume":            r.VisitRestoreResumeResponse,
 	}
-	if len(visits) != 28 {
-		t.Fatalf("メソッドの数 = %d, want 28", len(visits))
+	if len(visits) != 30 {
+		t.Fatalf("メソッドの数 = %d, want 30", len(visits))
 	}
 	for name, visit := range visits {
 		checkResponse(t, name, recordResponse(t, visit), want)
@@ -930,7 +962,7 @@ func sendRoute(h http.Handler, method, path string, body *string, accept ...stri
 	return rec
 }
 
-// resumeRoute は、経歴書の28の操作の1つの、仕様書の経路への要求と、経歴書の処理の呼び出しである。
+// resumeRoute は、経歴書の30の操作の1つの、仕様書の経路への要求と、経歴書の処理の呼び出しである。
 type resumeRoute struct {
 	name, method, path, body, call string
 }
@@ -943,7 +975,7 @@ func (rt resumeRoute) accept() []string {
 	return nil
 }
 
-// resumeRoutes は、経歴書の28の操作の要求を、resumeOps と同じ名前で返す。
+// resumeRoutes は、経歴書の30の操作の要求を、resumeOps と同じ名前で返す。
 func resumeRoutes() []resumeRoute {
 	user := handlerUserID.String()
 	base := "/api/resumes/" + testResumeID
@@ -966,6 +998,11 @@ func resumeRoutes() []resumeRoute {
 		{
 			"ExportResumeWithSettings", http.MethodPost, base + "/export", `{"format":"pdf"}`,
 			"ExportResumeWithSettings(" + user + ", " + testResumeID + `, {"format":"pdf"})`,
+		},
+		{"BackupResume", http.MethodGet, base + "/backup", "", "BackupResume(" + user + ", " + testResumeID + ")"},
+		{
+			"RestoreResume", http.MethodPost, "/api/resumes/restore", `{"version":"1.0"}`,
+			"RestoreResume(" + user + `, {"version":"1.0"})`,
 		},
 	}
 	segments := map[string]string{
@@ -995,7 +1032,7 @@ func resumeRoutes() []resumeRoute {
 	return routes
 }
 
-// TestResumeRoutes_Wired は、New に ResumeHandlers を渡すと、仕様書の経路への28の操作の要求が経歴書の受け口に届き、
+// TestResumeRoutes_Wired は、New に ResumeHandlers を渡すと、仕様書の経路への30の操作の要求が経歴書の受け口に届き、
 // 受け口の答えで答えることを確かめる(要件1の受入基準2)。
 func TestResumeRoutes_Wired(t *testing.T) {
 	wants := map[string]wantResponse{}
@@ -1003,8 +1040,8 @@ func TestResumeRoutes_Wired(t *testing.T) {
 		wants[op.name] = op.want
 	}
 	routes := resumeRoutes()
-	if len(routes) != 28 || len(wants) != 28 {
-		t.Fatalf("操作の数 = 経路 %d、受け口 %d, want 28", len(routes), len(wants))
+	if len(routes) != 30 || len(wants) != 30 {
+		t.Fatalf("操作の数 = 経路 %d、受け口 %d, want 30", len(routes), len(wants))
 	}
 	for _, rt := range routes {
 		t.Run(rt.name, func(t *testing.T) {
@@ -1025,7 +1062,7 @@ func TestResumeRoutes_Wired(t *testing.T) {
 	}
 }
 
-// TestResumeRoutes_Unimplemented は、New に ResumeHandlers を渡さなければ、マスタと経歴書の28の操作の要求に、
+// TestResumeRoutes_Unimplemented は、New に ResumeHandlers を渡さなければ、マスタと経歴書の30の操作の要求に、
 // 今と同じ未実装の答えを返すことを確かめる。
 func TestResumeRoutes_Unimplemented(t *testing.T) {
 	handler := resumeServer(t, nil, handlerUserID)
@@ -1459,4 +1496,312 @@ func TestExportHandlers_RejectWithoutJSONAccept(t *testing.T) {
 				rec.Body.String(), screen.Code, screen.Header().Get("Content-Type"), screen.Body.String())
 		}
 	}
+}
+
+// TestBackupHandlers_BackupResponse は、書き出しの受け口が、処理が返したバックアップのファイルを、状態の番号 200 と、
+// application/json と、attachment の Content-Disposition と、ファイルの本文で答えることを確かめる(要件1の受入基準1)。
+// Content-Disposition のファイル名は、出力の受け口と同じく、処理が経歴書の名前から作ったファイル名から、Java 版と
+// 同じ規則で作る(要件3の受入基準4)。受け口は Accept の行を見ないので、Accept の行に application/json が無くても、
+// 同じ答えを返す。
+func TestBackupHandlers_BackupResponse(t *testing.T) {
+	names := []string{"職務経歴書_backup.json", `職務 "経歴" \書<&>_backup.json`, "resume_backup.json"}
+	accepts := [][]string{nil, {"application/json"}, {"text/html"}, {"application/pdf", "text/markdown"}}
+	body := `{"version":"1.0","exportedAt":"2026-11-24T00:00:00Z","resume":{"resumeName":"<&>"}}`
+	for _, name := range names {
+		want := formatContentDisposition(false, name)
+		if !strings.HasPrefix(want, "attachment;") {
+			t.Fatalf("期待する Content-Disposition = %q の出し方が attachment でない", want)
+		}
+		for _, accept := range accepts {
+			label := fmt.Sprintf("%s(Accept %q)", name, accept)
+			f := newFakeResumes()
+			f.export = resume.Export{Body: []byte(body), ContentType: "application/json", FileName: name}
+			resp, err := newResumeHandlers(f, false).BackupResume(
+				withAccept(loggedIn(), accept...), gen.BackupResumeRequestObject{ResumeId: testResumeID},
+			)
+			if err != nil {
+				t.Fatalf("%s が誤りを返した: %v", label, err)
+			}
+			r, ok := resp.(authResponse)
+			if !ok {
+				t.Fatalf("%s の答えの型 = %T, want authResponse", label, resp)
+			}
+			rec := httptest.NewRecorder()
+			if err := r.write(rec); err != nil {
+				t.Fatalf("%s の答えを書けない: %v", label, err)
+			}
+			if rec.Code != http.StatusOK {
+				t.Errorf("%s の状態の番号 = %d, want 200", label, rec.Code)
+			}
+			if got := rec.Header().Values("Content-Type"); !reflect.DeepEqual(got, []string{"application/json"}) {
+				t.Errorf("%s の Content-Type = %q, want application/json", label, got)
+			}
+			if got := rec.Header().Values("Content-Disposition"); !reflect.DeepEqual(got, []string{want}) {
+				t.Errorf("%s の Content-Disposition = %q, want %q", label, got, want)
+			}
+			if rec.Body.String() != body {
+				t.Errorf("%s の本文 = %q, want %q", label, rec.Body.String(), body)
+			}
+			checkResumeCalls(t, label, f, "BackupResume("+handlerUserID.String()+", "+testResumeID+")")
+		}
+	}
+}
+
+// TestBackupHandlers_RestoreResponse は、戻しの受け口が、処理が戻した経歴書を、状態の番号 201 と、application/json と、
+// JavaJSON で書いた経歴書の答えの本文で答えることを確かめる(要件1の受入基準1)。経歴書の名前と項目の字に、対に
+// なっていないサロゲートがあるときも、Java 版と同じく、U+FFFD に置き換えずに番号で書く。
+func TestBackupHandlers_RestoreResponse(t *testing.T) {
+	lone := fullResume()
+	lone.Name = "経歴\xed\xa0\x80書<&>"
+	lone.Careers[0].CompanyName = "会社\xed\xb0\x80"
+	cases := []struct {
+		name     string
+		r        resume.Resume
+		want     string
+		contains []string
+	}{
+		{name: "経歴書", r: fullResume(), want: fullResumeJSON},
+		{
+			name: "対になっていないサロゲートを含む経歴書", r: lone, want: string(resume.JavaJSON(newResumeBody(lone))),
+			contains: []string{`"resumeName":"経歴\uD800書<&>"`, `"companyName":"会社\uDC00"`},
+		},
+	}
+	for _, c := range cases {
+		f := newFakeResumes()
+		f.resume = c.r
+		resp, err := newResumeHandlers(f, false).RestoreResume(
+			loggedIn(), gen.RestoreResumeRequestObject{Body: bodyOf(`{"version":"1.0"}`)},
+		)
+		got := handled(t, resp, err)
+		checkResponse(t, c.name, got, jsonWant(http.StatusCreated, c.want))
+		for _, s := range c.contains {
+			if !strings.Contains(got.body, s) {
+				t.Errorf("%s の本文 %s に %s が無い", c.name, got.body, s)
+			}
+		}
+		if strings.ContainsRune(got.body, utf8.RuneError) {
+			t.Errorf("%s の本文 %s に U+FFFD がある", c.name, got.body)
+		}
+		checkResumeCalls(t, c.name, f, "RestoreResume("+handlerUserID.String()+`, {"version":"1.0"})`)
+	}
+}
+
+// backupUnsentCase は、testdata/backup-unsent.json の、画面が送らない1つの要求と、Java 版の答えである。
+// Accept と RequestContentType と Body が nil の要求は、そのヘッダと本文を付けずに送る。BodyBase64 は、UTF-8 として
+// 読めない本文を base64 で書いたものである。
+type backupUnsentCase struct {
+	Name               string  `json:"name"`
+	User               string  `json:"user"`
+	Method             string  `json:"method"`
+	Path               string  `json:"path"`
+	Accept             *string `json:"accept"`
+	RequestContentType *string `json:"request_content_type"`
+	Body               *string `json:"body"`
+	BodyBase64         *string `json:"body_base64"`
+	Status             int     `json:"status"`
+	ContentType        string  `json:"content_type"`
+	Response           string  `json:"response"`
+}
+
+// backupUnsentDiffs は、backup-unsent.json の要求のうち、Go 版の答えが Java 版と違う要求と、違いを載せた一覧の番号である。
+// Java 版は本文の頭の BOM を読み飛ばすが、Go 版は生成したコードが本文を JSON として読めないとして断る(CB-067)。
+// Java 版は Content-Type のヘッダが JSON でない戻しの要求に 500 で答えるが、Go 版はヘッダを見ずに戻す(CB-068 から CB-074)。
+var backupUnsentDiffs = map[string]string{
+	"restore-unreadable-bom":            "CB-067",
+	"restore-content-type-missing":      "CB-068",
+	"restore-content-type-text-plain":   "CB-069",
+	"restore-content-type-form":         "CB-070",
+	"restore-content-type-xml":          "CB-071",
+	"restore-content-type-octet-stream": "CB-072",
+	"restore-content-type-text-json":    "CB-073",
+	"restore-content-type-multipart":    "CB-074",
+}
+
+// backupUnsentUsers は、backup-unsent.json の利用者のメールアドレスと、compat/fixtures/users/basic.sql の利用者の ID である。
+var backupUnsentUsers = map[string]uuid.UUID{
+	"user1@example.com": uuid.MustParse("00000000-0000-4000-8000-000000000001"),
+	"user2@example.com": uuid.MustParse("00000000-0000-4000-8000-000000000002"),
+}
+
+// backupUnsentFixtures は、Java 版の答えを控えたときと同じ順にデータベースに入れる、backend/compat/fixtures の SQL の
+// ファイルである。
+var backupUnsentFixtures = []string{"users/basic.sql", "resumes/fonts.sql", "backup/backup.sql"}
+
+// TestBackupHandlers_UnsentRequests は、New で作った経路に、画面が送らない書き出しと戻しの要求を、Java 版の答えを控えた
+// ときと同じヘッダと本文で送り、Java 版の答えと比べる(要件1の受入基準2)。Java 版と違う答えになる要求が
+// backupUnsentDiffs と合うこと、表の番号が変えた動きの一覧にあること、ほかの要求に Java 版と同じ状態の番号と
+// Content-Type と本文で答えることを確かめる。本文は、書き出しの時刻と、ID と、作成と更新の日時を除いて比べる。
+// 戻しの答えが 201 のときは、Java 版の答えを控えたときと同じく、次の要求を送る前に、作られた経歴書を消す。
+func TestBackupHandlers_UnsentRequests(t *testing.T) {
+	b, err := os.ReadFile("testdata/backup-unsent.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var file struct {
+		Cases []backupUnsentCase `json:"cases"`
+	}
+	if err := json.Unmarshal(b, &file); err != nil {
+		t.Fatal(err)
+	}
+	checkBackupUnsentDiffTable(t, file.Cases)
+	pool := startResumeDB(t)
+	for _, name := range backupUnsentFixtures {
+		script, err := fs.ReadFile(os.DirFS(filepath.Join("..", "..", "compat", "fixtures")), name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// 引数の無い Exec は、ファイルの中の複数の文を1回で送る
+		if _, err := pool.Exec(t.Context(), string(script)); err != nil {
+			t.Fatalf("初めのデータ %s を入れられません: %v", name, err)
+		}
+	}
+	svc := resume.New(resume.Deps{Pool: pool, Now: time.Now})
+	for _, c := range file.Cases {
+		t.Run(c.Name, func(t *testing.T) {
+			userID, ok := backupUnsentUsers[c.User]
+			if !ok {
+				t.Fatalf("利用者 %s の ID が無い", c.User)
+			}
+			handler := resumeServer(t, svc, userID)
+			rec := sendUnsent(t, handler, c)
+			diffs := backupUnsentDiff(c, rec)
+			if rec.Code == http.StatusCreated {
+				deleteRestored(t, handler, rec)
+			}
+			id, listed := backupUnsentDiffs[c.Name]
+			switch {
+			case len(diffs) > 0 && !listed:
+				t.Errorf("Java 版と違うのに表に無い: %s", strings.Join(diffs, "; "))
+			case len(diffs) == 0 && listed:
+				t.Errorf("表に %s で載っているのに、Java 版と同じ答え", id)
+			}
+		})
+	}
+}
+
+// checkBackupUnsentDiffTable は、backupUnsentDiffs の要求が backup-unsent.json にあり、番号が変えた動きの一覧にあることを
+// 確かめる。
+func checkBackupUnsentDiffTable(t *testing.T, cases []backupUnsentCase) {
+	t.Helper()
+	names := map[string]bool{}
+	for _, c := range cases {
+		names[c.Name] = true
+	}
+	for name := range backupUnsentDiffs {
+		if !names[name] {
+			t.Errorf("表の要求 %s が backup-unsent.json に無い", name)
+		}
+	}
+	b, err := os.ReadFile("../../compat/changed-behaviors.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var items []struct {
+		ID string `yaml:"id"`
+	}
+	if err := yaml.Unmarshal(b, &items); err != nil {
+		t.Fatal(err)
+	}
+	known := map[string]bool{}
+	for _, it := range items {
+		known[it.ID] = true
+	}
+	for name, id := range backupUnsentDiffs {
+		if !known[id] {
+			t.Errorf("要求 %s の番号 %q は、変えた動きの一覧に無い", name, id)
+		}
+	}
+}
+
+// sendUnsent は、偽の送信の検査に通る Cookie とヘッダを付けて、c の要求を、c のヘッダと本文で送る。
+func sendUnsent(t *testing.T, h http.Handler, c backupUnsentCase) *httptest.ResponseRecorder {
+	t.Helper()
+	var body io.Reader
+	switch {
+	case c.BodyBase64 != nil:
+		raw, err := base64.StdEncoding.DecodeString(*c.BodyBase64)
+		if err != nil {
+			t.Fatalf("本文の base64 を読めない: %v", err)
+		}
+		body = bytes.NewReader(raw)
+	case c.Body != nil:
+		body = strings.NewReader(*c.Body)
+	}
+	req := httptest.NewRequest(c.Method, c.Path, body)
+	req.Header.Set("Cookie", "XSRF-TOKEN="+routeCSRF)
+	req.Header.Set("X-XSRF-TOKEN", routeCSRF)
+	if c.Accept != nil {
+		req.Header.Set("Accept", *c.Accept)
+	}
+	if c.RequestContentType != nil {
+		req.Header.Set("Content-Type", *c.RequestContentType)
+	}
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	return rec
+}
+
+// backupUnsentDiff は、Go 版の答えを Java 版の答えと比べ、違いを返す。本文は JSON として読み、書き出しの時刻と、
+// 作成と更新の日時を除き、ID を置き換えの形にして比べる。
+func backupUnsentDiff(c backupUnsentCase, rec *httptest.ResponseRecorder) []string {
+	var diffs []string
+	if rec.Code != c.Status {
+		diffs = append(diffs, fmt.Sprintf("状態の番号 = %d, want %d", rec.Code, c.Status))
+	}
+	if got := rec.Header().Get("Content-Type"); got != c.ContentType {
+		diffs = append(diffs, fmt.Sprintf("Content-Type = %q, want %q", got, c.ContentType))
+	}
+	got, gotErr := unsentBody(rec.Body.String())
+	want, wantErr := unsentBody(c.Response)
+	if gotErr != nil || wantErr != nil || !reflect.DeepEqual(got, want) {
+		diffs = append(diffs, fmt.Sprintf("本文 = %s, want %s", rec.Body.String(), c.Response))
+	}
+	return diffs
+}
+
+// unsentBody は、答えの本文を JSON として読み、書き出しの時刻と、作成と更新の日時を除き、経歴書の ID を <resumeId>、
+// ほかの ID を <itemId> にした値を返す。バックアップのファイルの6つの欄の項目は、JSON に書いた字の順に並べ替える。
+// Java 版のファイルの項目の並びは、データベースの中の行の置かれ方で変わり、その違いは一覧の CB-062 と CB-001 が許す。
+func unsentBody(s string) (any, error) {
+	var v any
+	if err := json.Unmarshal([]byte(s), &v); err != nil {
+		return nil, err
+	}
+	m, ok := v.(map[string]any)
+	if !ok {
+		return v, nil
+	}
+	if r, ok := m["resume"].(map[string]any); ok {
+		for _, e := range r {
+			if items, ok := e.([]any); ok {
+				slices.SortFunc(items, func(a, b any) int { return strings.Compare(jsonText(a), jsonText(b)) })
+			}
+		}
+	}
+	delete(m, "exportedAt")
+	delete(m, "createdAt")
+	delete(m, "updatedAt")
+	resumeID, _ := m["id"].(string)
+	today := time.Now().In(jst).Format(time.DateOnly)
+	return maskWholeBody(m, resumeID, today, today), nil
+}
+
+// deleteRestored は、戻しが作った経歴書を、経歴書の削除の経路で消す。
+func deleteRestored(t *testing.T, h http.Handler, rec *httptest.ResponseRecorder) {
+	t.Helper()
+	var created struct {
+		ID string `json:"id"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &created); err != nil || created.ID == "" {
+		t.Fatalf("戻しの答え %s から経歴書の ID を読めない: %v", rec.Body.String(), err)
+	}
+	if del := sendRoute(h, http.MethodDelete, "/api/resumes/"+created.ID, nil); del.Code != http.StatusNoContent {
+		t.Fatalf("戻した経歴書を消せない: %d %s", del.Code, del.Body.String())
+	}
+}
+
+// jsonText は、v を JSON に書いた字を返す。
+func jsonText(v any) string {
+	b, _ := json.Marshal(v)
+	return string(b)
 }

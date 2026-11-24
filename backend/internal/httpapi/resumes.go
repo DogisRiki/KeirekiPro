@@ -26,6 +26,8 @@ type ResumeService interface {
 	UpdateResumeBasic(ctx context.Context, userID uuid.UUID, resumeID string, body []byte) (resume.Resume, error)
 	ExportResume(ctx context.Context, userID uuid.UUID, resumeID string, format resume.ExportFormat) (resume.Export, error)
 	ExportResumeWithSettings(ctx context.Context, userID uuid.UUID, resumeID string, body []byte) (resume.Export, error)
+	BackupResume(ctx context.Context, userID uuid.UUID, resumeID string) (resume.Export, error)
+	RestoreResume(ctx context.Context, userID uuid.UUID, body []byte) (resume.Resume, error)
 
 	CreateCareer(ctx context.Context, userID uuid.UUID, resumeID string, body []byte) (resume.Resume, error)
 	UpdateCareer(ctx context.Context, userID uuid.UUID, resumeID, careerID string, body []byte) (resume.Resume, error)
@@ -54,7 +56,7 @@ type ResumeService interface {
 
 var _ ResumeService = (*resume.Service)(nil)
 
-// resumeHandlers は、経歴書の28の操作の受け口である。
+// resumeHandlers は、経歴書の30の操作の受け口である。
 type resumeHandlers struct {
 	svc    ResumeService
 	secure bool
@@ -417,4 +419,35 @@ func (h *resumeHandlers) ExportResumeWithSettings(
 		return authResponse{}, errNoLoginUser
 	}
 	return h.exported(h.svc.ExportResumeWithSettings(ctx, id, req.ResumeId, rawBody(req.Body)))
+}
+
+// BackupResume は、経歴書をバックアップのファイルに書き出し、200 と、attachment の Content-Disposition と、ファイルで
+// 答える。Java 版の BackupResumeController と同じく、Accept の行を見ない。
+func (h *resumeHandlers) BackupResume(
+	ctx context.Context, req gen.BackupResumeRequestObject,
+) (gen.BackupResumeResponseObject, error) {
+	id, ok := authctx.UserID(ctx)
+	if !ok {
+		return authResponse{}, errNoLoginUser
+	}
+	return h.exported(h.svc.BackupResume(ctx, id, req.ResumeId))
+}
+
+// RestoreResume は、本文のバックアップのファイルから経歴書を戻し、201 で答える。本文は読まずに処理に渡す。
+// 答えの本文は、ほかの経歴書の操作と違い、JavaJSON で書く。戻した経歴書の字に対になっていないサロゲートがあるとき、
+// Java 版はそのサロゲートを番号で書くが、encoding/json は U+FFFD に置き換えるためである。
+func (h *resumeHandlers) RestoreResume(
+	ctx context.Context, req gen.RestoreResumeRequestObject,
+) (gen.RestoreResumeResponseObject, error) {
+	id, ok := authctx.UserID(ctx)
+	if !ok {
+		return authResponse{}, errNoLoginUser
+	}
+	r, err := h.svc.RestoreResume(ctx, id, rawBody(req.Body))
+	if err != nil {
+		return h.fail(err)
+	}
+	return authResponse{
+		status: http.StatusCreated, contentType: "application/json", body: resume.JavaJSON(newResumeBody(r)),
+	}, nil
 }

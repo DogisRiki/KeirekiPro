@@ -432,6 +432,10 @@ type ResetPasswordRequest struct {
 	Token *string `json:"token,omitempty"`
 }
 
+// RestoreResumeRequest 復元の要求の本文。形は `ResumeBackup` と同じ(Java の `RestoreResumeRequest`)。
+// 生成したコードは本文を読まずに受け口へ渡し、受け口が Java 版と同じ決まりで読む。
+type RestoreResumeRequest = json.RawMessage
+
 // ResumeBackup バックアップの JSON(Java の `BackupResumeResponse` と `RestoreResumeRequest`)。
 // バックアップの応答では `version`・`exportedAt`・`resume` を必ず書く。
 // 復元の要求では Java の DTO はどれも必須にしていない(`version` は `1.0` でなければ 400)。
@@ -1123,7 +1127,7 @@ type RegisterUserJSONRequestBody = UserRegistrationRequest
 type CreateResumeJSONRequestBody = CreateResumeRequest
 
 // RestoreResumeJSONRequestBody defines body for RestoreResume for application/json ContentType.
-type RestoreResumeJSONRequestBody = ResumeBackup
+type RestoreResumeJSONRequestBody = RestoreResumeRequest
 
 // UpdateResumeBasicJSONRequestBody defines body for UpdateResumeBasic for application/json ContentType.
 type UpdateResumeBasicJSONRequestBody = UpdateResumeBasicRequest
@@ -4862,6 +4866,20 @@ func (response RestoreResume403JSONResponse) VisitRestoreResumeResponse(w http.R
 		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
 	}
 	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RestoreResume404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response RestoreResume404JSONResponse) VisitRestoreResumeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
 	_, err := buf.WriteTo(w)
 	return err
 }

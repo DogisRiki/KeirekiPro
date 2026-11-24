@@ -1,0 +1,73 @@
+{
+  "version": "1.0",
+  "exportedAt": "2026-03-10T01:00:00Z",
+  "resume": {
+    "resumeName": "職歴の欄の無い経歴書",
+    "date": "2026-03-10",
+    "lastName": "山田",
+    "firstName": "太郎",
+    "projects": [
+      {
+        "companyName": "株式会社もどし",
+        "startDate": "2016-04",
+        "endDate": "2019-09",
+        "active": false,
+        "name": "受注の画面の開発",
+        "overview": "電話で受けていた注文を、画面で受け付けるようにした。",
+        "teamComp": "全体5名",
+        "role": "画面の実装を受け持った。",
+        "achievement": "注文の受け付けの間違いを減らした。",
+        "process": {
+          "requirements": false,
+          "basicDesign": true,
+          "detailedDesign": true,
+          "implementation": true,
+          "integrationTest": true,
+          "systemTest": false,
+          "maintenance": false
+        },
+        "techStack": {
+          "frontend": {
+            "languages": ["TypeScript"],
+            "frameworks": ["React"]
+          },
+          "backend": {
+            "languages": ["Go"]
+          },
+          "infrastructure": {
+            "databases": ["PostgreSQL"]
+          },
+          "tools": {
+            "sourceControls": ["Git"]
+          }
+        }
+      }
+    ],
+    "certifications": [
+      {
+        "name": "基本情報技術者試験",
+        "date": "2017-04"
+      }
+    ],
+    "portfolios": [
+      {
+        "name": "A 注文の記録",
+        "overview": "注文の履歴を残す。",
+        "techStack": "Go、React",
+        "link": "https://example.com/portfolio/restore"
+      }
+    ],
+    "snsPlatforms": [
+      {
+        "name": "A GitHub",
+        "link": "https://github.com/example-restore-file"
+      }
+    ],
+    "selfPromotions": [
+      {
+        "title": "A 確かめて進める",
+        "content": "小さく作って確かめながら進めます。"
+      }
+    ]
+  }
+}

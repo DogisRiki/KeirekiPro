@@ -622,3 +622,7 @@ DELETE FROM self_promotions
 WHERE
     id = $1
     AND resume_id = $2;
+
+-- 利用者が居るかを調べる。退会すると利用者の行が消えるので、退会した利用者には false を返す。
+-- name: ExistsUser :one
+SELECT EXISTS (SELECT 1 FROM users WHERE id = $1);

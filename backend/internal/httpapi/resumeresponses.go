@@ -9,7 +9,7 @@ import (
 	"github.com/DogisRiki/KeirekiPro/backend/internal/resume"
 )
 
-// 経歴書の28の操作の答えも、認証と利用者の操作と同じ authResponse で書く。誤りの答えを、認証と利用者の操作と同じ
+// 経歴書の30の操作の答えも、認証と利用者の操作と同じ authResponse で書く。誤りの答えを、認証と利用者の操作と同じ
 // 形で書くためである。
 var (
 	_ gen.ListCertificationNamesResponseObject   = authResponse{}
@@ -40,6 +40,8 @@ var (
 	_ gen.DeleteSelfPromotionResponseObject      = authResponse{}
 	_ gen.ExportResumeResponseObject             = authResponse{}
 	_ gen.ExportResumeWithSettingsResponseObject = authResponse{}
+	_ gen.BackupResumeResponseObject             = authResponse{}
+	_ gen.RestoreResumeResponseObject            = authResponse{}
 )
 
 // localDateTime は、t を Java の LocalDateTime を ISO_LOCAL_DATE_TIME で書いた形で書く。秒は 0 でも書き、秒より細かい
@@ -327,5 +329,15 @@ func (r authResponse) VisitExportResumeResponse(w http.ResponseWriter) error {
 
 // VisitExportResumeWithSettingsResponse は、応答を書く。
 func (r authResponse) VisitExportResumeWithSettingsResponse(w http.ResponseWriter) error {
+	return r.write(w)
+}
+
+// VisitBackupResumeResponse は、応答を書く。
+func (r authResponse) VisitBackupResumeResponse(w http.ResponseWriter) error {
+	return r.write(w)
+}
+
+// VisitRestoreResumeResponse は、応答を書く。
+func (r authResponse) VisitRestoreResumeResponse(w http.ResponseWriter) error {
 	return r.write(w)
 }

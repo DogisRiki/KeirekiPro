@@ -12,7 +12,8 @@ import (
 
 // selfPerf は、Go 版のイメージを両方の位置に置いて、応答の時間の比べ方を確かめる筋書きである。
 // 1つ目の段でログインし、2つ目の段で偽の送信の検査の Cookie を受け取り、最後の段を測る。
-// Go 版の経歴書の復元はまだ作られておらず 501 を返すので、ログインの確かめと偽の送信の検査を通ったことを 501 で確かめる。
+// Go 版の経歴書の復元は、ファイルの版の無い本文に 400 で答えるので、ログインの確かめと偽の送信の検査を通ったことを
+// 400 で確かめる。
 const selfPerf = `name: self-perf
 group: 0
 fixtures: [users/basic.sql]
@@ -27,7 +28,7 @@ steps:
     expect: {status: 200}
   - name: restore-with-token
     request: {method: POST, path: /api/resumes/restore, json: {}, csrf: true}
-    expect: {status: 501}
+    expect: {status: 400}
 `
 
 func TestPerf_SelfPairRuns(t *testing.T) {

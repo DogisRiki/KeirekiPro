@@ -640,3 +640,36 @@ func TestStore_TechStackColumns(t *testing.T) {
 
 	assertResume(t, mustFind(t, userID, r.ID), sorted(r))
 }
+
+// TestStoreIntegration_UserExists は、利用者が居るかの問い合わせが、居る利用者に true を、
+// 退会して行が消えた利用者と、もとから居ない ID に false を返すことを確かめる。
+func TestStoreIntegration_UserExists(t *testing.T) {
+	ctx := t.Context()
+	s := testStore()
+
+	present := insertTestUser(t)
+	left := insertTestUser(t)
+	if _, err := testPool.Exec(ctx, `DELETE FROM users WHERE id = $1::uuid`, left.String()); err != nil {
+		t.Fatalf("退会した利用者の行を消せません: %v", err)
+	}
+
+	for _, c := range []struct {
+		name   string
+		userID uuid.UUID
+		want   bool
+	}{
+		{"居る利用者", present, true},
+		{"退会した利用者", left, false},
+		{"もとから居ない ID", uuid.New(), false},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			got, err := s.userExists(ctx, c.userID)
+			if err != nil {
+				t.Fatalf("利用者が居るかを調べられません: %v", err)
+			}
+			if got != c.want {
+				t.Errorf("userExists(%s) = %v, want %v", c.userID, got, c.want)
+			}
+		})
+	}
+}
