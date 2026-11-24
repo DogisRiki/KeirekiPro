@@ -1,0 +1,77 @@
+# バックアップの書き出しの筋書き(要件1の受入基準1と3、要件3の受入基準1と3と4、要件6の受入基準1)。
+# user1 が、名前だけを送って API で作った経歴書を書き出す。経歴書を作る要求と本文は、正解のファイル
+# fixtures/backups/java-created.json を作ったときの要求(research.md の「正解のファイルを作るために送った要求」)と同じである。
+# 続けて、初期のデータの経歴書 401(resumes/fonts.sql)と、801、802、803、804(backup/backup.sql)を書き出す。
+# 最後に、無い経歴書(0000000009ff)と、経歴書の ID の形でない値(not-a-uuid)に書き出しを送り、404 で答えられることを確かめる。
+# 書き出しの Accept は、画面と同じく application/json にする。
+# 書き出しの本文の6つの欄の項目の順は、変えた動きの一覧の CB-001 と CB-062 の order_only に従い、比べない。
+name: backup-export
+group: 5
+fixtures: [users/basic.sql, resumes/fonts.sql, backup/backup.sql]
+modes: [compare]
+steps:
+  - name: login-user1
+    request:
+      method: POST
+      path: /api/auth/login
+      json: {email: user1@example.com, password: Passw0rd!}
+    expect: {status: 200}
+  # API で作った経歴書
+  - name: create-resume
+    request:
+      method: POST
+      path: /api/resumes
+      csrf: true
+      json: {"resumeName":"APIで作ったバックアップの経歴書"}
+    capture: {createdID: $.id}
+    expect: {status: 201}
+  - name: backup-created
+    request:
+      method: GET
+      path: /api/resumes/{createdID}/backup
+      headers: {Accept: application/json}
+    expect: {status: 200, content_type: application/json}
+  # 初期のデータの経歴書
+  - name: backup-401
+    request:
+      method: GET
+      path: /api/resumes/00000000-0000-4000-8000-000000000401/backup
+      headers: {Accept: application/json}
+    expect: {status: 200, content_type: application/json}
+  - name: backup-801
+    request:
+      method: GET
+      path: /api/resumes/00000000-0000-4000-8000-000000000801/backup
+      headers: {Accept: application/json}
+    expect: {status: 200, content_type: application/json}
+  - name: backup-802
+    request:
+      method: GET
+      path: /api/resumes/00000000-0000-4000-8000-000000000802/backup
+      headers: {Accept: application/json}
+    expect: {status: 200, content_type: application/json}
+  - name: backup-803
+    request:
+      method: GET
+      path: /api/resumes/00000000-0000-4000-8000-000000000803/backup
+      headers: {Accept: application/json}
+    expect: {status: 200, content_type: application/json}
+  - name: backup-804
+    request:
+      method: GET
+      path: /api/resumes/00000000-0000-4000-8000-000000000804/backup
+      headers: {Accept: application/json}
+    expect: {status: 200, content_type: application/json}
+  # 無い経歴書と、経歴書の ID の形でない値
+  - name: backup-missing
+    request:
+      method: GET
+      path: /api/resumes/00000000-0000-4000-8000-0000000009ff/backup
+      headers: {Accept: application/json}
+    expect: {status: 404, content_type: application/json}
+  - name: backup-not-uuid
+    request:
+      method: GET
+      path: /api/resumes/not-a-uuid/backup
+      headers: {Accept: application/json}
+    expect: {status: 404, content_type: application/json}

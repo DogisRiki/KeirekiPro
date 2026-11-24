@@ -183,7 +183,7 @@
   - _依存: 1.3, 5.1_
 
 - [ ] 6. バックアップの操作の筋書きで Java 版と Go 版を比べる
-- [ ] 6.1 書き出しと、Java 版が書き出したファイルの戻しの筋書きを書く
+- [x] 6.1 書き出しと、Java 版が書き出したファイルの戻しの筋書きを書く
 
   Claude は、バックアップの操作の筋書きの節のとおりに、`backend/compat/scenarios/backup/` に `export.yaml` と `export-added.yaml` と `restore.yaml` を `group: 5` で書く。Claude は、`export.yaml` と `export-added.yaml` の、経歴書を作る段と項目を足す段と値を変える段に、小タスク1.3 で research.md に書き足した要求と同じ操作と本文を同じ順に書く。Claude は、書き出しの段の Accept を `application/json` にし、戻しの段に `csrf: true` を付け、戻しの本文を `json_file` で `fixtures/backups/` のファイルから送る。
   - 完了の確かめ方: `go test -tags compat -count=1 -run 'TestCompare_Scenarios/(<3つの筋書きの名前を | でつないだもの>)' ./compat/` が通る。`export.yaml` と `export-added.yaml` の、経歴書を作る段と項目を足す段と値を変える段の操作と本文と順が、小タスク1.3 で research.md に書き足した要求と同じである

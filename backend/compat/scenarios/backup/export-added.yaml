@@ -1,0 +1,232 @@
+# 項目を足して直した経歴書の、バックアップの書き出しの筋書き(要件1の受入基準1と3、要件3の受入基準1と4、要件6の受入基準1)。
+# user1 が、API で経歴書を作り、6つの欄のそれぞれに3件の項目を、名前の順とも期間の順とも違う順に足してから書き出す。
+# 続けて、経歴書を読んで各欄で1件目に足した項目の ID を取り出し、経歴書の名前と基本の情報と、各欄の1件目の項目の値を PUT で
+# 直してから、もう一度書き出す。
+# 経歴書を作る段と項目を足す段と値を変える段の操作と本文と順は、正解のファイル fixtures/backups/java-added.json と
+# java-edited.json を作ったときの要求(research.md の「正解のファイルを作るために送った要求」)と同じである。
+# 経歴書を読む答えでは、職歴とプロジェクトと資格は年月の新しい順に、ポートフォリオと SNS と自己PR は名前の順に並ぶ。
+# そのため、1件目に足した項目は、職歴とプロジェクトと資格では並びの1つ目に、名前を「B 」で始めたポートフォリオと SNS と
+# 自己PR では並びの2つ目に入る。名前の頭を英大文字にしたので、2つの版のどちらでも同じ場所に入る(CB-001)。
+# 書き出しの Accept は、画面と同じく application/json にする。
+# 書き出しの本文の6つの欄の項目の順は、変えた動きの一覧の CB-001 と CB-062 の order_only に従い、比べない。
+name: backup-export-added
+group: 5
+fixtures: [users/basic.sql]
+modes: [compare]
+steps:
+  - name: login-user1
+    request:
+      method: POST
+      path: /api/auth/login
+      json: {email: user1@example.com, password: Passw0rd!}
+    expect: {status: 200}
+  # 経歴書を作り、6つの欄のそれぞれに3件の項目を足す
+  - name: create-resume
+    request:
+      method: POST
+      path: /api/resumes
+      csrf: true
+      json: {"resumeName":"項目を足したバックアップの経歴書"}
+    capture: {resumeID: $.id}
+    expect: {status: 201}
+  - name: create-career-1
+    request:
+      method: POST
+      path: /api/resumes/{resumeID}/careers
+      csrf: true
+      json: {"companyName":"株式会社ウエスト","startDate":"2019-04","endDate":"2022-03","isActive":false}
+    expect: {status: 201}
+  - name: create-career-2
+    request:
+      method: POST
+      path: /api/resumes/{resumeID}/careers
+      csrf: true
+      json: {"companyName":"株式会社アルファ","startDate":"2010-04","endDate":"2013-03","isActive":false}
+    expect: {status: 201}
+  - name: create-career-3
+    request:
+      method: POST
+      path: /api/resumes/{resumeID}/careers
+      csrf: true
+      json: {"companyName":"株式会社ミドル","startDate":"2014-04","endDate":"2018-03","isActive":false}
+    expect: {status: 201}
+  - name: create-project-1
+    request:
+      method: POST
+      path: /api/resumes/{resumeID}/projects
+      csrf: true
+      json: {"companyName":"株式会社ウエスト","startDate":"2019-06","endDate":"2021-12","isActive":false,"name":"在庫の案件","overview":"倉庫の在庫を数える仕組みを作った。","teamComp":"全体8名","role":"設計と開発","achievement":"在庫の差を減らした。","requirements":false,"basicDesign":true,"detailedDesign":true,"implementation":true,"integrationTest":true,"systemTest":true,"maintenance":false,"frontendLanguages":["TypeScript"],"frontendFrameworks":["React"],"frontendLibraries":[],"frontendBuildTools":[],"frontendPackageManagers":[],"frontendLinters":[],"frontendFormatters":[],"frontendTestingTools":[],"backendLanguages":["Go"],"backendFrameworks":[],"backendBuildTools":[],"backendPackageManagers":[],"backendLinters":[],"backendFormatters":[],"backendTestingTools":[],"ormTools":[],"auth":[],"clouds":["AWS"],"operatingSystems":[],"containers":[],"databases":["PostgreSQL"],"webServers":[],"ciCdTools":[],"iacTools":[],"monitoringTools":[],"loggingTools":[],"sourceControls":[],"projectManagements":[],"communicationTools":[],"documentationTools":[],"apiDevelopmentTools":[],"designTools":[],"editors":[],"developmentEnvironments":[]}
+    expect: {status: 201}
+  - name: create-project-2
+    request:
+      method: POST
+      path: /api/resumes/{resumeID}/projects
+      csrf: true
+      json: {"companyName":"株式会社アルファ","startDate":"2010-06","endDate":"2012-12","isActive":false,"name":"会計の案件","overview":"会計の帳簿を作る仕組みを直した。","teamComp":"全体4名","role":"開発","achievement":"締めの日数を短くした。","requirements":false,"basicDesign":false,"detailedDesign":false,"implementation":true,"integrationTest":true,"systemTest":false,"maintenance":false,"frontendLanguages":[],"frontendFrameworks":[],"frontendLibraries":[],"frontendBuildTools":[],"frontendPackageManagers":[],"frontendLinters":[],"frontendFormatters":[],"frontendTestingTools":[],"backendLanguages":["Java"],"backendFrameworks":["Spring"],"backendBuildTools":[],"backendPackageManagers":[],"backendLinters":[],"backendFormatters":[],"backendTestingTools":[],"ormTools":[],"auth":[],"clouds":[],"operatingSystems":[],"containers":[],"databases":["Oracle"],"webServers":[],"ciCdTools":[],"iacTools":[],"monitoringTools":[],"loggingTools":[],"sourceControls":[],"projectManagements":[],"communicationTools":[],"documentationTools":[],"apiDevelopmentTools":[],"designTools":[],"editors":[],"developmentEnvironments":[]}
+    expect: {status: 201}
+  - name: create-project-3
+    request:
+      method: POST
+      path: /api/resumes/{resumeID}/projects
+      csrf: true
+      json: {"companyName":"株式会社ミドル","startDate":"2015-01","endDate":"2017-12","isActive":false,"name":"物流の案件","overview":"配送の順を決める仕組みを作った。","teamComp":"全体6名","role":"リーダー","achievement":"配送の時間を短くした。","requirements":true,"basicDesign":true,"detailedDesign":true,"implementation":true,"integrationTest":true,"systemTest":true,"maintenance":true,"frontendLanguages":[],"frontendFrameworks":[],"frontendLibraries":[],"frontendBuildTools":[],"frontendPackageManagers":[],"frontendLinters":[],"frontendFormatters":[],"frontendTestingTools":[],"backendLanguages":["Python"],"backendFrameworks":[],"backendBuildTools":[],"backendPackageManagers":[],"backendLinters":[],"backendFormatters":[],"backendTestingTools":[],"ormTools":[],"auth":[],"clouds":[],"operatingSystems":[],"containers":[],"databases":[],"webServers":[],"ciCdTools":[],"iacTools":[],"monitoringTools":[],"loggingTools":[],"sourceControls":["Git"],"projectManagements":[],"communicationTools":[],"documentationTools":[],"apiDevelopmentTools":[],"designTools":[],"editors":[],"developmentEnvironments":[]}
+    expect: {status: 201}
+  - name: create-certification-1
+    request:
+      method: POST
+      path: /api/resumes/{resumeID}/certifications
+      csrf: true
+      json: {"name":"B 応用情報技術者","date":"2019-10"}
+    expect: {status: 201}
+  - name: create-certification-2
+    request:
+      method: POST
+      path: /api/resumes/{resumeID}/certifications
+      csrf: true
+      json: {"name":"A 基本情報技術者","date":"2012-04"}
+    expect: {status: 201}
+  - name: create-certification-3
+    request:
+      method: POST
+      path: /api/resumes/{resumeID}/certifications
+      csrf: true
+      json: {"name":"C 情報処理安全確保支援士","date":"2016-10"}
+    expect: {status: 201}
+  - name: create-portfolio-1
+    request:
+      method: POST
+      path: /api/resumes/{resumeID}/portfolios
+      csrf: true
+      json: {"name":"B 家計簿のアプリ","overview":"家計を記録するアプリ","techStack":"React, Go","link":"https://example.com/b"}
+    expect: {status: 201}
+  - name: create-portfolio-2
+    request:
+      method: POST
+      path: /api/resumes/{resumeID}/portfolios
+      csrf: true
+      json: {"name":"A 日記のアプリ","overview":"日記を書くアプリ","techStack":"Vue","link":"https://example.com/a"}
+    expect: {status: 201}
+  - name: create-portfolio-3
+    request:
+      method: POST
+      path: /api/resumes/{resumeID}/portfolios
+      csrf: true
+      json: {"name":"C 天気のアプリ","overview":"天気を見るアプリ","techStack":"Swift","link":"https://example.com/c"}
+    expect: {status: 201}
+  - name: create-sns-platform-1
+    request:
+      method: POST
+      path: /api/resumes/{resumeID}/sns-platforms
+      csrf: true
+      json: {"name":"B Qiita","link":"https://qiita.com/example"}
+    expect: {status: 201}
+  - name: create-sns-platform-2
+    request:
+      method: POST
+      path: /api/resumes/{resumeID}/sns-platforms
+      csrf: true
+      json: {"name":"A GitHub","link":"https://github.com/example"}
+    expect: {status: 201}
+  - name: create-sns-platform-3
+    request:
+      method: POST
+      path: /api/resumes/{resumeID}/sns-platforms
+      csrf: true
+      json: {"name":"C Zenn","link":"https://zenn.dev/example"}
+    expect: {status: 201}
+  - name: create-self-promotion-1
+    request:
+      method: POST
+      path: /api/resumes/{resumeID}/self-promotions
+      csrf: true
+      json: {"title":"B 設計の力","content":"読みやすい設計を考えられる。"}
+    expect: {status: 201}
+  - name: create-self-promotion-2
+    request:
+      method: POST
+      path: /api/resumes/{resumeID}/self-promotions
+      csrf: true
+      json: {"title":"A 粘り強さ","content":"難しい不具合も最後まで調べる。"}
+    expect: {status: 201}
+  - name: create-self-promotion-3
+    request:
+      method: POST
+      path: /api/resumes/{resumeID}/self-promotions
+      csrf: true
+      json: {"title":"C 学ぶ習慣","content":"毎週新しい技術を試す。"}
+    expect: {status: 201}
+  # 項目を足した経歴書を書き出す
+  - name: backup-added
+    request:
+      method: GET
+      path: /api/resumes/{resumeID}/backup
+      headers: {Accept: application/json}
+    expect: {status: 200, content_type: application/json}
+  # 経歴書を読んで各欄で1件目に足した項目の ID を取り出し、経歴書と項目の値を直してから、もう一度書き出す
+  - name: get-resume
+    request:
+      method: GET
+      path: /api/resumes/{resumeID}
+    capture:
+      careerID: '$.careers[0].id'
+      projectID: '$.projects[0].id'
+      certificationID: '$.certifications[0].id'
+      portfolioID: '$.portfolios[1].id'
+      snsPlatformID: '$.snsPlatforms[1].id'
+      selfPromotionID: '$.selfPromotions[1].id'
+    expect: {status: 200}
+  - name: update-basic
+    request:
+      method: PUT
+      path: /api/resumes/{resumeID}/basic
+      csrf: true
+      json: {"resumeName":"項目を直したバックアップの経歴書","date":"2026-05-01","lastName":"鈴木","firstName":"次郎"}
+    expect: {status: 200}
+  - name: update-career
+    request:
+      method: PUT
+      path: /api/resumes/{resumeID}/careers/{careerID}
+      csrf: true
+      json: {"companyName":"株式会社イースト","startDate":"2023-04","endDate":null,"isActive":true}
+    expect: {status: 200}
+  - name: update-project
+    request:
+      method: PUT
+      path: /api/resumes/{resumeID}/projects/{projectID}
+      csrf: true
+      json: {"companyName":"株式会社イースト","startDate":"2023-06","endDate":null,"isActive":true,"name":"在庫の案件の作り直し","overview":"在庫の仕組みを新しい基盤で作り直している。","teamComp":"全体10名","role":"設計の取りまとめ","achievement":"移行の手順を決めた。","requirements":true,"basicDesign":true,"detailedDesign":true,"implementation":false,"integrationTest":false,"systemTest":false,"maintenance":false,"frontendLanguages":["TypeScript"],"frontendFrameworks":[],"frontendLibraries":[],"frontendBuildTools":[],"frontendPackageManagers":[],"frontendLinters":[],"frontendFormatters":[],"frontendTestingTools":[],"backendLanguages":["Go","Rust"],"backendFrameworks":[],"backendBuildTools":[],"backendPackageManagers":[],"backendLinters":[],"backendFormatters":[],"backendTestingTools":[],"ormTools":[],"auth":[],"clouds":["AWS"],"operatingSystems":[],"containers":[],"databases":[],"webServers":[],"ciCdTools":[],"iacTools":[],"monitoringTools":[],"loggingTools":[],"sourceControls":[],"projectManagements":[],"communicationTools":[],"documentationTools":[],"apiDevelopmentTools":[],"designTools":[],"editors":[],"developmentEnvironments":[]}
+    expect: {status: 200}
+  - name: update-certification
+    request:
+      method: PUT
+      path: /api/resumes/{resumeID}/certifications/{certificationID}
+      csrf: true
+      json: {"name":"D データベーススペシャリスト","date":"2021-04"}
+    expect: {status: 200}
+  - name: update-portfolio
+    request:
+      method: PUT
+      path: /api/resumes/{resumeID}/portfolios/{portfolioID}
+      csrf: true
+      json: {"name":"D 地図のアプリ","overview":"地図を見るアプリ","techStack":"Kotlin","link":"https://example.com/d"}
+    expect: {status: 200}
+  - name: update-sns-platform
+    request:
+      method: PUT
+      path: /api/resumes/{resumeID}/sns-platforms/{snsPlatformID}
+      csrf: true
+      json: {"name":"D X","link":"https://x.com/example"}
+    expect: {status: 200}
+  - name: update-self-promotion
+    request:
+      method: PUT
+      path: /api/resumes/{resumeID}/self-promotions/{selfPromotionID}
+      csrf: true
+      json: {"title":"D 伝える力","content":"考えを短く伝えられる。"}
+    expect: {status: 200}
+  - name: backup-edited
+    request:
+      method: GET
+      path: /api/resumes/{resumeID}/backup
+      headers: {Accept: application/json}
+    expect: {status: 200, content_type: application/json}
