@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =====================================================================
-# push の前に、CI の dependency-cooldown と同じ判定を手元で流す(/ship の手順1が呼ぶ)
+# push の前に、CI の dependency-cooldown と同じ判定を手元で流す(/ship-it の手順1が呼ぶ)
 #
 # 使い方: bash .claude/scripts/ship/pre-push-dependency-cooldown.sh [--base <コミット>] [--head <コミット>] [--now-epoch <秒>]
 #   作業フォルダの中で動かす。

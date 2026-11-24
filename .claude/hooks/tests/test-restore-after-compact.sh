@@ -541,7 +541,7 @@ t_claude_md_compact_instructions() {
         'Issue の番号|spec の名前と段階|作業のブランチ|PR の番号' \
         '/spec-review|CYCLE|ROUND|CHANGED|受け入れた指摘|却下した指摘|直さなかった外れ|Opus の審査役に替えたかどうか' \
         '/kiro-impl|検査のコマンド一式|REJECTED|debug の補助役を動かした回数' \
-        '/ship|同じ失敗が続いた回数' \
+        '/ship-it|同じ失敗が続いた回数' \
         '/memory-inspect-now|どの手順にいるか|何番目の組まで尋ねたか|「消す」と答えたメモリファイルの名前|SHA-256|「点検を中止する」を選んだかどうか' \
         '答えを待っている問いの全文|まだ Issue の本文か spec.json に書いていないもの' \
         '所有者が会話で伝えたこと|まだ作業に使っていないもの' \

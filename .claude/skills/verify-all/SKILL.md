@@ -7,7 +7,7 @@ description: 変更領域を判定して該当するverify(frontend/backend/terr
 ## Job
 
 `git diff` から変更領域を判定し、該当する verify Skill を直列実行する。
-コミット前・PR作成前(/ship)の標準ゲート。ゴールベースループ(/goal)の判定端点。
+コミット前・PR作成前(/ship-it)の標準ゲート。ゴールベースループ(/goal)の判定端点。
 
 ## Steps
 

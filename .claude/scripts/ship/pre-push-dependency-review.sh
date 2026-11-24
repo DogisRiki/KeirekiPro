@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =====================================================================
-# push の前に、CI の dependency-review と同じ判定を手元で流す(/ship の手順1が呼ぶ)
+# push の前に、CI の dependency-review と同じ判定を手元で流す(/ship-it の手順1が呼ぶ)
 #
 # 使い方: bash .claude/scripts/ship/pre-push-dependency-review.sh [--base <コミット>] [--head <コミット>]
 #   作業フォルダの中で動かす。
