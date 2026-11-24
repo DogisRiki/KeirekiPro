@@ -27,8 +27,15 @@ type jv struct {
 	truth bool
 	// items は、並びの要素である。
 	items []*jv
-	// fields は、オブジェクトの欄である。同じ名前の欄が2つあれば、あとの値を持つ。
-	fields map[string]*jv
+	// members は、オブジェクトの欄を、本文に書かれた順に並べたものである。同じ名前の欄が2つあれば、両方を持つ。
+	// Java 版の Jackson は、同じ名前の欄の値をすべて読み、あとの値を使う。前の値を読めなければ、本文を読めない。
+	members []jvMember
+}
+
+// jvMember は、オブジェクトの1つの欄の名前と値である。
+type jvMember struct {
+	name  string
+	value *jv
 }
 
 // jtreeMaxDepth は、Java 版の Jackson 3(jackson-core 3.1.7)の既定の、オブジェクトと並びの入れ子の深さの上限である
@@ -112,7 +119,7 @@ func (p *jtreeParser) object(depth int) (*jv, bool) {
 		return nil, false
 	}
 	p.pos++
-	v := &jv{kind: jvObject, fields: map[string]*jv{}}
+	v := &jv{kind: jvObject}
 	p.skipSpace()
 	if p.pos < len(p.in) && p.in[p.pos] == '}' {
 		p.pos++
@@ -136,7 +143,7 @@ func (p *jtreeParser) object(depth int) (*jv, bool) {
 		if !ok {
 			return nil, false
 		}
-		v.fields[name] = item
+		v.members = append(v.members, jvMember{name: name, value: item})
 		if more, ok := p.next('}'); !ok || !more {
 			return closed(v, ok)
 		}

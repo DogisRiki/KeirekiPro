@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-// dumpJV は、値の木 v を、種類が分かる字にする。オブジェクトの欄は名前の順に並べる。
+// dumpJV は、値の木 v を、種類が分かる字にする。オブジェクトの欄は名前の順に並べ、同じ名前の欄はあとの値だけを書く。
 func dumpJV(v *jv) string {
 	switch v.kind {
 	case jvNull:
@@ -25,14 +25,18 @@ func dumpJV(v *jv) string {
 		}
 		return "[" + strings.Join(parts, ",") + "]"
 	default:
-		names := make([]string, 0, len(v.fields))
-		for name := range v.fields {
-			names = append(names, name)
+		last := map[string]*jv{}
+		names := make([]string, 0, len(v.members))
+		for _, m := range v.members {
+			if _, seen := last[m.name]; !seen {
+				names = append(names, m.name)
+			}
+			last[m.name] = m.value
 		}
 		slices.Sort(names)
 		parts := make([]string, len(names))
 		for i, name := range names {
-			parts[i] = strconv.Quote(name) + ":" + dumpJV(v.fields[name])
+			parts[i] = strconv.Quote(name) + ":" + dumpJV(last[name])
 		}
 		return "{" + strings.Join(parts, ",") + "}"
 	}
@@ -239,7 +243,8 @@ func TestParseJTree_TrailingIgnored(t *testing.T) {
 	})
 }
 
-// TestParseJTree_DuplicateKey は、parseJTree が、同じ名前の欄があとの値になることを確かめる(要件4の受入基準6)。
+// TestParseJTree_DuplicateKey は、parseJTree が、同じ名前の欄の値をすべて書かれた順に持ち、名前ごとのあとの値が分かることを
+// 確かめる(要件4の受入基準6)。
 // Java 版は、version を 0.9 のあとに 1.0 と書いた本文を 201 で戻し、1.0 のあとに 0.9 と書いた本文を
 // 「サポートされていないバックアップバージョンです。」で断った(testdata/backup/restore.json の duplicate-version-later-valid と
 // duplicate-version-later-invalid)。
@@ -262,4 +267,18 @@ func TestParseJTree_DuplicateKey(t *testing.T) {
 			}
 		})
 	}
+
+	// Java 版の Jackson は、同じ名前の欄の前の値も読み、前の値を読めない本文を断る(小タスク3.4 で Java 版に送った
+	// {"version":{},"version":"1.0"})。readRestoreFile が前の値を確かめられるように、木は前の値も書かれた順に持つ。
+	t.Run("前の値も書かれた順に持つ", func(t *testing.T) {
+		v := mustParseJTree(t, `{"version":{},"x":1,"version":"1.0"}`)
+		got := make([]string, len(v.members))
+		for i, m := range v.members {
+			got[i] = strconv.Quote(m.name) + ":" + dumpJV(m.value)
+		}
+		want := []string{`"version":{}`, `"x":n:1`, `"version":"1.0"`}
+		if !slices.Equal(got, want) {
+			t.Errorf("members = %q, want %q", got, want)
+		}
+	})
 }

@@ -68,7 +68,7 @@
     - `capture_test.go` に足す `TestCapture_JSONCaptureMissing` は、値の名前が取り出されていない段を失敗にし、誤りに段の名前と値の名前を書くことを確かめる
   - _要件: 7.2_
 
-- [ ] 3. JSON の読み書きと字の数え方の部品を作る
+- [x] 3. JSON の読み書きと字の数え方の部品を作る
 - [x] 3.1 Java 版と同じ字の並びで JSON を書く書き手を作る (並行可)
 
   Claude は、JSON の書き手の節のとおりに、`backend/internal/resume/javajson.go` に `JavaJSON` を作る。`JavaJSON` は、構造体の欄を宣言の順に、`json` のタグの名前と `omitempty` に従って書き、`json.Marshaler` を持つ値はその書き方に従う。`JavaJSON` は、空白と改行を入れない。
@@ -93,7 +93,7 @@
   - _要件: 2.1, 4.5_
   - _対象の部品: WTF-8 の扱い_
 
-- [ ] 3.4 戻しの本文の読み手を作る
+- [x] 3.4 戻しの本文の読み手を作る
 
   Claude は、戻しの本文の読み手の節のとおりに、`backend/internal/resume/restoreread.go` に、`readRestoreFile` と、戻しの本文の型 `rsFile` と `rsResume` と6つの欄の項目の型を作る。`readRestoreFile` は、小タスク3.2 の `parseJTree` で本文を値の木にし、出力の spec の `numbersWithinLimit` で数の長さを確かめ、欄の種類ごとの読み方で戻しの本文の型にする。写す元は、Java 版の `RestoreResumeRequest` である。
   - 完了の確かめ方: `go test ./internal/resume/ -run TestReadRestoreFile` が通る。3つ目の大きなまとまりの最後のタスクなので、大きなまとまりの最後のタスクで verify のスキルを流すと決めた完了条件の2つ目のとおり、`/verify-backend` も通る
@@ -264,7 +264,9 @@
 - 小タスク1.4 と1.5 は、どちらも `make generate` で生成したコードを作り直す。2つの小タスクが作り直す対象は別々で、小タスク1.4 は仕様書から作る `internal/httpapi/gen` を、小タスク1.5 は sqlc の `internal/platform/database/sqlcgen` を対象にする。ただし、`make generate` は両方を作り直す。そのため、2つの小タスクを並行に進めるときは、Claude は、あとに終えた小タスクで `make generate-check` をもう一度流す
 - Claude は、`backup/backup.sql` の経歴書 801 から 805 を、Java 版の戻しの値の決まりに通る値で書く。Java 版が書き出したファイルを戻す筋書きは、すべての要求に 201 を期待するためである。経歴書の名前に禁じた9字を入れるときは、名前に改行か U+2028 のような行の区切りの字を混ぜる。Java 版の禁じた字の検査は、行の区切りの字を含む名前を確かめないため、その名前は戻しで断られない。姓と名には、かな、漢字、英字だけを入れ、リンクには `<` `>` `"` を入れない
 - Claude の Write と Edit のツールは、ファイルの中身に書いたサロゲートの組の番号(例: `\uD83D\uDE00`)と U+2028 と U+2029 の番号を、番号のままにせずに字に変えて書くことがある。Claude は、テストに番号の字の並びを書いたら、書いたあとに grep で番号のままかを確かめ、字に変わっていれば perl で逆斜線を `\x5c` と書いて書き直す
-- Java 版の Jackson の版は 3.1.7 である(Spring Boot 4.1.2)。Claude は、Jackson の動きを確かめるときは、jackson-core の 3.1.7 のタグのコードを読む。小タスク3.4 の `readRestoreFile` は、出力の spec の `numbersWithinLimit` に本文を渡す前に、頭の BOM を外す。Go の encoding/json は BOM を読み飛ばさず、BOM の付いた本文を読めない本文とするためである
+- Java 版の Jackson の版は 3.1.7 である(Spring Boot 4.1.2)。Claude は、Jackson の動きを確かめるときは、jackson-core の 3.1.7 のタグのコードを読む。小タスク3.4 の `readRestoreFile` は、本文を丸ごと出力の spec の `numbersWithinLimit` に渡さず、`parseJTree` で作った値の木の数を1つずつ渡す。Jackson は最初の値のあとに続く字を読まないので、本文を丸ごと渡すと、読まない字の中の長い数まで確かめてしまうためである。頭の BOM は `parseJTree` が読み飛ばす
+- 同じ名前の欄が2つある本文を、Java 版の Jackson は、前の値も読み、あとの値を使う。前の値を読めなければ、本文を読めない(400「入力エラーがあります。」)。小タスク3.4 の `readRestoreFile` も同じにした。design.md の「あとの値を使う」は、前の値を読まないことではない
+- 真偽の欄に数が書かれているとき、Java 版の Jackson は、整数の書き方の数だけを読み、0 でなければ真とする。`1.0` `1e0` `-0.0` のような小数の書き方の数は読めない値とする。小タスク3.4 の `readRestoreFile` も同じにした。design.md の「数は 0 でなければ真とする」は、整数の書き方の数のことである
 
 ## 完了条件(全タスク共通)
 
