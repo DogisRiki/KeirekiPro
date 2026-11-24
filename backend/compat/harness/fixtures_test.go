@@ -308,7 +308,7 @@ func TestFixtures_AllLoadable(t *testing.T) {
 		}
 		dir, ext := path.Dir(name), path.Ext(name)
 		switch {
-		case (dir == "users" || dir == "resumes" || dir == "export") && ext == ".sql":
+		case (dir == "users" || dir == "resumes" || dir == "export" || dir == "backup") && ext == ".sql":
 			// 下のデータベースの確かめで読み込む
 		case dir == "export" && ext == ".json":
 			// 出力の操作の筋書きが送る要求の本文。断る条件を確かめる本文もあるので、JSON として読めることだけを確かめる
@@ -354,8 +354,9 @@ func TestFixtures_AllLoadable(t *testing.T) {
 		t.Fatalf("fixtures/ を読めません: %v", err)
 	}
 
-	// export/ の SQL は、resumes/many-pages.sql の経歴書に項目を足すので、users/ と resumes/ のあとに読み込む
-	db := fixtureDB(t, "export")
+	// export/ の SQL は、resumes/many-pages.sql の経歴書に項目を足すので、users/ と resumes/ のあとに読み込む。
+	// backup/ の SQL は、users/basic.sql の user1 の経歴書を作り、筋書きが resumes/fonts.sql のあとに読み込むので、同じく users/ と resumes/ のあとに読み込む
+	db := fixtureDB(t, "export", "backup")
 	ctx := t.Context()
 
 	// 出力の操作の筋書きは、次の経歴書を出力するので、どれも Java 版の ResumeExportRuleCheckService の出力の前提を満たす
