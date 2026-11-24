@@ -5,8 +5,9 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/DogisRiki/KeirekiPro/backend/internal/auth"
 	"github.com/google/uuid"
+
+	"github.com/DogisRiki/KeirekiPro/backend/internal/auth"
 )
 
 // errRestoreServer は、戻すファイルの経歴書が無いか、6つの欄のどれかの並びに値の無い要素があるときの誤りである。

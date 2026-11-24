@@ -352,7 +352,8 @@ func TestBuildRestored_SortsEntries(t *testing.T) {
 	}
 	r.projects = []*rsProject{project("中の案件", YearMonth{2016, 1}), project("古い案件", YearMonth{2014, 1}), project("新しい案件", YearMonth{2020, 1})}
 	r.certifications = []*rsCertification{
-		{name: ptr("古い資格"), date: &YearMonth{2010, 1}}, {name: ptr("新しい資格"), date: &YearMonth{2020, 1}},
+		{name: ptr("古い資格"), date: &YearMonth{2010, 1}},
+		{name: ptr("新しい資格"), date: &YearMonth{2020, 1}},
 		{name: ptr("中の資格"), date: &YearMonth{2015, 1}},
 	}
 	portfolio := func(name string) *rsPortfolio {
@@ -360,7 +361,8 @@ func TestBuildRestored_SortsEntries(t *testing.T) {
 	}
 	r.portfolios = []*rsPortfolio{portfolio("う作品"), portfolio("あ作品"), portfolio("い作品")}
 	r.snsPlatforms = []*rsSnsPlatform{
-		{name: ptr("Zenn"), link: ptr("https://zenn.dev")}, {name: ptr("GitHub"), link: ptr("https://github.com")},
+		{name: ptr("Zenn"), link: ptr("https://zenn.dev")},
+		{name: ptr("GitHub"), link: ptr("https://github.com")},
 		{name: ptr("Qiita"), link: ptr("https://qiita.com")},
 	}
 	r.selfPromotions = []*rsSelfPromotion{{title: ptr("C 題"), content: ptr("中身")}, {title: ptr("A 題"), content: ptr("中身")}, {title: ptr("B 題"), content: ptr("中身")}}
