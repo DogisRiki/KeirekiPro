@@ -18,7 +18,7 @@
 # mainへのpushだけを起点にすると、最後のpushのあとに古いmainから作ったブランチで
 # 出したPRは、次にmainへpushされるまで out-of-date のまま止まるため。
 # mainと衝突しているPRでは GitHub が pull_request のワークフローを起動しないので、
-# PRの起点では動かない。衝突の解消は、PRを出した側(/ship の見届け)が受け持つ。
+# PRの起点では動かない。衝突の解消は、PRを出した側(/ship-it の見届け)が受け持つ。
 # https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#pull_request
 #
 # 同時実行の組は、pushの実行と、PRの起点の実行と、検査が終わったときの実行で分ける。同じ組では待てる実行が1つだけで、

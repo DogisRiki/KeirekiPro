@@ -1,6 +1,6 @@
 #!/bin/bash
 # =====================================================================
-# .claude/scripts/ship/wait-approval.sh(/ship の承認待ちで裏で動かすスクリプト)のテスト
+# .claude/scripts/ship/wait-approval.sh(/ship-it の承認待ちで裏で動かすスクリプト)のテスト
 #
 # 実行: bash .claude/hooks/tests/test-wait-approval.sh
 # このスクリプトは Stop フック check-ship-watch-before-stop.sh と組で動くので、テストをフックのテストと同じ場所に置く。

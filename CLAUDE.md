@@ -52,7 +52,7 @@ CI環境(GitHub Actions = Docker Compose無し)では `bash .claude/scripts/para
 - DependabotのPRをcloseしない。とくにdockerレーンは、closeするとそのタグの更新が恒久的にブロックされ、復旧経路が限られる(Dependabot側の照合キーにdigestが含まれないため)。`@dependabot recreate` / `rebase` を自分の判断で打たない(クールダウン中はPRがcloseされる)。赤で止まっているPRの扱いは `doc/開発フロー/監査手順.md` に従う
 - 同一の失敗が3回続いたら停止して人間に報告する(修正の無限ループを作らない)。止まる前に `bash .claude/scripts/usage/usage.sh mark same-failure` を1回呼ぶ(このコマンドが失敗しても、停止と報告を続ける)
 - 依頼範囲外の問題を見つけたら報告のみ行う(勝手に直さない)
-- `/loop` などの定期実行ループの中からはcommit/pushしない(出荷は明示的な `/ship` でのみ行う)
+- `/loop` などの定期実行ループの中からはcommit/pushしない(出荷は明示的な `/ship-it` でのみ行う)
 
 ## Git規約
 
@@ -64,8 +64,8 @@ CI環境(GitHub Actions = Docker Compose無し)では `bash .claude/scripts/para
 - 人間はIssueを閉じない
 - push先はfeatureブランチのみ。マージはauto-merge(ゲート全通過で自動)に任せる。auto-mergeは、PRが作られると仕組み(ワークフロー)が予約する。
   AIは予約の操作(`gh pr merge`)をせず、予約されたことを確かめる。予約が付かないときは自分で予約せず報告する
-- 出荷手順(verify→commit→push→PR→auto-mergeの予約の確認)は `/ship` に従う
-- 実装と確かめが終わったら、AIは `/ship` を自分で起動する。spec で進めたときも、所有者に出荷してよいかを尋ねない。
+- 出荷の手順は `/ship-it` に従う
+- 実装と確かめが終わったら、AIは `/ship-it` を自分で起動する。spec で進めたときも、所有者に出荷してよいかを尋ねない。
   ただし、所有者が画面などで手で確かめることが残っているときは、AIは確かめの手順を示して止まり、所有者の結果を受けてから出荷する
 
 ## 作業規約
@@ -119,7 +119,7 @@ AIがIssueの本文とその時点のコードを調べ、4つの観点で判断
   - `/kiro-validate-design` は使わない(`/spec-review` が置き換えた)。cc-sdd のスキルの出力で案内されても起動しない
 - Phase 2(実装): `/kiro-impl {feature}`(タスクごとに実装+確認役の独立レビュー+最終検証)
   - 再検証のみ: `/kiro-validate-impl {feature}`
-- 実装完了後の出荷は `/ship`(PR本文に `Spec: .kiro/specs/{feature}` と `Refs: #<Issue番号>` を記載)
+- 実装完了後の出荷は `/ship-it`(PR本文に `Spec: .kiro/specs/{feature}` と `Refs: #<Issue番号>` を記載)
 - Issue を閉じる PR がマージされたあとの集計は `usage-report` のスキルに従う
 
 ### ルール
@@ -144,7 +144,7 @@ Claude Code は、会話の要約を作るとき、次のことを必ず要約�
 - 進めている Issue の番号、spec の名前と段階、作業のブランチ、作った PR の番号
 - `/spec-review` の往復の途中なら、CYCLE(審査のサイクルの番号)と ROUND(往復の番号)と CHANGED(本文を直したあとの審査かどうか)、その往復で受け入れた指摘と却下した指摘の ID、まだ記録に書いていない「直さなかった外れ」、Fable の審査役から Opus の審査役に替えたかどうか
 - `/kiro-impl` の途中なら、検査のコマンド一式、確認役が差し戻した(REJECTED)往復の数、debug の補助役を動かした回数
-- `/ship` の途中なら、同じ失敗が続いた回数
+- `/ship-it` の途中なら、同じ失敗が続いた回数
 - `/memory-inspect-now` の点検の途中なら、どの手順にいるか、何番目の組まで尋ねたか、「消す」と答えたメモリファイルの名前と、示したときの SHA-256、尋ね直すメモリファイルと答えが無かったために残すメモリファイルの名前、「点検を中止する」を選んだかどうか
 - 所有者に尋ねて答えを待っている問いの全文と、所有者が答えた内容のうち、まだ Issue の本文か spec.json に書いていないもの
 - 所有者が会話で伝えたことのうち、まだ作業に使っていないもの(たとえば、審査役のモデルの選び)

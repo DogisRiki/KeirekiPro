@@ -64,6 +64,7 @@
     "verify-*": "実装",
     "goal-*": "実装",
     "ship": "出荷とレビュー対応",
+    "ship-it": "出荷とレビュー対応",
     "review-loop": "出荷とレビュー対応",
     "request": null
   },

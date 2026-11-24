@@ -1,5 +1,8 @@
 {
     "language": "japanese",
+    "skillOverrides": {
+        "ship-local": "off"
+    },
     "env": {
         "MSYS2_ARG_CONV_EXCL": "*",
         "CLAUDE_CODE_AUTO_COMPACT_WINDOW": "250000"
