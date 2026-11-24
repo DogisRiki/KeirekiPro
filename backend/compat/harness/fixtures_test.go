@@ -201,11 +201,24 @@ func decodeStrict(data []byte, v any) error {
 // checkBackup は、name のバックアップのファイルが、ファイルの名前どおりの形かを確かめる。
 // basic.json は正しいバックアップ、wrong-version.json は版の違うバックアップ、
 // no-resume.json は resume を含まないバックアップ、broken.json は JSON として読めないバックアップである。
+// java- で始まるファイルは Java 版が書き出したバックアップで、basic.json と同じく確かめる。
+// reject- と lax- と malformed- で始まるファイルは、戻しで断る条件、Java 版の戻しが確かめない決まり、
+// 形の誤りを確かめる要求の本文なので、JSON として読めることだけを確かめる。
 func checkBackup(t *testing.T, name string, data []byte) {
 	t.Helper()
 	var b backupFile
 	err := decodeStrict(data, &b)
-	switch path.Base(name) {
+	base := path.Base(name)
+	switch {
+	case strings.HasPrefix(base, "java-"):
+		base = "basic.json"
+	case strings.HasPrefix(base, "reject-") || strings.HasPrefix(base, "lax-") || strings.HasPrefix(base, "malformed-"):
+		if !json.Valid(data) {
+			t.Errorf("%s: JSON として読めるはずですが、読めません", name)
+		}
+		return
+	}
+	switch base {
 	case "broken.json":
 		if err == nil {
 			t.Errorf("%s: JSON として読めないはずですが、読めました", name)
