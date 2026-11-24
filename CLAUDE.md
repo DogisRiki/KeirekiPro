@@ -57,7 +57,8 @@ CI環境(GitHub Actions = Docker Compose無し)では `bash .claude/scripts/para
 ## Git規約
 
 - 前提: ホストOSに **bash と perl(JSON::PP)が必要。jqには依存しない。**(`.claude/hooks/` のフックはこれらで実行される。シェルスクリプトは `.gitattributes` でLF強制)。
-  **Windowsでは Git for Windows(Git Bash同梱)を入れることで満たす。** macOS / Linux は標準で満たす
+  **Windowsでは Git for Windows(Git Bash同梱)を入れることで満たす。** macOS / Linux は標準で満たす。
+  Windowsでは PowerShell 7 も入れる(所有者に示すコマンドを `&&` でつなぐため。手順は `doc/開発フロー/参加者セットアップ手順.md`)
 - Git操作は、ホストOSで、そのセッションの作業フォルダの最上位で実行する(devcontainer内Gitは無効)
 - Windows では、Claude の Bash は Git Bash の引数の書き換えを止めてある(`.claude/settings.json` の `env` の `MSYS2_ARG_CONV_EXCL`)。`git` `gh` `docker` などにパスを渡すときは、`C:/Users/…` のドライブ文字の形か、作業フォルダからの相対の形で書く。`/c/…` や、`mktemp` が返す `/tmp/…` の形は渡さない。`mktemp` の結果は `cd "$d" && pwd -W` でドライブ文字の形に直す。対象は Windows 向けのプログラムに渡す引数だけで、`>/dev/null` のようなリダイレクトは今までどおり書く
 - ブランチ名は `.branch_name_template`、コミットメッセージは `.commit_template` に従う
