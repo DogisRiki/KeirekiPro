@@ -114,7 +114,7 @@
   - _要件: 3.1, 3.4_
   - _依存: 3.1_
 
-- [ ] 4.2 書き出しのメソッドの結合テストを書く
+- [x] 4.2 書き出しのメソッドの結合テストを書く
 
   Claude は、テストの方針の節の結合テストのとおりに、`backend/internal/resume/backup_integration_test.go` を書く。`internal/resume` の結合テストは、パッケージで1つの Postgres を使い、出力の結合テストの `loadExportFixtures` が、`users/basic.sql` と `resumes/fonts.sql` を含む初期のデータを1度だけ入れる。初期のデータの ID は決まった値なので、同じファイルを2度入れると重なって失敗する。そのため、Claude は、`backup_integration_test.go` に、先に `loadExportFixtures` を呼んでから、`backend/compat/fixtures` の `backup/backup.sql` と `resumes/resume-limits.sql` を `sync.Once` で1度だけ入れる関数 `loadBackupFixtures` を作る。書き出しと戻しの結合テストは、どれも `loadBackupFixtures` を呼んでから動く。
   - 完了の確かめ方: `go test ./internal/resume/ -run TestBackupIntegration` が通る
