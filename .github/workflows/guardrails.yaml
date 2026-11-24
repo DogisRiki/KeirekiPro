@@ -195,6 +195,11 @@ jobs:
           # gitのpathspecでは '*' が '/' を跨ぐため、'*.md' だけで入れ子も含む全ての .md に一致する
           common_excludes=(
             ':(exclude)frontend/pnpm-lock.yaml'
+            # Go 版の backend の部品の照合値を go コマンドが書く一覧。
+            # 部品を上げると go.mod より多くの行が変わるため、lockfile と同じく数えない。
+            # go.mod は使う部品とその版を宣言するファイルなので、今までどおり数える。
+            # ワイルドカードにはしない(下の checkov の baseline と同じ理由)
+            ':(exclude)backend/go.sum'
             ':(exclude)*.md'
             ':(exclude)doc/**'
             ':(exclude).kiro/**'
