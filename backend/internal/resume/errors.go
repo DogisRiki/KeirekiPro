@@ -40,6 +40,13 @@ const (
 	// MessageResumeNameDuplicated は、同じ利用者の中に同じ名前の経歴書があるときの文言である(ResumeNameDuplicationCheckService)。
 	MessageResumeNameDuplicated = "この職務経歴書名は既に登録されています。"
 
+	// MessageUnsupportedBackupVersion は、戻すファイルの版が無いか 1.0 でないときの文言である(RestoreResumeUseCase)。
+	MessageUnsupportedBackupVersion = "サポートされていないバックアップバージョンです。"
+
+	// MessageInvalidBackupFile は、戻すファイルの経歴書と項目の値が、Java 版が戻しで確かめる値の決まりを満たさないときの文言である
+	// (RestoreResumeUseCase)。2つの文を改行でつなぐ。
+	MessageInvalidBackupFile = "バックアップファイルが不正なためリストアできません。\n別のバックアップファイルでお試しください。"
+
 	// MessageCareerPeriodOverlapFormat は、職歴どうしの期間が重なるときの文言の書式である(Resume.validateIsCareerOverlap)。
 	// 1つ目の %s に直す職歴の会社名を、2つ目の %s に重なる職歴の会社名を「、」でつないで入れる。
 	MessageCareerPeriodOverlapFormat = "「%s」と「%s」の期間が重複しています。"

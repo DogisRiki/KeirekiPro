@@ -96,6 +96,16 @@ func (s store) resumeNameExists(ctx context.Context, userID uuid.UUID, name stri
 	return exists, nil
 }
 
+// userExists は、利用者が居るかを調べる。退会すると利用者の行が消えるので、退会した利用者には false を返す。
+// 戻しは、トランザクションが誤りで終わったあとに呼び、退会してすでに居ない利用者の要求を 404 にする。
+func (s store) userExists(ctx context.Context, userID uuid.UUID) (bool, error) {
+	exists, err := s.q.ExistsUser(ctx, toUUID(userID))
+	if err != nil {
+		return false, fmt.Errorf("利用者が居るかを調べられません: %w", err)
+	}
+	return exists, nil
+}
+
 // insertResume は、経歴書の行と6つの欄のすべての項目を書く。経歴書を写して作るときも、この関数で書く。
 func (s store) insertResume(ctx context.Context, r Resume) error {
 	if err := s.q.InsertResume(ctx, sqlcgen.InsertResumeParams{

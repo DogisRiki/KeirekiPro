@@ -38,42 +38,6 @@ func (e EmailNotVerifiedErrorResponseKind) Valid() bool {
 	}
 }
 
-// Defines values for ExportResumeRequestDisposition.
-const (
-	Attachment ExportResumeRequestDisposition = "attachment"
-	Inline     ExportResumeRequestDisposition = "inline"
-)
-
-// Valid indicates whether the value is a known member of the ExportResumeRequestDisposition enum.
-func (e ExportResumeRequestDisposition) Valid() bool {
-	switch e {
-	case Attachment:
-		return true
-	case Inline:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for ExportResumeRequestFormat.
-const (
-	Markdown ExportResumeRequestFormat = "markdown"
-	Pdf      ExportResumeRequestFormat = "pdf"
-)
-
-// Valid indicates whether the value is a known member of the ExportResumeRequestFormat enum.
-func (e ExportResumeRequestFormat) Valid() bool {
-	switch e {
-	case Markdown:
-		return true
-	case Pdf:
-		return true
-	default:
-		return false
-	}
-}
-
 // Defines values for ForbiddenResponseMessage.
 const (
 	Empty ForbiddenResponseMessage = "アクセス権限がありません。"
@@ -312,17 +276,7 @@ type ErrorResponse struct {
 }
 
 // ExportResumeRequest `format` が `pdf` なら `pdfSettings` が要る(無ければ 400、`errors` の項目名は `pdfSettingsRequired`)。
-type ExportResumeRequest struct {
-	Disposition ExportResumeRequestDisposition `json:"disposition"`
-	Format      ExportResumeRequestFormat      `json:"format"`
-	PdfSettings *PdfSettings                   `json:"pdfSettings,omitempty"`
-}
-
-// ExportResumeRequestDisposition defines model for ExportResumeRequest.Disposition.
-type ExportResumeRequestDisposition string
-
-// ExportResumeRequestFormat defines model for ExportResumeRequest.Format.
-type ExportResumeRequestFormat string
+type ExportResumeRequest = json.RawMessage
 
 // FontSizes 文字の大きさ(pt)。どれも 6 以上 72 以下の小数。
 type FontSizes struct {
@@ -477,6 +431,10 @@ type ResetPasswordRequest struct {
 	// Token メールのリンクで受け取ったトークン(Java の DTO は必須にしていない)
 	Token *string `json:"token,omitempty"`
 }
+
+// RestoreResumeRequest 復元の要求の本文。形は `ResumeBackup` と同じ(Java の `RestoreResumeRequest`)。
+// 生成したコードは本文を読まずに受け口へ渡し、受け口が Java 版と同じ決まりで読む。
+type RestoreResumeRequest = json.RawMessage
 
 // ResumeBackup バックアップの JSON(Java の `BackupResumeResponse` と `RestoreResumeRequest`)。
 // バックアップの応答では `version`・`exportedAt`・`resume` を必ず書く。
@@ -1169,7 +1127,7 @@ type RegisterUserJSONRequestBody = UserRegistrationRequest
 type CreateResumeJSONRequestBody = CreateResumeRequest
 
 // RestoreResumeJSONRequestBody defines body for RestoreResume for application/json ContentType.
-type RestoreResumeJSONRequestBody = ResumeBackup
+type RestoreResumeJSONRequestBody = RestoreResumeRequest
 
 // UpdateResumeBasicJSONRequestBody defines body for UpdateResumeBasic for application/json ContentType.
 type UpdateResumeBasicJSONRequestBody = UpdateResumeBasicRequest
@@ -4908,6 +4866,20 @@ func (response RestoreResume403JSONResponse) VisitRestoreResumeResponse(w http.R
 		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
 	}
 	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RestoreResume404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response RestoreResume404JSONResponse) VisitRestoreResumeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
 	_, err := buf.WriteTo(w)
 	return err
 }

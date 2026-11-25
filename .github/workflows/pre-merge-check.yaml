@@ -2,7 +2,7 @@ name: Pre-merge Check
 
 # マージ前の人間確認(選択式)。
 #
-# 人間がIssueに pre-merge-check ラベルを付けると、/ship が作るPRへ引き継がれる
+# 人間がIssueに pre-merge-check ラベルを付けると、/ship-it が作るPRへ引き継がれる
 # (PRに直接付けてもよい)。ラベル付きPRは、リポジトリ所有者のApproveがあるまで
 # このチェックが赤になり、マージが保留される(required check に指定する)。
 # 用途: マージ前にローカルで画面を確認したい変更。確認して問題があれば

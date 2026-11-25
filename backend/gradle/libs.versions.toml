@@ -26,13 +26,13 @@
 
 [versions]
 # プラグイン
-spring-boot = "4.1.2"
+spring-boot = "4.2.0"
 spring-dependency-management = "1.1.7"
 spotless = "8.11.0"
 spotbugs = "6.5.13"
 pitest = "1.19.0"
 # buildscript の classpath と plugins の両方から参照する。ずれを防ぐため1箇所にする
-flyway = "13.12.2"
+flyway = "13.13.0"
 
 # 依存
 mybatis-spring-boot = "4.1.0"

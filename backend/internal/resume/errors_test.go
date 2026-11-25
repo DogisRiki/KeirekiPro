@@ -163,3 +163,23 @@ func TestErrors_Constructors(t *testing.T) {
 		})
 	}
 }
+
+// TestErrors_BackupMessages は、戻しの2つの文言の字が、Java 版の RestoreResumeUseCase.java の文字列と同じことを確かめる
+// (要件4の受入基準2と5)。
+func TestErrors_BackupMessages(t *testing.T) {
+	tests := []struct {
+		name string
+		got  string
+		want string
+	}{
+		{"MessageUnsupportedBackupVersion", MessageUnsupportedBackupVersion, "サポートされていないバックアップバージョンです。"},
+		{"MessageInvalidBackupFile", MessageInvalidBackupFile, "バックアップファイルが不正なためリストアできません。\n別のバックアップファイルでお試しください。"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.got != tt.want {
+				t.Errorf("%s = %q。want %q", tt.name, tt.got, tt.want)
+			}
+		})
+	}
+}

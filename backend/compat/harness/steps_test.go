@@ -232,3 +232,89 @@ func TestExpectContentType(t *testing.T) {
 		t.Errorf("content_type の無い段の誤り = %v", err)
 	}
 }
+
+func TestExpectContentType_VersionStep(t *testing.T) {
+	// 版に送る段の expect の content_type は、筋書きを読む時点で断らない
+	steps := "  - name: bad\n    request: {method: GET, path: /x}\n    expect: {content_type: image/png}\n" +
+		"  - name: last\n    request: {method: GET, path: /x}\n"
+	s, err := LoadScenario(writeScenario(t, kindsScenario("compare", steps)))
+	if err != nil {
+		t.Fatalf("版に送る段の expect の content_type: 誤り = %v, want 無し", err)
+	}
+	if got := s.Steps[0].Expect.ContentType; got != "image/png" {
+		t.Errorf("expect の content_type = %q", got)
+	}
+
+	// 版に送る段の応答の Content-Type を、文字の並びのまま比べる
+	step := Step{Name: "export-md", Request: Request{Method: http.MethodGet, Path: "/x"}, Expect: Expect{ContentType: "text/markdown;charset=UTF-8"}}
+	resp := func(ct string) Response {
+		h := http.Header{}
+		if ct != "" {
+			h.Set("Content-Type", ct)
+		}
+		return Response{Status: http.StatusOK, Header: h}
+	}
+	if got := checkStepExpect(NewSession(), step, resp("text/markdown;charset=UTF-8")); len(got) != 0 {
+		t.Errorf("同じ Content-Type の段の報告 = %q, want 無し", got)
+	}
+	for ct, want := range map[string]string{
+		"text/markdown": `段 export-md の応答の Content-Type が "text/markdown" でした。期待は "text/markdown;charset=UTF-8" です`,
+		"":              `段 export-md の応答の Content-Type が "" でした。期待は "text/markdown;charset=UTF-8" です`,
+	} {
+		if got := checkStepExpect(NewSession(), step, resp(ct)); !slices.Equal(got, []string{want}) {
+			t.Errorf("Content-Type %q の段の報告 = %q, want %q", ct, got, want)
+		}
+	}
+	// content_type の無い段は、Content-Type を確かめない
+	if got := checkStepExpect(NewSession(), Step{Name: "none"}, resp("text/plain")); len(got) != 0 {
+		t.Errorf("content_type の無い段の報告 = %q", got)
+	}
+}
+
+func TestExpectBodyContains(t *testing.T) {
+	// 版に送る段の expect の body_contains は、筋書きを読む時点で断らない。版に送る段のほかには書けない
+	steps := "  - name: read\n    request: {method: GET, path: /x}\n    expect: {body_contains: [\"# 職務経歴書\", \"{name}\"]}\n"
+	s, err := LoadScenario(writeScenario(t, kindsScenario("compare", steps)))
+	if err != nil {
+		t.Fatalf("body_contains を書いた筋書き: %v", err)
+	}
+	if got := s.Steps[0].Expect.BodyContains; !slices.Equal(got, []string{"# 職務経歴書", "{name}"}) {
+		t.Errorf("expect の body_contains = %q", got)
+	}
+	for name, tc := range map[string]struct{ step, want string }{
+		"絶対の URL の段の body_contains": {`    request: {method: GET, url: "http://localhost:4566/b/k"}` + "\n    expect: {body_contains: [a]}\n", "body_contains は、版に送る段にだけ"},
+		"redis の段の body_contains":   {"    redis: {del: [k]}\n    expect: {body_contains: [a]}\n", "expect を書けません"},
+	} {
+		bad := "  - name: bad\n" + tc.step + "  - name: last\n    request: {method: GET, path: /x}\n"
+		_, err := LoadScenario(writeScenario(t, kindsScenario("compare", bad)))
+		if err == nil || !strings.Contains(err.Error(), "段 bad ") || !strings.Contains(err.Error(), tc.want) {
+			t.Errorf("%s: 誤り = %v, want 段 bad の %q を含む誤り", name, err, tc.want)
+		}
+	}
+
+	session := NewSession()
+	session.vars["name"] = "保存した名前"
+	resp := Response{Status: http.StatusOK, Body: []byte("# 職務経歴書\n\n名前: 保存した名前\n")}
+	// 取り出した名前を差し込んだ字の並びと、そのままの字の並びが本文にあれば、合わないことは無い
+	ok := Step{Name: "read-md", Expect: Expect{BodyContains: []string{"# 職務経歴書", "名前: {name}"}}}
+	if got := checkStepExpect(session, ok, resp); len(got) != 0 {
+		t.Errorf("本文にある字の並びの段の報告 = %q, want 無し", got)
+	}
+	if ok.Expect.BodyContains[1] != "名前: {name}" {
+		t.Errorf("筋書きの段が書き換わりました: %q", ok.Expect.BodyContains)
+	}
+	// 本文に無い字の並びは、段の名前と、差し込んだあとの見つからない字の並びを1つずつ書く
+	bad := Step{Name: "read-md", Expect: Expect{BodyContains: []string{"# 職務経歴書", "古い名前", "{name} 様"}}}
+	want := []string{
+		`段 read-md の応答の本文に "古い名前" がありません`,
+		`段 read-md の応答の本文に "保存した名前 様" がありません`,
+	}
+	if got := checkStepExpect(session, bad, resp); !slices.Equal(got, want) {
+		t.Errorf("本文に無い字の並びの段の報告 =\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
+	}
+	// 取り出していない名前は、段の誤りにする
+	missing := Step{Name: "bad", Expect: Expect{BodyContains: []string{"{other}"}}}
+	if got := checkStepExpect(session, missing, resp); len(got) != 1 || !strings.Contains(got[0], "段 bad ") || !strings.Contains(got[0], "other") {
+		t.Errorf("取り出していない名前の報告 = %q", got)
+	}
+}

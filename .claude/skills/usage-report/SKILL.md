@@ -1,6 +1,6 @@
 ---
 name: usage-report
-description: Issue ごとの AI の作業の集計を GitHub に出す手順。次の4つの時点で必ず使う。/ship が Issue を閉じる PR のマージを見届けたとき(マージを見届けたとき)。会話の始めに、まだ出していない集計があると知らされたとき(次の会話で出すとき)。会話の始めに、まだ答えていない案があると知らされたとき(案を尋ねるとき)。会話の始めに、この PC で話す人が所有者かどうかがまだ決まっていないと知らされたとき(所有者かを尋ねるとき)。
+description: Issue ごとの AI の作業の集計を GitHub に出す手順。次の4つの時点で必ず使う。/ship-it が Issue を閉じる PR のマージを見届けたとき(マージを見届けたとき)。会話の始めに、まだ出していない集計があると知らされたとき(次の会話で出すとき)。会話の始めに、まだ答えていない案があると知らされたとき(案を尋ねるとき)。会話の始めに、この PC で話す人が所有者かどうかがまだ決まっていないと知らされたとき(所有者かを尋ねるとき)。
 allowed-tools: Read, Write, Bash, Grep
 ---
 
@@ -21,7 +21,7 @@ allowed-tools: Read, Write, Bash, Grep
 
 ### マージを見届けたとき
 
-`/ship` の CI の見届けで、PR の `state` が `MERGED` だと分かり、PR の本文の行頭に `Closes #<N>` があるときである。Claude は、同じ会話の中で、その Issue について、下の「集計を出す手順」を行う。
+`/ship-it` の CI の見届けで、PR の `state` が `MERGED` だと分かり、PR の本文の行頭に `Closes #<N>` があるときである。Claude は、同じ会話の中で、その Issue について、下の「集計を出す手順」を行う。
 
 ### 次の会話で出すとき
 
@@ -81,10 +81,10 @@ Claude は、会話の相手に、このリポジトリの所有者かどうか�
 6. 価格を1つも足さなかったときは、Claude は、料金表のほかのモデルの突き合わせと `prices.checked_on` の書き換えをせず、PR を作らない。Claude は、作業フォルダの最上位に `cd` で戻り、`git worktree remove <worktree>` と `git branch -D <ブランチ>` を実行する。Claude は、価格が見つからなかったモデルと、突き合わせても足す価格が無かったモデルの名前を会話の相手に書いて、この手順を終える。価格を1つ以上足したときは、Claude は、料金表に次の2つを書く。
    - Claude は、料金表にあるほかのモデルのうち、ページに載っているモデルの価格をページと突き合わせ、違う値をページの値に直す。Claude は、直したモデルと種類と、直す前と後の値を覚える。ページに載っていないモデルの価格を、Claude は変えない。
    - Claude は、`prices.checked_on` を読んだ日にする。ページの場所が `prices.source` と違えば、Claude は、`prices.source` を読んだ場所にする。
-7. Claude は、worktree で `bash .claude/scripts/usage/tests/test-report.sh` を流す。価格を直したために既存の場合の期待の値が外れたら、Claude は、期待の値を新しい価格で求め直した値に直し、直したことを PR の本文の `Test-Change-Justification` に書く。Claude は、続けて、`/ship` の手順1(verify と push の前の3つの検査)を worktree で行う。
-8. Claude は、`/ship` の手順3と手順4のとおりに、worktree を作業のフォルダにして、`git commit -F <scratchpad のメッセージのファイル>` と `git push -u origin <ブランチ>` を、それぞれ単独のコマンドで実行する。メッセージは `.commit_template` に従い、prefix を `chore` に、`Refs:` を `N/A` にする。
+7. Claude は、worktree で `bash .claude/scripts/usage/tests/test-report.sh` を流す。価格を直したために既存の場合の期待の値が外れたら、Claude は、期待の値を新しい価格で求め直した値に直し、直したことを PR の本文の `Test-Change-Justification` に書く。Claude は、続けて、`/ship-it` の手順1(verify と push の前の3つの検査)を worktree で行う。
+8. Claude は、`/ship-it` の手順3と手順4のとおりに、worktree を作業のフォルダにして、`git commit -F <scratchpad のメッセージのファイル>` と `git push -u origin <ブランチ>` を、それぞれ単独のコマンドで実行する。メッセージは `.commit_template` に従い、prefix を `chore` に、`Refs:` を `N/A` にする。
 9. Claude は、PR の本文を下の見本の形で scratchpad のファイルに書き、`gh pr create --base main --head <ブランチ> --title "chore: 作業の集計の料金表に <モデルの名前> の価格を足す" --body-file <本文のファイル>` を実行する。本文に `Closes` を書かない。
-10. Claude は、worktree を作業のフォルダにしたまま、`/ship` の手順6(自動マージの予約の確認)と手順7(CI の見届け)を行う。手順7の所有者の承認待ちでは、Claude は、`wait-approval.sh` を裏で動かし、承認を待っていることを会話の相手に書く。CI が赤になったら、Claude は、worktree で直して push する。同じ失敗が3回続いたら、Claude は、止めて報告する。
+10. Claude は、worktree を作業のフォルダにしたまま、`/ship-it` の手順6(自動マージの予約の確認)と手順7(CI の見届け)を行う。手順7の所有者の承認待ちでは、Claude は、`wait-approval.sh` を裏で動かし、承認を待っていることを会話の相手に書く。CI が赤になったら、Claude は、worktree で直して push する。同じ失敗が3回続いたら、Claude は、止めて報告する。
 11. PR がマージされたか、所有者が PR を閉じたら、Claude は、作業フォルダの最上位に `cd` で戻り、`git worktree remove <worktree>` と `git branch -D <ブランチ>` を実行する。所有者が閉じた PR を、Claude は作り直さない。次の集計でそのモデルの価格がまだ分からなければ、Claude は、その集計のときに、この手順に従って PR をもう一度作る。
 12. Claude は、PR の URL と、価格を足したモデルと、価格が見つからなかったモデルと、突き合わせても足す価格が無かったモデルの名前を、会話の相手に書く。
 

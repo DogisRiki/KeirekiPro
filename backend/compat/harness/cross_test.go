@@ -308,3 +308,133 @@ func TestCrossRoute_ResumeSteps(t *testing.T) {
 		}
 	}
 }
+
+// exportCrossFiles は、出力の操作の、版をまたいで確かめる筋書きのファイルである。
+var exportCrossFiles = []string{"cross-export.yaml"}
+
+// exportStep は、出力の操作の段かを返す。版に送る、経路が /export で終わる段である。
+func exportStep(step Step) bool {
+	return step.Kind() == StepVersion && strings.HasSuffix(step.Request.Path, "/export")
+}
+
+// TestCrossRoute_ExportSteps は、出力の操作の版をまたぐ筋書きを読み、Java 版から Go 版の向きと Go 版から Java 版の向きの
+// それぞれで、出力の2つの段(設定を付けない出力と設定を付けた出力)が、その前の、経歴書か項目を変える段(出力の段でない、
+// GET でない、版に送る段)と違う版に送られることを確かめる。段の to: other が外れると、経歴書を保存した版と同じ版で出力する
+// ことになり、一方の版が保存した経歴書をもう一方の版が出力できるかを確かめなくなるためである。
+// 筋書きのファイルが無いときと、出力の段が GET と POST の1つずつでないときは失敗する。
+func TestCrossRoute_ExportSteps(t *testing.T) {
+	dir := filepath.Join("..", "scenarios", "export")
+	for _, file := range exportCrossFiles {
+		if _, err := os.Stat(filepath.Join(dir, file)); err != nil {
+			t.Errorf("版をまたぐ筋書き %s がありません: %v", file, err)
+		}
+	}
+	scenarios, err := LoadScenarios(dir, ModeCross)
+	if err != nil {
+		t.Fatalf("LoadScenarios: %v", err)
+	}
+	if len(scenarios) == 0 {
+		t.Fatalf("%s に、版をまたぐ動かし方の筋書きがありません", dir)
+	}
+	for _, s := range scenarios {
+		methods := map[string]int{}
+		for _, step := range s.Steps {
+			if exportStep(step) {
+				methods[step.Request.Method]++
+			}
+		}
+		if methods["GET"] != 1 || methods["POST"] != 1 || len(methods) != 2 {
+			t.Errorf("筋書き %s の出力の段 = %v, want GET と POST の1つずつ", s.Name, methods)
+		}
+		for _, direction := range []string{CrossJavaToGo, CrossGoToJava} {
+			route, err := CrossRoute(s, direction)
+			if err != nil {
+				t.Errorf("CrossRoute(%s, %s): %v", s.Name, direction, err)
+				continue
+			}
+			changed := -1
+			for i, step := range s.Steps {
+				switch {
+				case exportStep(step):
+					switch {
+					case changed < 0:
+						t.Errorf("筋書き %s の出力の段「%s」の前に、経歴書か項目を変える段がありません", s.Name, step.Name)
+					case route[i] == "" || route[i] == route[changed]:
+						t.Errorf("筋書き %s の向き %s で、出力の段「%s」が、その前の変える段「%s」と同じ版 %s に送られます",
+							s.Name, direction, step.Name, s.Steps[changed].Name, route[changed])
+					}
+				case resumeChangingStep(step):
+					changed = i
+				}
+			}
+		}
+	}
+}
+
+// backupCrossFiles は、バックアップの操作の、版をまたいで確かめる筋書きのファイルである。
+var backupCrossFiles = []string{"cross-backup.yaml"}
+
+// backupStep は、バックアップの書き出しの段かを返す。版に送る、経路が /backup で終わる GET の段である。
+func backupStep(step Step) bool {
+	return step.Kind() == StepVersion && step.Request.Method == "GET" && strings.HasSuffix(step.Request.Path, "/backup")
+}
+
+// restoreStep は、バックアップの戻しの段かを返す。版に送る、/api/resumes/restore への POST の段である。
+func restoreStep(step Step) bool {
+	return step.Kind() == StepVersion && step.Request.Method == "POST" && step.Request.Path == "/api/resumes/restore"
+}
+
+// TestCrossRoute_BackupSteps は、バックアップの操作の版をまたぐ筋書きを読み、Java 版から Go 版の向きと Go 版から Java 版の向きの
+// それぞれで、戻しの段が書き出しの段と違う版に送られ、最後の読む段が書き出しの段と同じ版に送られることを確かめる。
+// 戻しの段が書き出しの段と同じ版に送られると、一方の版で書き出したファイルをもう一方の版で戻せるかを確かめなくなる。
+// 最後の段が書き出しの段と違う版に送られると、戻した経歴書を最初の版で読めるかを確かめなくなる。
+// 筋書きのファイルが無いときと、書き出しの段と戻しの段が1つずつでないときと、最後の段が経歴書を読む GET でないときは失敗する。
+func TestCrossRoute_BackupSteps(t *testing.T) {
+	dir := filepath.Join("..", "scenarios", "backup")
+	for _, file := range backupCrossFiles {
+		if _, err := os.Stat(filepath.Join(dir, file)); err != nil {
+			t.Errorf("版をまたぐ筋書き %s がありません: %v", file, err)
+		}
+	}
+	scenarios, err := LoadScenarios(dir, ModeCross)
+	if err != nil {
+		t.Fatalf("LoadScenarios: %v", err)
+	}
+	if len(scenarios) == 0 {
+		t.Fatalf("%s に、版をまたぐ動かし方の筋書きがありません", dir)
+	}
+	for _, s := range scenarios {
+		var backups, restores []int
+		for i, step := range s.Steps {
+			switch {
+			case backupStep(step):
+				backups = append(backups, i)
+			case restoreStep(step):
+				restores = append(restores, i)
+			}
+		}
+		if len(backups) != 1 || len(restores) != 1 || restores[0] < backups[0] {
+			t.Errorf("筋書き %s の書き出しの段 = %v と戻しの段 = %v, want 書き出しの段のあとに戻しの段が1つずつ", s.Name, backups, restores)
+			continue
+		}
+		backup, restore, last := backups[0], restores[0], len(s.Steps)-1
+		if l := s.Steps[last]; l.Kind() != StepVersion || l.Request.Method != "GET" || !strings.HasPrefix(l.Request.Path, "/api/resumes/") {
+			t.Errorf("筋書き %s の最後の段「%s」が、経歴書を読む GET の段ではありません", s.Name, l.Name)
+		}
+		for _, direction := range []string{CrossJavaToGo, CrossGoToJava} {
+			route, err := CrossRoute(s, direction)
+			if err != nil {
+				t.Errorf("CrossRoute(%s, %s): %v", s.Name, direction, err)
+				continue
+			}
+			if route[backup] == "" || route[restore] == route[backup] {
+				t.Errorf("筋書き %s の向き %s で、戻しの段「%s」が、書き出しの段「%s」と同じ版 %s に送られます",
+					s.Name, direction, s.Steps[restore].Name, s.Steps[backup].Name, route[backup])
+			}
+			if route[last] != route[backup] {
+				t.Errorf("筋書き %s の向き %s で、最後の段「%s」が版 %s に送られます, want 書き出しの段「%s」と同じ版 %s",
+					s.Name, direction, s.Steps[last].Name, route[last], s.Steps[backup].Name, route[backup])
+			}
+		}
+	}
+}

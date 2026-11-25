@@ -44,9 +44,9 @@ bash .claude/scripts/ci-tool-signature/verify-ci-tool.sh <node|trivy|codex|terra
 - Claude は、所有者に、完成品を置くコマンドを示す。コマンドは、scratchpad の完成品を作業フォルダの `.github/` の下に `cp` で写す形にし、ファイルごとに1行で書く。置いたあとに所有者が確かめる方法として、`git diff --stat` に変えたファイルだけが出ることを書く
 - 所有者が置いたあと、Claude は `git diff` で、変わったのが版の文字列だけであることを確かめる
 
-## Step 5: `/ship` で PR を作り、確かめた結果を本文に書く
+## Step 5: `/ship-it` で PR を作り、確かめた結果を本文に書く
 
-- Claude は `/ship` で PR を作る
+- Claude は `/ship-it` で PR を作る
 - Claude は、PR の本文に、スクリプトが出した `### CI の道具の版の署名の確認` から始まる文を、そのまま写す
 - 記録の目印の行(`<!-- ci-tool-cooldown-exception data=... -->`)が出力にあれば、Claude は、その行も1文字も変えずに本文に写す。週次監査が、この行から、72時間待たずに入れた版の一覧を作るためである。公開から72時間経っていた版では、スクリプトはこの行を出さないので、Claude も書かない
 - Claude は、記録の目印の行を、自分で書いたり書き換えたりしない。1つの PR に書く記録の目印の行は、スクリプトが出した行だけにする

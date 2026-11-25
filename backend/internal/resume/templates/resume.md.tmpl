@@ -1,0 +1,233 @@
+
+# {{esc .Title}}
+
+**{{esc .AsOfDateLabel}}**
+
+**氏名：{{esc .FullName}}**
+
+---
+
+## 職歴
+
+| 期間 | 会社名 |
+|------|--------|
+{{range .Careers}}| {{esc .PeriodLabel}} | {{esc .CompanyName}} |
+{{end}}
+
+---
+
+## 職務内容
+
+{{range $i, $x := .CompanySections}}{{if not $i}}
+{{end}}### {{esc .CompanyLabel}}
+
+
+{{range $i, $x := .Projects}}{{if not $i}}
+{{end}}#### {{esc .ProjectLabel}}
+
+
+**プロジェクト概要：**
+{{esc .Overview}}
+
+
+**チーム構成：**
+{{esc .TeamComp}}
+
+
+**役割：**
+{{esc .Role}}
+
+
+{{if .Achievements}}
+**主な成果：**
+{{range $i, $x := .Achievements}}{{if not $i}}
+{{end}}{{esc .}}
+{{end}}
+{{end}}
+
+
+**作業工程：**
+
+| 要件定義 | 基本設計 | 詳細設計 | 実装・単体テスト | 結合テスト | 総合テスト | 運用・保守 |
+|:--------:|:--------:|:--------:|:----------------:|:----------:|:----------:|:----------:|
+| {{if .Process.Requirements}}○{{end}} | {{if .Process.BasicDesign}}○{{end}} | {{if .Process.DetailedDesign}}○{{end}} | {{if .Process.Implementation}}○{{end}} | {{if .Process.IntegrationTest}}○{{end}} | {{if .Process.SystemTest}}○{{end}} | {{if .Process.Maintenance}}○{{end}} |
+
+{{with .Tech}}
+**技術スタック：**
+
+{{with .Frontend}}
+- フロントエンド
+  {{if .Languages}}
+  - 開発言語：{{join .Languages}}
+  {{end}}
+  {{if .Frameworks}}
+  - フレームワーク：{{join .Frameworks}}
+  {{end}}
+  {{if .Libraries}}
+  - ライブラリ：{{join .Libraries}}
+  {{end}}
+  {{if .BuildTools}}
+  - ビルドツール：{{join .BuildTools}}
+  {{end}}
+  {{if .PackageManagers}}
+  - パッケージマネージャー：{{join .PackageManagers}}
+  {{end}}
+  {{if .Linters}}
+  - リンター：{{join .Linters}}
+  {{end}}
+  {{if .Formatters}}
+  - フォーマッター：{{join .Formatters}}
+  {{end}}
+  {{if .TestingTools}}
+  - テストツール：{{join .TestingTools}}
+  {{end}}
+{{end}}
+
+{{with .Backend}}
+- バックエンド
+  {{if .Languages}}
+  - 開発言語：{{join .Languages}}
+  {{end}}
+  {{if .Frameworks}}
+  - フレームワーク：{{join .Frameworks}}
+  {{end}}
+  {{if .Libraries}}
+  - ライブラリ：{{join .Libraries}}
+  {{end}}
+  {{if .BuildTools}}
+  - ビルドツール：{{join .BuildTools}}
+  {{end}}
+  {{if .PackageManagers}}
+  - パッケージマネージャー：{{join .PackageManagers}}
+  {{end}}
+  {{if .Linters}}
+  - リンター：{{join .Linters}}
+  {{end}}
+  {{if .Formatters}}
+  - フォーマッター：{{join .Formatters}}
+  {{end}}
+  {{if .TestingTools}}
+  - テストツール：{{join .TestingTools}}
+  {{end}}
+  {{if .OrmTools}}
+  - ORM：{{join .OrmTools}}
+  {{end}}
+  {{if .Auth}}
+  - 認証：{{join .Auth}}
+  {{end}}
+{{end}}
+
+{{with .Infrastructure}}
+- インフラ
+  {{if .Clouds}}
+  - クラウド：{{join .Clouds}}
+  {{end}}
+  {{if .OperatingSystems}}
+  - OS：{{join .OperatingSystems}}
+  {{end}}
+  {{if .Containers}}
+  - コンテナ：{{join .Containers}}
+  {{end}}
+  {{if .Databases}}
+  - データベース：{{join .Databases}}
+  {{end}}
+  {{if .WebServers}}
+  - Webサーバー：{{join .WebServers}}
+  {{end}}
+  {{if .CiCdTools}}
+  - CI/CD：{{join .CiCdTools}}
+  {{end}}
+  {{if .IacTools}}
+  - IaC：{{join .IacTools}}
+  {{end}}
+  {{if .MonitoringTools}}
+  - 監視：{{join .MonitoringTools}}
+  {{end}}
+  {{if .LoggingTools}}
+  - ロギング：{{join .LoggingTools}}
+  {{end}}
+{{end}}
+
+{{with .Tools}}
+- 開発支援ツール
+  {{if .SourceControls}}
+  - ソース管理：{{join .SourceControls}}
+  {{end}}
+  {{if .ProjectManagements}}
+  - プロジェクト管理：{{join .ProjectManagements}}
+  {{end}}
+  {{if .CommunicationTools}}
+  - コミュニケーション：{{join .CommunicationTools}}
+  {{end}}
+  {{if .DocumentationTools}}
+  - ドキュメント：{{join .DocumentationTools}}
+  {{end}}
+  {{if .APIDevelopmentTools}}
+  - API開発：{{join .APIDevelopmentTools}}
+  {{end}}
+  {{if .DesignTools}}
+  - デザイン：{{join .DesignTools}}
+  {{end}}
+  {{if .Editors}}
+  - エディタ：{{join .Editors}}
+  {{end}}
+  {{if .DevelopmentEnvironments}}
+  - 開発環境：{{join .DevelopmentEnvironments}}
+  {{end}}
+{{end}}
+
+{{end}}
+
+{{end}}
+{{end}}
+
+---
+
+{{if .Certifications}}
+## 保有資格
+
+| 取得年月 | 資格名 |
+|----------|--------|
+{{range .Certifications}}| {{esc .AcquiredAtLabel}} | {{esc .Name}} |
+{{end}}
+
+---
+
+{{end}}
+
+{{if .Portfolios}}
+## 個人開発・成果物
+
+{{range $i, $x := .Portfolios}}{{if not $i}}
+{{end}}**{{esc .Name}}**
+{{esc .Overview}}
+URL: {{esc .URL}}
+{{if notBlank .TechStack}}技術スタック：{{esc (deref .TechStack)}}
+{{end}}
+
+
+{{end}}
+
+---
+
+{{end}}
+
+{{if .SnsPlatforms}}
+## SNS
+
+{{range .SnsPlatforms}}- {{esc .Name}}: {{esc .URL}}
+{{end}}
+
+---
+
+{{end}}
+
+## 自己PR
+
+{{range $i, $x := .SelfPromotions}}{{if not $i}}
+{{end}}**{{esc .Title}}**
+{{esc .Content}}
+
+
+{{end}}
+

@@ -840,7 +840,7 @@ perl -MJSON::PP -e '
     my $tri = sub { { requirements => $_[0], design => $_[1], tasks => $_[2] } };
     my $d = { v => 1, issue => 501, prs => [ 612, 618 ], spec => $t, start_date => "2026-10-20", end_date => "2026-11-02",
         totals => { work_sec => 50700, wait_sec => 7800, concurrent_sec => 23280, tokens => 123456789, usd => 312.45,
-            usd_unknown_models => [], limit_count => 1, limit_sec => 9000 },
+            usd_unknown_models => [], limit_count => 1, limit_sec => 9000, compacts => 2, rereads => 5 },
         stages => [ map { { name => $_, work_sec => 720, wait_sec => 0, concurrent_sec => 180, tokens => 1234567, usd => 3.1 } } @st ],
         models => [ $m->("claude-opus-5-5", "本体の会話"), $m->("claude-opus-5-5", "spec の審査役"), $m->("claude-opus-5-5", "タスクごとの確認役"),
             $m->("claude-haiku-5-5", "Explore") ],
@@ -868,6 +868,8 @@ cat >"$DRAFT/report.md" <<'__MD__'
 | 使用料 | $312.45 |
 | 使う量の上限で止まった回数 | 1 |
 | 使う量の上限で止まっていた時間 | 2時間30分 |
+| 会話の要約の回数 | 2 |
+| 要約のあとに同じ資料を読み直した回数 | 5 |
 
 ### 段階ごと
 

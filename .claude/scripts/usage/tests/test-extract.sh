@@ -609,6 +609,69 @@ perl -MJSON::PP -e 'local $/; my $d = decode_json(<STDIN>); delete $d->{stage_ma
 perl "$WORK/nomarks/extract.pl" --state "$WORK/nomarksstate" --all --skip-locked --repo "$REPO" 2>/dev/null
 check "データのファイルに stage_marks が無いときは 1 で終わり、抜き出した記録を作らない" "$?/$( [ -e "$WORK/nomarksstate/extract/s-ev.jsonl" ] && echo yes || echo no)" "1/no"
 
+printf '== 手順の本文を読んだ印と審査役を起動した印と要約の区切り\n'
+perl -MJSON::PP -e '
+    my ($file, $cwd) = @ARGV;
+    my $j = JSON::PP->new->utf8->canonical;
+    my $n = 0;
+    my $c = sub { $n++; return (cwd => $cwd, sessionId => "s-sk", timestamp => sprintf("2026-10-26T00:05:%02d.000Z", $n)) };
+    my $call = sub { my ($id, $name, $input) = @_; return {$c->(), type => "assistant",
+        message => {id => "msg_$id", model => "claude-opus-5-5", role => "assistant", stop_reason => "tool_use", usage => {input_tokens => 1, output_tokens => 1},
+            content => [{type => "tool_use", id => $id, name => $name, input => $input}]}} };
+    my @l = (
+        $call->("k1", "Read", {file_path => "C:\\work\\repo\\.claude\\skills\\kiro-spec-design\\SKILL.md"}),
+        $call->("k2", "Read", {file_path => "/work/repo/.claude/skills/simplify/SKILL.md"}),
+        $call->("k3", "Read", {file_path => "/work/repo/.claude/skills/spec-review/README.md"}),
+        $call->("k4", "Agent", {subagent_type => "spec-style-checker", prompt => "- FEATURE: x\n- STAGE: design\nSECRET-PROMPT"}),
+        $call->("k5", "Agent", {subagent_type => "general-purpose", prompt => "- STAGE: tasks\nSECRET-PROMPT"}),
+        {$c->(), type => "system", subtype => "compact_boundary", content => "SECRET-SUMMARY"},
+        $call->("k6", "Edit", {file_path => "/work/repo/.claude/skills/start/SKILL.md", old_string => "SECRET-OLD", new_string => "SECRET-NEW"}),
+        $call->("k7", "Write", {file_path => "/work/repo/.claude/skills/simplify/SKILL.md", content => "SECRET-CONTENT"}),
+    );
+    open my $f, ">", $file or die "$file: $!";
+    print $f $j->encode($_), "\n" for @l;
+' "$D/s-sk.jsonl" "$REPO"
+run_all
+SK="$EX/s-sk.jsonl"
+check "stage_marks に載ったスキルの SKILL.md を読んだ行と、審査役か点検役を起動した行だけが、via を付けた段階の印になる" \
+    "$(kall "$SK" stage name)|$(kall "$SK" stage via)|$(kall "$SK" stage spec_stage)" "kiro-spec-design,spec-review|read,agent|null,design"
+check "stage_marks に載ったスキルの SKILL.md を書き換えた行だけが skill_edit の行になり、要約の区切りが compact の行になる" \
+    "$(kall "$SK" skill_edit name)|$(kcount "$SK" compact)" "start|1"
+check "依頼文と書き換えた文と要約の文が、抜き出した記録に残らない" "$(grep -c SECRET "$SK")" "0"
+
+printf '== ファイルを読んだ印\n'
+perl -MJSON::PP -e '
+    my ($file, $cwd) = @ARGV;
+    my $j = JSON::PP->new->utf8->canonical;
+    my $n = 0;
+    my $c = sub { $n++; return (cwd => $cwd, sessionId => "s-rd", timestamp => sprintf("2026-10-26T00:06:%02d.000Z", $n)) };
+    my $call = sub { my ($id, $name, $input) = @_; return {$c->(), type => "assistant",
+        message => {id => "msg_$id", model => "claude-opus-5-5", role => "assistant", stop_reason => "tool_use", usage => {input_tokens => 1, output_tokens => 1},
+            content => [{type => "tool_use", id => $id, name => $name, input => $input}]}} };
+    my @l = (
+        # 1つ目から5つ目は、同じ <REPO>/SecretDir/a.md を読む。1つ目は区切りを \ にする
+        $call->("r1", "Read", {file_path => ($cwd =~ tr{/}{\\}r) . "\\SecretDir\\a.md"}),
+        $call->("r2", "Read", {file_path => "$cwd/.claude/worktrees/wt1/SecretDir/./x/../a.md"}),
+        $call->("r3", "Bash", {command => "sed -n 1,20p SecretDir/a.md | head -n 5"}),
+        $call->("r4", "Bash", {command => "cd \"$cwd/..\" && cat \"repo/SecretDir/a.md\" 2>/dev/null"}),
+        $call->("r5", "Bash", {command => "if true; then tail -n 3 SecretDir/a.md; fi"}),
+        # 6つ目は、別の b.md を読む
+        $call->("r6", "Bash", {command => "head -5 SecretDir/b.md"}),
+        # 読む印を書かない: sed -i、ヒアドキュメントの本文、リダイレクトの先、変数、読まないコマンド、標準入力
+        $call->("r7", "Bash", {command => "sed -i s/x/y/ SecretDir/a.md; cat >SecretDir/c.md <<'"'"'EOF'"'"'\ncat SecretDir/d.md\nEOF\ncat \"\$F\" | grep -n x SecretDir/e.md | head -n 3; ls SecretDir"}),
+        $call->("r8", "Grep", {pattern => "x", path => "$cwd/SecretDir/a.md"}),
+    );
+    open my $f, ">", $file or die "$file: $!";
+    print $f $j->encode($_), "\n" for @l;
+' "$D/s-rd.jsonl" "$REPO"
+run_all
+RD="$EX/s-rd.jsonl"
+check "Read の file_path と、cat head tail sed の引数のファイルを、場所をそろえて読んだ行にし、sed -i とヒアドキュメントの本文とリダイレクトの先と変数と Grep を読んだ行にしない" \
+    "$(kall "$RD" read f | tr ',' '\n' | sort | uniq -c | awk '{print $1}' | sort | tr '\n' ' ')" "1 5 "
+check "読んだ行の f は、場所の SHA-1 の先頭16文字である" \
+    "$(kfield "$RD" read 1 f)" "$(perl -MDigest::SHA=sha1_hex -e 'my $p = "$ARGV[0]/SecretDir/a.md"; $p = lc $p if $p =~ m{\A[A-Za-z]:}; print substr(sha1_hex($p), 0, 16)' "$REPO")"
+check "ファイルの場所が抜き出した記録に残らない" "$(grep -ci secret "$RD")" "0"
+
 printf '== デスクトップアプリの手元の記録\n'
 # desktop.jsonl の行を local>session の形にしてつなぐ。ファイルが無ければ nofile
 dpairs() {

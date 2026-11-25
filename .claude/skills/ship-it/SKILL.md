@@ -2,7 +2,7 @@
 description: verify-all→ブランチ確認→規約準拠commit→push→PR作成→auto-mergeの予約の確認→CI監視まで、実装完了からCIの見届けまでを一気通貫で行う。auto-mergeは仕組みが予約する。
 ---
 
-# ship
+# ship-it
 
 ## Job
 
@@ -274,7 +274,7 @@ auto-mergeは、PRが作られると仕組み(ワークフロー)が予約する
    コードスキャンの解析を消す API(`code-scanning/analyses` への DELETE)を呼ばない。
    これらの API を呼ぶと、警告を数える `codeql-complete` の結論を偽れるためである
 
-   見届けを終えたあとは、`/ship` は自分では動かない。所有者が会話で再実行を頼んだら、
+   見届けを終えたあとは、`/ship-it` は自分では動かない。所有者が会話で再実行を頼んだら、
    Claude は `gh run rerun <実行の番号> --failed` で失敗したジョブを再実行し、手順7の1から見届けを続ける。
 
 8. **所有者が確かめる画面の用意**: `pre-merge-check` ラベルの付いたPRで、手順7の4の5に当たったときに行う。

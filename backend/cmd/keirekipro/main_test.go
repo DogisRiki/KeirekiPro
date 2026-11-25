@@ -14,6 +14,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
@@ -987,5 +988,79 @@ func TestRun_PassesResumeHandlers(t *testing.T) {
 	_ = res.Body.Close()
 	if res.StatusCode != http.StatusOK || string(body) != `{"resumes":[]}` {
 		t.Errorf("経歴書の一覧 = %d %s, want 200 {\"resumes\":[]}", res.StatusCode, body)
+	}
+}
+
+// 入口が、起動した PDF を作る部品を経歴書の処理に渡すことを、ログインした利用者が、出力の前提を満たす経歴書を設定を
+// 付けた出力で PDF にする要求が、200 と application/pdf と %PDF- で始まる本文で答えられることで確かめる(要件1の
+// 受入基準3)。internal/resume と internal/httpapi のテストは PDF の部品を自分で渡すので、main.go が渡し忘れても
+// 通ってしまうためである。
+func TestRun_PassesPDFEngineToResume(t *testing.T) {
+	name := newDatabase(t)
+	pool := connect(t, name)
+	files, err := backend.Migrations()
+	if err != nil {
+		t.Fatalf("マイグレーションのファイルを読めません: %v", err)
+	}
+	if _, err := migrate.Run(t.Context(), pool, files, migrate.Apply); err != nil {
+		t.Fatalf("V1〜V7 を適用できません: %v", err)
+	}
+	// 利用者1と、利用者1の6つの欄がそろった経歴書「フォントを比べる経歴書」を入れる
+	fixtures := os.DirFS(filepath.Join("..", "..", "compat", "fixtures"))
+	if err := pgx.BeginFunc(t.Context(), pool, func(tx pgx.Tx) error {
+		for _, f := range []string{"users/basic.sql", "resumes/fonts.sql"} {
+			script, err := fs.ReadFile(fixtures, f)
+			if err != nil {
+				return err
+			}
+			if _, err := tx.Exec(t.Context(), string(script)); err != nil {
+				return fmt.Errorf("%s: %w", f, err)
+			}
+		}
+		return nil
+	}); err != nil {
+		t.Fatalf("初期のデータを入れられません: %v", err)
+	}
+	userID := uuid.MustParse("00000000-0000-4000-8000-000000000001")
+	secret := strings.Repeat("s", 64)
+	token, err := auth.New(auth.Deps{Pool: pool, JWT: config.JWT{Secret: secret, AccessTokenValidity: time.Hour}}).
+		IssueAccessToken(t.Context(), userID, []string{"USER"})
+	if err != nil {
+		t.Fatalf("ログインの状態の値を作れません: %v", err)
+	}
+
+	vars := testEnv(t, name)
+	vars["JWT_SECRET"] = secret
+	h := newHarness(t, vars)
+	stop, done := h.start(t)
+	defer func() {
+		stop()
+		<-done
+	}()
+	body := `{"format":"pdf","disposition":"inline","pdfSettings":{"fontFamily":"NotoSerifJP",` +
+		`"fontSizes":{"title":20.5,"date":9,"fullName":13,"sectionHeading":14.5},` +
+		`"tableHeaderColor":{"rgb":{"r":18,"g":52,"b":171}}}}`
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost,
+		"http://"+h.addr+"/api/resumes/00000000-0000-4000-8000-000000000401/export", strings.NewReader(body))
+	if err != nil {
+		t.Fatalf("要求を作れません: %v", err)
+	}
+	// CSRF の確かめは、Cookie XSRF-TOKEN と X-XSRF-TOKEN ヘッダが同じ値かを比べる
+	csrf := "export-csrf-token"
+	req.Header.Set("Cookie", "accessToken="+token+"; XSRF-TOKEN="+csrf)
+	req.Header.Set("X-XSRF-TOKEN", csrf)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/pdf, application/json")
+	res, err := httpClient.Do(req)
+	if err != nil {
+		t.Fatalf("出力の要求を送れません: %v", err)
+	}
+	got, _ := io.ReadAll(res.Body)
+	_ = res.Body.Close()
+	if res.StatusCode != http.StatusOK || res.Header.Get("Content-Type") != "application/pdf" ||
+		!bytes.HasPrefix(got, []byte("%PDF-")) {
+		head := got[:min(len(got), 200)]
+		t.Errorf("設定を付けた PDF の出力 = %d %q %q, want 200 application/pdf と %%PDF- で始まる本文",
+			res.StatusCode, res.Header.Get("Content-Type"), head)
 	}
 }

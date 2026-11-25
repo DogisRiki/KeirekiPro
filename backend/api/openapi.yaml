@@ -671,6 +671,7 @@ paths:
         `GET /api/resumes/{resumeId}/backup` が返した JSON をそのまま受け取り、新しい職務経歴書として作る。
         `version` が `1.0` でないとき、作れる数の上限を超えるとき、中身が規則に合わないときは 400。
         Java の DTO は検証の注釈を持たず、検証はドメインで行う。`resume` が無いと Java 版は 500 を返す。
+        退会してすでに居ない利用者が送ると 404(Java 版は 500 を返す)。
       parameters:
         - $ref: '#/components/parameters/XsrfTokenHeader'
         - $ref: '#/components/parameters/XsrfTokenCookie'
@@ -679,7 +680,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ResumeBackup'
+              $ref: '#/components/schemas/RestoreResumeRequest'
       responses:
         '201':
           $ref: '#/components/responses/ResumeInfoCreated'
@@ -689,6 +690,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
         '500':
           $ref: '#/components/responses/InternalServerError'
   /api/resumes/{resumeId}:
@@ -2035,6 +2038,7 @@ components:
         type: string
     ExportResumeRequest:
       type: object
+      x-go-type: json.RawMessage
       description: |
         `format` が `pdf` なら `pdfSettings` が要る(無ければ 400、`errors` の項目名は `pdfSettingsRequired`)。
       required: [format, disposition]
@@ -2404,6 +2408,12 @@ components:
           type: string
         content:
           type: string
+    RestoreResumeRequest:
+      type: object
+      x-go-type: json.RawMessage
+      description: |
+        復元の要求の本文。形は `ResumeBackup` と同じ(Java の `RestoreResumeRequest`)。
+        生成したコードは本文を読まずに受け口へ渡し、受け口が Java 版と同じ決まりで読む。
     ResumeBackup:
       type: object
       description: |

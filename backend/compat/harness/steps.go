@@ -130,10 +130,43 @@ func (s *Session) CheckValues(step Step, resp Response) []string {
 	return problems
 }
 
-// checkStepExpect は、段 step の応答 resp が、expect の status と fields(CheckExpect)と、values(session の CheckValues)に
-// 合うかを確かめ、合わないことを1つずつ文にして返す。版をまたぐ動かし方と応答の時間の比べ方は、送り先の版の応答をこれで確かめる。
+// checkStepExpect は、段 step の応答 resp が、expect の status と fields(CheckExpect)と、values(session の CheckValues)と、
+// content_type と、body_contains(session の checkBodyContains)に合うかを確かめ、合わないことを1つずつ文にして返す。
+// 版をまたぐ動かし方と応答の時間の比べ方は、送り先の版の応答をこれで確かめる。
 func checkStepExpect(session *Session, step Step, resp Response) []string {
-	return append(CheckExpect(step, resp), session.CheckValues(step, resp)...)
+	problems := append(CheckExpect(step, resp), session.CheckValues(step, resp)...)
+	problems = append(problems, checkContentType(step, resp)...)
+	return append(problems, session.checkBodyContains(step, resp)...)
+}
+
+// checkContentType は、段 step の応答 resp の Content-Type が、expect の content_type と文字の並びのまま同じかを確かめる。
+// content_type の無い段は確かめない。
+func checkContentType(step Step, resp Response) []string {
+	if step.Expect.ContentType == "" {
+		return nil
+	}
+	if got := resp.Header.Get("Content-Type"); got != step.Expect.ContentType {
+		return []string{fmt.Sprintf("段 %s の応答の Content-Type が %q でした。期待は %q です", step.Name, got, step.Expect.ContentType)}
+	}
+	return nil
+}
+
+// checkBodyContains は、版に送る段 step の応答 resp の本文に、expect の body_contains の字の並びがすべて含まれるかを確かめ、
+// 見つからない字の並びを1つずつ文にして返す。字の並びの {名前} は、この Session で取り出した値に置き換えてから探す。
+// 合わないことの文には、段の名前と、置き換えたあとの見つからない字の並びを書く。
+func (s *Session) checkBodyContains(step Step, resp Response) []string {
+	var problems []string
+	for _, raw := range step.Expect.BodyContains {
+		want, err := s.expand(step, " expect の body_contains の値", raw)
+		if err != nil {
+			problems = append(problems, strings.TrimPrefix(err.Error(), "harness: "))
+			continue
+		}
+		if !bytes.Contains(resp.Body, []byte(want)) {
+			problems = append(problems, fmt.Sprintf("段 %s の応答の本文に %q がありません", step.Name, want))
+		}
+	}
+	return problems
 }
 
 // checkAbsoluteExpect は、絶対の URL の段 step の応答 resp が、expect の status と content_type と body_file に合うかを確かめ、
@@ -144,11 +177,7 @@ func checkAbsoluteExpect(step Step, resp Response) []string {
 	if step.Expect.Status != 0 && resp.Status != step.Expect.Status {
 		problems = append(problems, fmt.Sprintf("段 %s のステータスが %d でした。期待は %d です", step.Name, resp.Status, step.Expect.Status))
 	}
-	if step.Expect.ContentType != "" {
-		if got := resp.Header.Get("Content-Type"); got != step.Expect.ContentType {
-			problems = append(problems, fmt.Sprintf("段 %s の応答の Content-Type が %q でした。期待は %q です", step.Name, got, step.Expect.ContentType))
-		}
-	}
+	problems = append(problems, checkContentType(step, resp)...)
 	if step.Expect.BodyFile != "" {
 		want, err := readImageFixture(step.Expect.BodyFile)
 		switch {

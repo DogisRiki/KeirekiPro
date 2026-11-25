@@ -1,0 +1,81 @@
+# Java 版が書き出したファイルの、バックアップの戻しの筋書き(要件1の受入基準1と3、要件2の受入基準1から3、要件3の受入基準4、
+# 要件6の受入基準1と2)。
+# user2 が、Java 版が書き出した8つのファイル(fixtures/backups/ の java- で始まるファイル)と、basic.json を、1つずつ戻す。
+# どの要求も 201 で答えられ、要求を送った user2 に、ファイルと同じ経歴書が作られる。Java 版と Go 版を比べる検査は、
+# 答えの本文と、要求のあとのデータベースを比べる。
+# user2 は初期のデータに経歴書を持たないので、戻す経歴書の名前は重ならず、経歴書の数の上限にも当たらない。
+# 戻しの段には csrf: true を付け、本文を json_file で送る。
+name: backup-restore
+group: 5
+fixtures: [users/basic.sql, resumes/fonts.sql, backup/backup.sql]
+modes: [compare]
+steps:
+  - name: login-user2
+    request:
+      method: POST
+      path: /api/auth/login
+      json: {email: user2@example.com, password: Passw0rd!}
+    expect: {status: 200}
+  - name: restore-java-401
+    request:
+      method: POST
+      path: /api/resumes/restore
+      csrf: true
+      json_file: backups/java-401.json
+    expect: {status: 201}
+  - name: restore-java-801
+    request:
+      method: POST
+      path: /api/resumes/restore
+      csrf: true
+      json_file: backups/java-801.json
+    expect: {status: 201}
+  - name: restore-java-802
+    request:
+      method: POST
+      path: /api/resumes/restore
+      csrf: true
+      json_file: backups/java-802.json
+    expect: {status: 201}
+  - name: restore-java-803
+    request:
+      method: POST
+      path: /api/resumes/restore
+      csrf: true
+      json_file: backups/java-803.json
+    expect: {status: 201}
+  - name: restore-java-804
+    request:
+      method: POST
+      path: /api/resumes/restore
+      csrf: true
+      json_file: backups/java-804.json
+    expect: {status: 201}
+  - name: restore-java-created
+    request:
+      method: POST
+      path: /api/resumes/restore
+      csrf: true
+      json_file: backups/java-created.json
+    expect: {status: 201}
+  - name: restore-java-added
+    request:
+      method: POST
+      path: /api/resumes/restore
+      csrf: true
+      json_file: backups/java-added.json
+    expect: {status: 201}
+  - name: restore-java-edited
+    request:
+      method: POST
+      path: /api/resumes/restore
+      csrf: true
+      json_file: backups/java-edited.json
+    expect: {status: 201}
+  - name: restore-basic
+    request:
+      method: POST
+      path: /api/resumes/restore
+      csrf: true
+      json_file: backups/basic.json
+    expect: {status: 201}

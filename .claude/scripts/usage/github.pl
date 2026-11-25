@@ -843,10 +843,11 @@ sub stage_names {
         '実装中の spec の直し', '出荷とレビュー対応', 'その他', '合計');
 }
 
-# 全体の合計の表の5行の項目の名前と、値の形の名前
+# 全体の合計の表の7行の項目の名前と、値の形の名前
 sub total_items {
     return (['AIの作業時間', 'time'], ['トークン数', 'num'], ['使用料', 'usd'],
-        ['使う量の上限で止まった回数', 'count'], ['使う量の上限で止まっていた時間', 'time']);
+        ['使う量の上限で止まった回数', 'count'], ['使う量の上限で止まっていた時間', 'time'],
+        ['会話の要約の回数', 'count'], ['要約のあとに同じ資料を読み直した回数', 'count']);
 }
 
 # 往復と手戻りの表の項目の名前
@@ -946,7 +947,8 @@ sub report_schema {
         start_date => $date,
         end_date => $date,
         totals => { work_sec => $num0, wait_sec => $num0, concurrent_sec => $num0, tokens => $int0, usd => $num0,
-            usd_unknown_models => [ sub { is_model_id(bytes_of($_[0])) } ], limit_count => $int0, limit_sec => $num0 },
+            usd_unknown_models => [ sub { is_model_id(bytes_of($_[0])) } ], limit_count => $int0, limit_sec => $num0,
+            compacts => $int, rereads => $int },
         stages => [ { name => sub { in_set(bytes_of($_[0]), stage_names()) }, work_sec => $num0, wait_sec => $num0,
             concurrent_sec => $num0, tokens => $int0, usd => $num0 } ],
         models => [ { model => sub { is_model_id(bytes_of($_[0])) }, role => sub { is_role(bytes_of($_[0])) }, in => $int0, cw => $int0, cr => $int0, out => $int0, usd => $num0 } ],

@@ -292,3 +292,107 @@ func TestSubstitute_BodyHeaderAndCookie(t *testing.T) {
 		t.Errorf("取り出した値 = %v", s.vars)
 	}
 }
+
+func TestCapture_JSONFileSentAsIs(t *testing.T) {
+	var (
+		mu          sync.Mutex
+		gotBody     []byte
+		contentType string
+	)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		b, _ := io.ReadAll(r.Body)
+		mu.Lock()
+		gotBody, contentType = b, r.Header.Get("Content-Type")
+		mu.Unlock()
+		_, _ = w.Write([]byte(`{}`))
+	}))
+	t.Cleanup(srv.Close)
+
+	want, err := readFixture("resumes/fonts-NotoSansJP.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	step := Step{Name: "export", Request: Request{Method: http.MethodPost, Path: "/api/resumes/x/export", JSONFile: "resumes/fonts-NotoSansJP.json"}}
+	if _, err := NewSession().Send(t.Context(), srv.Client(), srv.URL, step); err != nil {
+		t.Fatalf("Send: %v", err)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	// ファイルのバイトを、空白と改行と項目の順を含めて、そのまま本文にする
+	if string(gotBody) != string(want) {
+		t.Errorf("本文 = %q, want %q", gotBody, want)
+	}
+	if contentType != "application/json" {
+		t.Errorf("Content-Type = %q, want application/json", contentType)
+	}
+
+	// 送る時点でファイルを読めないときは、段の誤りにする
+	missing := Step{Name: "gone", Request: Request{Method: http.MethodPost, Path: "/x", JSONFile: "export/none.json"}}
+	if _, err := NewSession().Send(t.Context(), srv.Client(), srv.URL, missing); err == nil ||
+		!strings.Contains(err.Error(), `段 gone の json_file "export/none.json" を読めません`) {
+		t.Errorf("無いファイルの段の誤り = %v", err)
+	}
+}
+
+func TestCapture_JSONCaptureSentAsIs(t *testing.T) {
+	// 前の段の答えの本文の全体を text で取り出し、次の段で json_capture でそのまま送る。
+	// 空白と改行と項目の順と、\u で書いた字と、{名前} の形の字を含めて、字を変えずに送ることを確かめる
+	const backup = "{\n  \"version\" : \"1.0\",\n  \"resume\" : {\"resumeName\":\"\u2028{id}\",\"a\":1}\n}"
+	var (
+		mu          sync.Mutex
+		gotBody     []byte
+		contentType string
+	)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			_, _ = w.Write([]byte(backup))
+			return
+		}
+		b, _ := io.ReadAll(r.Body)
+		mu.Lock()
+		gotBody, contentType = b, r.Header.Get("Content-Type")
+		mu.Unlock()
+		w.WriteHeader(http.StatusCreated)
+	}))
+	t.Cleanup(srv.Close)
+
+	s := NewSession()
+	export := get("export", "/api/resumes/x/backup")
+	export.Capture = map[string]string{"backup": "text", "id": "text"}
+	if _, err := s.Send(t.Context(), srv.Client(), srv.URL, export); err != nil {
+		t.Fatalf("書き出しの段: %v", err)
+	}
+	restore := Step{Name: "restore", Request: Request{Method: http.MethodPost, Path: "/api/resumes/restore", JSONCapture: "backup"}}
+	if _, err := s.Send(t.Context(), srv.Client(), srv.URL, restore); err != nil {
+		t.Fatalf("戻しの段: %v", err)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if string(gotBody) != backup {
+		t.Errorf("本文 = %q, want %q", gotBody, backup)
+	}
+	if contentType != "application/json" {
+		t.Errorf("Content-Type = %q, want application/json", contentType)
+	}
+}
+
+func TestCapture_JSONCaptureMissing(t *testing.T) {
+	// 値の名前が取り出されていない段は、要求を送らずに失敗し、誤りに段の名前と値の名前を書く
+	var sent atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		sent.Add(1)
+		w.WriteHeader(http.StatusCreated)
+	}))
+	t.Cleanup(srv.Close)
+
+	s := NewSession()
+	s.vars["other"] = "{}"
+	restore := Step{Name: "restore", Request: Request{Method: http.MethodPost, Path: "/api/resumes/restore", JSONCapture: "backup"}}
+	_, err := s.Send(t.Context(), srv.Client(), srv.URL, restore)
+	if err == nil || !strings.Contains(err.Error(), "段 restore") || !strings.Contains(err.Error(), "json_capture") || !strings.Contains(err.Error(), "backup") {
+		t.Errorf("誤り = %v, want 段 restore と json_capture と backup を含む", err)
+	}
+	if n := sent.Load(); n != 0 {
+		t.Errorf("取り出していない値の段が要求を %d 回送りました", n)
+	}
+}

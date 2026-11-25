@@ -1,9 +1,9 @@
 #!/bin/bash
 # =====================================================================
-# Stop hook: /ship の見届けを、終えてはいけない状態で終えないようにする
+# Stop hook: /ship-it の見届けを、終えてはいけない状態で終えないようにする
 #
-# いまのブランチのPRが、/ship の手順7で見届けを続ける状態にあるときに、停止をブロックする(exit 2)。
-# 止める状態は次の5つ。どれも .claude/skills/ship/SKILL.md の手順7の判定で「見届けを続ける」側に当たる。
+# いまのブランチのPRが、/ship-it の手順7で見届けを続ける状態にあるときに、停止をブロックする(exit 2)。
+# 止める状態は次の5つ。どれも .claude/skills/ship-it/SKILL.md の手順7の判定で「見届けを続ける」側に当たる。
 #   - PRが開いていて、main と衝突している(mergeStateStatus が DIRTY)
 #   - PRが開いていて、必須の検査に結果が出ていないもの(bucket が pending)がある
 #   - PRが開いていて、必須の検査がすべて通り、自動マージの予約があり、承認待ち(REVIEW_REQUIRED)でない
@@ -103,11 +103,11 @@ verdict=$(perl -MJSON::PP -e '
         }
         exit 0 unless @missing;
         my $list = join("、", @missing);
-        print "merged|$n\tPR #$n はマージされましたが、Issue $list の集計がまだ GitHub に出ていません。/ship の手順7の判定のとおり、usage-report のスキルの『マージを見届けたとき』の手順で集計を出してから、見届けを終えてください。\n";
+        print "merged|$n\tPR #$n はマージされましたが、Issue $list の集計がまだ GitHub に出ていません。/ship-it の手順7の判定のとおり、usage-report のスキルの『マージを見届けたとき』の手順で集計を出してから、見届けを終えてください。\n";
         exit 0;
     }
     if (($pr->{mergeStateStatus} // "") eq "DIRTY") {
-        print "dirty|$n|$sha\tPR #$n は main と衝突しています。/ship の手順7の判定のとおり、手元で main を取り込んでから見届けを続けてください。\n";
+        print "dirty|$n|$sha\tPR #$n は main と衝突しています。/ship-it の手順7の判定のとおり、手元で main を取り込んでから見届けを続けてください。\n";
         exit 0;
     }
     my $checks = eval { JSON::PP::decode_json($checks_json) };
@@ -115,13 +115,13 @@ verdict=$(perl -MJSON::PP -e '
     my @pending = map { $_->{name} // "" } grep { ref $_ eq "HASH" && ($_->{bucket} // "") eq "pending" } @$checks;
     if (@pending) {
         my %seen; my $names = join("、", grep { !$seen{$_}++ } @pending);
-        print "pending|$n|$sha\tPR #$n の必須の検査に、結果がまだ出ていないものがあります($names)。/ship の手順7の判定のとおり、gh pr checks $n --watch --required で結果が出るのを待ち、見届けを続けてください。\n";
+        print "pending|$n|$sha\tPR #$n の必須の検査に、結果がまだ出ていないものがあります($names)。/ship-it の手順7の判定のとおり、gh pr checks $n --watch --required で結果が出るのを待ち、見届けを続けてください。\n";
         exit 0;
     }
     my $all_pass = !grep { !(ref $_ eq "HASH" && ($_->{bucket} // "") =~ /\A(?:pass|skipping)\z/) } @$checks;
     my $review_required = ($pr->{reviewDecision} // "") eq "REVIEW_REQUIRED";
     if ($all_pass && defined $pr->{autoMergeRequest} && !$review_required) {
-        print "merging|$n|$sha\tPR #$n は必須の検査がすべて通り、自動マージの予約があります。/ship の手順7の判定のとおり、マージされるまで見届けを続けてください。\n";
+        print "merging|$n|$sha\tPR #$n は必須の検査がすべて通り、自動マージの予約があります。/ship-it の手順7の判定のとおり、マージされるまで見届けを続けてください。\n";
         exit 0;
     }
     my %gated;
@@ -137,7 +137,7 @@ verdict=$(perl -MJSON::PP -e '
     my $beat;
     if (open my $fh, "<", "$state_dir/approval-wait-$n") { $beat = <$fh>; close $fh; }
     exit 0 if defined $beat && $beat =~ /\A([0-9]+)\s*\z/ && abs(time - $1) <= 300;
-    print "approval|$n|$sha\tPR #$n は所有者の承認を待っていますが、承認を待つコマンドが動いていません。/ship の手順7の判定のとおり、bash .claude/scripts/ship/wait-approval.sh $n を Bash の run_in_background で動かしてから返答を終えてください。手順7の判定で承認待ちに当たらないと分かったとき(dependency-cooldown に記録のコメントが無いときなど)は、そのことを書いて返答を終えてください。\n";
+    print "approval|$n|$sha\tPR #$n は所有者の承認を待っていますが、承認を待つコマンドが動いていません。/ship-it の手順7の判定のとおり、bash .claude/scripts/ship/wait-approval.sh $n を Bash の run_in_background で動かしてから返答を終えてください。手順7の判定で承認待ちに当たらないと分かったとき(dependency-cooldown に記録のコメントが無いときなど)は、そのことを書いて返答を終えてください。\n";
 ' -- "$pr_json" "$checks_json" "$usage_dir" "$project_dir/.github/audit/required-checks.json" "$state_dir" 2>/dev/null)
 
 [ -n "$verdict" ] || exit 0

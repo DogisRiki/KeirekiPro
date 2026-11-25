@@ -1,0 +1,45 @@
+# 出力の操作で、ほかの利用者の経歴書の筋書き(要件4の受入基準1)。
+# user2 が、user1 の経歴書 401(resumes/fonts.sql。出力の前提を満たす)と 101(resumes/empty.sql。満たさない)に、
+# 設定を付けない出力の Markdown と、設定を付けた出力の attachment を送る。どの要求も、無い経歴書と同じ答えになる。
+# Accept は、画面と同じく application/json を含める。
+name: export-other-user
+group: 4
+fixtures: [users/basic.sql, resumes/fonts.sql, resumes/empty.sql]
+modes: [compare]
+steps:
+  - name: login-user2
+    request:
+      method: POST
+      path: /api/auth/login
+      json: {email: user2@example.com, password: Passw0rd!}
+    expect: {status: 200}
+  # 出力の前提を満たす user1 の経歴書
+  - name: markdown-other-fonts
+    request:
+      method: GET
+      path: /api/resumes/00000000-0000-4000-8000-000000000401/export
+      headers: {Accept: 'text/markdown, application/json'}
+    expect: {status: 404, content_type: application/json}
+  - name: save-pdf-other-fonts
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-000000000401/export
+      csrf: true
+      headers: {Accept: 'application/pdf, application/json'}
+      json_file: resumes/fonts-NotoSansJP.json
+    expect: {status: 404, content_type: application/json}
+  # 出力の前提を満たさない user1 の経歴書
+  - name: markdown-other-empty
+    request:
+      method: GET
+      path: /api/resumes/00000000-0000-4000-8000-000000000101/export
+      headers: {Accept: 'text/markdown, application/json'}
+    expect: {status: 404, content_type: application/json}
+  - name: save-pdf-other-empty
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-000000000101/export
+      csrf: true
+      headers: {Accept: 'application/pdf, application/json'}
+      json_file: resumes/fonts-NotoSansJP.json
+    expect: {status: 404, content_type: application/json}

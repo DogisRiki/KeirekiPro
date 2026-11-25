@@ -944,8 +944,8 @@ UR="$SK/usage-report/SKILL.md"
 check "usage-report の SKILL.md に、4つの時点の見出しと、usage.sh の draft・publish・proposals・proposal・owner を呼ぶ行と、所見の決まりの見出しがある" \
     "$(hasline "$UR" '^### マージを見届けたとき$')$(hasline "$UR" '^### 次の会話で出すとき$')$(hasline "$UR" '^### 案を尋ねるとき$')$(hasline "$UR" '^### 所有者かを尋ねるとき$') $(hasline "$UR" 'usage\.sh draft <N>')$(hasline "$UR" 'usage\.sh publish <N>')$(hasline "$UR" 'usage\.sh proposals')$(hasline "$UR" 'usage\.sh proposal <')$(hasline "$UR" 'usage\.sh owner (yes|no)') $(hasline "$UR" '^## 所見の決まり$')" \
     "yesyesyesyes yesyesyesyesyes yes"
-check "ship の SKILL.md の MERGED の行が usage-report の手順を指し、同じ失敗の3回目の箇所が mark same-failure を呼ぶ" \
-    "$(hasline "$SK/ship/SKILL.md" 'MERGED.*usage-report のスキル.*マージを見届けたとき')$(hasnear "$SK/ship/SKILL.md" '同じ失敗が3回続いたとき' 2 'usage\.sh mark same-failure')" "yesyes"
+check "ship-it の SKILL.md の MERGED の行が usage-report の手順を指し、同じ失敗の3回目の箇所が mark same-failure を呼ぶ" \
+    "$(hasline "$SK/ship-it/SKILL.md" 'MERGED.*usage-report のスキル.*マージを見届けたとき')$(hasnear "$SK/ship-it/SKILL.md" '同じ失敗が3回続いたとき' 2 'usage\.sh mark same-failure')" "yesyes"
 check "spec-review の SKILL.md が changed のときに mark spec-fix を呼ぶ" \
     "$(hasline "$SK/spec-review/SKILL.md" 'changed.*usage\.sh mark spec-fix --stage')" "yes"
 check "spec-review の SKILL.md の所有者への報告の箇所が mark spec-review-end を呼ぶ" \

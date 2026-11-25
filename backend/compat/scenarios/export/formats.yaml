@@ -1,0 +1,166 @@
+# 出力の操作で、画面が送る3種類の要求と、API の仕様書が書く1種類の要求の筋書き(要件1の受入基準1)。
+# user1 が、5つの経歴書のそれぞれに、次の4種類の要求を送る。
+#   - 設定を付けない出力で、Accept を text/markdown, application/json にした要求(画面の Markdown の保存)
+#   - 設定を付けた出力で、Accept を application/pdf, application/json にし、既定の設定で inline にした要求(画面のプレビュー)
+#   - 設定を付けた出力で、Accept を application/pdf, application/json にし、resumes/fonts-NotoSansJP.json で attachment に
+#     した要求(画面の PDF の保存)
+#   - 設定を付けない出力で、Accept を application/pdf, application/json にした要求(画面は送らない。API の仕様書が既定の設定の
+#     PDF を返すと書く)
+# 経歴書は、export/export.sql の 601(項目が最も少ない)と 701(名前と本文に記号)、resumes/many-pages.sql の 201
+# (export.sql が自己PR を足して出力の前提を満たす)、long-text.sql の 301、fonts.sql の 401 である。
+name: export-formats
+group: 4
+fixtures: [users/basic.sql, resumes/many-pages.sql, resumes/long-text.sql, resumes/fonts.sql, export/export.sql]
+modes: [compare]
+steps:
+  - name: login-user1
+    request:
+      method: POST
+      path: /api/auth/login
+      json: {email: user1@example.com, password: Passw0rd!}
+    expect: {status: 200}
+  # 経歴書 601: 項目の少ない経歴書
+  - name: markdown-few
+    request:
+      method: GET
+      path: /api/resumes/00000000-0000-4000-8000-000000000601/export
+      headers: {Accept: 'text/markdown, application/json'}
+    expect: {status: 200, content_type: text/markdown;charset=utf-8}
+  - name: preview-pdf-few
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-000000000601/export
+      csrf: true
+      headers: {Accept: 'application/pdf, application/json'}
+      json_file: export/inline-default.json
+    expect: {status: 200, content_type: application/pdf}
+  - name: save-pdf-few
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-000000000601/export
+      csrf: true
+      headers: {Accept: 'application/pdf, application/json'}
+      json_file: resumes/fonts-NotoSansJP.json
+    expect: {status: 200, content_type: application/pdf}
+  - name: default-pdf-few
+    request:
+      method: GET
+      path: /api/resumes/00000000-0000-4000-8000-000000000601/export
+      headers: {Accept: 'application/pdf, application/json'}
+    expect: {status: 200, content_type: application/pdf}
+  # 経歴書 201: 職歴と案件の多い経歴書
+  - name: markdown-many-pages
+    request:
+      method: GET
+      path: /api/resumes/00000000-0000-4000-8000-000000000201/export
+      headers: {Accept: 'text/markdown, application/json'}
+    expect: {status: 200, content_type: text/markdown;charset=utf-8}
+  - name: preview-pdf-many-pages
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-000000000201/export
+      csrf: true
+      headers: {Accept: 'application/pdf, application/json'}
+      json_file: export/inline-default.json
+    expect: {status: 200, content_type: application/pdf}
+  - name: save-pdf-many-pages
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-000000000201/export
+      csrf: true
+      headers: {Accept: 'application/pdf, application/json'}
+      json_file: resumes/fonts-NotoSansJP.json
+    expect: {status: 200, content_type: application/pdf}
+  - name: default-pdf-many-pages
+    request:
+      method: GET
+      path: /api/resumes/00000000-0000-4000-8000-000000000201/export
+      headers: {Accept: 'application/pdf, application/json'}
+    expect: {status: 200, content_type: application/pdf}
+  # 経歴書 301: 長い文の経歴書
+  - name: markdown-long-text
+    request:
+      method: GET
+      path: /api/resumes/00000000-0000-4000-8000-000000000301/export
+      headers: {Accept: 'text/markdown, application/json'}
+    expect: {status: 200, content_type: text/markdown;charset=utf-8}
+  - name: preview-pdf-long-text
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-000000000301/export
+      csrf: true
+      headers: {Accept: 'application/pdf, application/json'}
+      json_file: export/inline-default.json
+    expect: {status: 200, content_type: application/pdf}
+  - name: save-pdf-long-text
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-000000000301/export
+      csrf: true
+      headers: {Accept: 'application/pdf, application/json'}
+      json_file: resumes/fonts-NotoSansJP.json
+    expect: {status: 200, content_type: application/pdf}
+  - name: default-pdf-long-text
+    request:
+      method: GET
+      path: /api/resumes/00000000-0000-4000-8000-000000000301/export
+      headers: {Accept: 'application/pdf, application/json'}
+    expect: {status: 200, content_type: application/pdf}
+  # 経歴書 701: 名前と本文に記号を入れた経歴書
+  - name: markdown-symbols
+    request:
+      method: GET
+      path: /api/resumes/00000000-0000-4000-8000-000000000701/export
+      headers: {Accept: 'text/markdown, application/json'}
+    expect: {status: 200, content_type: text/markdown;charset=utf-8}
+  - name: preview-pdf-symbols
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-000000000701/export
+      csrf: true
+      headers: {Accept: 'application/pdf, application/json'}
+      json_file: export/inline-default.json
+    expect: {status: 200, content_type: application/pdf}
+  - name: save-pdf-symbols
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-000000000701/export
+      csrf: true
+      headers: {Accept: 'application/pdf, application/json'}
+      json_file: resumes/fonts-NotoSansJP.json
+    expect: {status: 200, content_type: application/pdf}
+  - name: default-pdf-symbols
+    request:
+      method: GET
+      path: /api/resumes/00000000-0000-4000-8000-000000000701/export
+      headers: {Accept: 'application/pdf, application/json'}
+    expect: {status: 200, content_type: application/pdf}
+  # 経歴書 401: 6つの欄がそろった経歴書
+  - name: markdown-fonts
+    request:
+      method: GET
+      path: /api/resumes/00000000-0000-4000-8000-000000000401/export
+      headers: {Accept: 'text/markdown, application/json'}
+    expect: {status: 200, content_type: text/markdown;charset=utf-8}
+  - name: preview-pdf-fonts
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-000000000401/export
+      csrf: true
+      headers: {Accept: 'application/pdf, application/json'}
+      json_file: export/inline-default.json
+    expect: {status: 200, content_type: application/pdf}
+  - name: save-pdf-fonts
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-000000000401/export
+      csrf: true
+      headers: {Accept: 'application/pdf, application/json'}
+      json_file: resumes/fonts-NotoSansJP.json
+    expect: {status: 200, content_type: application/pdf}
+  - name: default-pdf-fonts
+    request:
+      method: GET
+      path: /api/resumes/00000000-0000-4000-8000-000000000401/export
+      headers: {Accept: 'application/pdf, application/json'}
+    expect: {status: 200, content_type: application/pdf}

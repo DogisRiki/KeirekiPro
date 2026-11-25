@@ -1,0 +1,176 @@
+# 一方の版で書き出したバックアップのファイルを、もう一方の版で戻せることを確かめる、版をまたぐ筋書き(要件7の受入基準1と2)。
+# user1 が、最初の版で、経歴書 401(resumes/fonts.sql)を書き出し、本文を取り出す。最初の版で経歴書 401 を消す。戻す経歴書の
+# 名前が、経歴書 401 の名前と重ならないようにするためである。
+# もう一方の版(to: other)で、取り出した本文を json_capture で戻し、201 で答えられることを確かめ、作った経歴書の ID を取り出す。
+# 最後の段は、その前の版に送る段と違う版、つまり最初の版に届く。最初の版で作った経歴書を読み、expect の values で、経歴書の
+# 名前と日付と姓と名と、6つの欄の項目の値が、経歴書 401 の値と同じことを確かめる。
+# 6つの欄の項目の添字は、経歴書を読む答えの項目の並び(職歴とプロジェクトは期間の新しい順、資格は取得の年月の新しい順、
+# ポートフォリオと SNS と自己PR は名前の順)に合わせる。
+# 経歴書を読む答えは、Java 版に合わせて、工程の systemTest の鍵に maintenance の値を、maintenance の鍵に systemTest の値を
+# 入れて答える。values の工程の2つの鍵は、この入れ替えに合わせて書く。
+name: backup-cross-backup
+group: 5
+fixtures: [users/basic.sql, resumes/fonts.sql]
+modes: [cross]
+steps:
+  - name: login-user1
+    request:
+      method: POST
+      path: /api/auth/login
+      json: {email: user1@example.com, password: Passw0rd!}
+    expect: {status: 200}
+  # 最初の版で、経歴書 401 を書き出す
+  - name: backup-401
+    request:
+      method: GET
+      path: /api/resumes/00000000-0000-4000-8000-000000000401/backup
+      headers: {Accept: application/json}
+    capture: {backup: text}
+    expect: {status: 200, content_type: application/json}
+  # 最初の版で、経歴書 401 を消す
+  - name: delete-401
+    request:
+      method: DELETE
+      path: /api/resumes/00000000-0000-4000-8000-000000000401
+      csrf: true
+    expect: {status: 204}
+  # もう一方の版で、書き出したファイルを戻す
+  - name: restore-other-version
+    to: other
+    request:
+      method: POST
+      path: /api/resumes/restore
+      csrf: true
+      json_capture: backup
+    capture: {restoredID: $.id}
+    expect: {status: 201}
+  # 最初の版で、戻した経歴書を読む
+  - name: get-restored-first-version
+    request:
+      method: GET
+      path: /api/resumes/{restoredID}
+    expect:
+      status: 200
+      values:
+        $.id: '{restoredID}'
+        $.resumeName: 'フォントを比べる経歴書'
+        $.date: '2026-02-04'
+        $.lastName: '鈴木'
+        $.firstName: '一郎'
+        '$.careers[0].active': true
+        '$.careers[0].companyName': 'Compare Systems 合同会社'
+        '$.careers[0].startDate': '2018-04'
+        '$.careers[1].active': false
+        '$.careers[1].companyName': '株式会社ひかく'
+        '$.careers[1].endDate': '2018-03'
+        '$.careers[1].startDate': '2012-04'
+        '$.projects[0].achievement': 'サーバの費用を年に約30%減らした。'
+        '$.projects[0].active': true
+        '$.projects[0].companyName': 'Compare Systems 合同会社'
+        '$.projects[0].name': '社内の基盤の移行'
+        '$.projects[0].overview': 'オンプレミスのサーバで動かしていた社内のシステムを、クラウドへ移した。'
+        '$.projects[0].process.basicDesign': true
+        '$.projects[0].process.detailedDesign': true
+        '$.projects[0].process.implementation': false
+        '$.projects[0].process.integrationTest': false
+        '$.projects[0].process.systemTest': true
+        '$.projects[0].process.requirements': true
+        '$.projects[0].process.maintenance': false
+        '$.projects[0].role': '移行の計画と、基盤の構成の設計を受け持った。'
+        '$.projects[0].startDate': '2022-01'
+        '$.projects[0].teamComp': '全体4名'
+        '$.projects[0].techStack.backend.languages': ['Go']
+        '$.projects[0].techStack.infrastructure.ciCdTools': ['GitHub Actions']
+        '$.projects[0].techStack.infrastructure.clouds': ['AWS']
+        '$.projects[0].techStack.infrastructure.containers': ['Docker', 'Amazon ECS']
+        '$.projects[0].techStack.infrastructure.databases': ['PostgreSQL']
+        '$.projects[0].techStack.infrastructure.iacTools': ['Terraform']
+        '$.projects[0].techStack.infrastructure.loggingTools': ['Fluent Bit']
+        '$.projects[0].techStack.infrastructure.monitoringTools': ['Amazon CloudWatch']
+        '$.projects[0].techStack.tools.communicationTools': ['Slack']
+        '$.projects[0].techStack.tools.editors': ['Visual Studio Code']
+        '$.projects[0].techStack.tools.projectManagements': ['Backlog']
+        '$.projects[0].techStack.tools.sourceControls': ['Git']
+        '$.projects[1].achievement': '公開から半年で、予約の件数を前のサイトの2倍にした。'
+        '$.projects[1].active': false
+        '$.projects[1].companyName': 'Compare Systems 合同会社'
+        '$.projects[1].endDate': '2021-12'
+        '$.projects[1].name': '予約のサイトの新規開発'
+        '$.projects[1].overview': '飲食店の予約を受け付けるサイトを、ゼロから作った。1日あたり約3万件の予約を受け付ける。'
+        '$.projects[1].process.basicDesign': true
+        '$.projects[1].process.detailedDesign': true
+        '$.projects[1].process.implementation': true
+        '$.projects[1].process.integrationTest': true
+        '$.projects[1].process.systemTest': false
+        '$.projects[1].process.requirements': true
+        '$.projects[1].process.maintenance': true
+        '$.projects[1].role': '開発のリーダーとして、技術の選定と設計と実装を受け持った。'
+        '$.projects[1].startDate': '2018-04'
+        '$.projects[1].teamComp': '全体5名(開発3名)'
+        '$.projects[1].techStack.backend.auth': ['Spring Security']
+        '$.projects[1].techStack.backend.frameworks': ['Spring Boot']
+        '$.projects[1].techStack.backend.languages': ['Java']
+        '$.projects[1].techStack.backend.ormTools': ['MyBatis']
+        '$.projects[1].techStack.frontend.frameworks': ['React']
+        '$.projects[1].techStack.frontend.languages': ['TypeScript']
+        '$.projects[1].techStack.infrastructure.ciCdTools': ['GitHub Actions']
+        '$.projects[1].techStack.infrastructure.clouds': ['AWS']
+        '$.projects[1].techStack.infrastructure.containers': ['Docker']
+        '$.projects[1].techStack.infrastructure.databases': ['PostgreSQL']
+        '$.projects[1].techStack.infrastructure.webServers': ['Nginx']
+        '$.projects[1].techStack.tools.apiDevelopmentTools': ['Postman']
+        '$.projects[1].techStack.tools.communicationTools': ['Slack']
+        '$.projects[1].techStack.tools.designTools': ['Figma']
+        '$.projects[1].techStack.tools.developmentEnvironments': ['Docker Compose']
+        '$.projects[1].techStack.tools.documentationTools': ['Confluence']
+        '$.projects[1].techStack.tools.editors': ['IntelliJ IDEA']
+        '$.projects[1].techStack.tools.projectManagements': ['Jira']
+        '$.projects[1].techStack.tools.sourceControls': ['Git']
+        '$.projects[2].achievement': "締めの処理の時間を40%短くした。\n障害の件数を年に12件から3件に減らした。"
+        '$.projects[2].active': false
+        '$.projects[2].companyName': '株式会社ひかく'
+        '$.projects[2].endDate': '2015-09'
+        '$.projects[2].name': '会計のシステムの保守'
+        '$.projects[2].overview': '月次の締めの処理を受け持つ会計のシステムの保守と、法改正への対応を行った。'
+        '$.projects[2].process.basicDesign': false
+        '$.projects[2].process.detailedDesign': true
+        '$.projects[2].process.implementation': true
+        '$.projects[2].process.integrationTest': true
+        '$.projects[2].process.systemTest': true
+        '$.projects[2].process.requirements': false
+        '$.projects[2].process.maintenance': false
+        '$.projects[2].role': '保守の担当として、障害の調べと直しを受け持った。'
+        '$.projects[2].startDate': '2012-04'
+        '$.projects[2].teamComp': '全体8名'
+        '$.projects[2].techStack.backend.frameworks': ['Struts']
+        '$.projects[2].techStack.backend.languages': ['Java']
+        '$.projects[2].techStack.infrastructure.databases': ['Oracle Database']
+        '$.projects[2].techStack.infrastructure.webServers': ['Apache']
+        '$.projects[2].techStack.tools.documentationTools': ['Excel']
+        '$.projects[2].techStack.tools.editors': ['Eclipse']
+        '$.projects[2].techStack.tools.projectManagements': ['Redmine']
+        '$.projects[2].techStack.tools.sourceControls': ['Subversion']
+        '$.certifications[0].date': '2020-09'
+        '$.certifications[0].name': 'AWS Certified Solutions Architect - Associate'
+        '$.certifications[1].date': '2014-06'
+        '$.certifications[1].name': '応用情報技術者試験'
+        '$.certifications[2].date': '2012-11'
+        '$.certifications[2].name': '基本情報技術者試験'
+        '$.portfolios[0].link': 'https://example.com/portfolio/weather'
+        '$.portfolios[0].name': 'A 天気の通知'
+        '$.portfolios[0].overview': '毎朝、その日の天気と服装の目安を知らせる。'
+        '$.portfolios[0].techStack': 'Go、AWS Lambda'
+        '$.portfolios[1].link': 'https://example.com/portfolio/menu'
+        '$.portfolios[1].name': 'B 献立の提案'
+        '$.portfolios[1].overview': '冷蔵庫にある食材から献立を提案する。'
+        '$.portfolios[1].techStack': 'TypeScript、Next.js'
+        '$.snsPlatforms[0].link': 'https://github.com/example-compare'
+        '$.snsPlatforms[0].name': 'GitHub'
+        '$.snsPlatforms[1].link': 'https://qiita.com/example-compare'
+        '$.snsPlatforms[1].name': 'Qiita'
+        '$.snsPlatforms[2].link': 'https://zenn.dev/example-compare'
+        '$.snsPlatforms[2].name': 'Zenn'
+        '$.selfPromotions[0].content': "設計から運用までを通して受け持てます。\n運用で見つけた困りごとを、次の設計に生かします。"
+        '$.selfPromotions[0].title': 'A 設計から運用まで'
+        '$.selfPromotions[1].content': '改善の前と後を、数字で比べて確かめることを大切にしています。'
+        '$.selfPromotions[1].title': 'B 数字で確かめる'

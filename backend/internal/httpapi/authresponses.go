@@ -20,7 +20,9 @@ type authResponse struct {
 	location string
 	// contentType は、空でなければ Content-Type に書く。
 	contentType string
-	body        []byte
+	// contentDisposition は、空でなければ Content-Disposition に書く。経歴書の出力の2つの操作が使う。
+	contentDisposition string
+	body               []byte
 }
 
 var (
@@ -115,7 +117,7 @@ func jacksonJSON(v any) []byte {
 	return bytes.TrimSuffix(buf.Bytes(), []byte("\n"))
 }
 
-// write は、Set-Cookie を並べた順に書き、Location と Content-Type があれば書き、状態の番号と本文を書く。
+// write は、Set-Cookie を並べた順に書き、Location と Content-Type と Content-Disposition があれば書き、状態の番号と本文を書く。
 func (r authResponse) write(w http.ResponseWriter) error {
 	h := w.Header()
 	for _, c := range r.cookies {
@@ -126,6 +128,9 @@ func (r authResponse) write(w http.ResponseWriter) error {
 	}
 	if r.contentType != "" {
 		h.Set("Content-Type", r.contentType)
+	}
+	if r.contentDisposition != "" {
+		h.Set("Content-Disposition", r.contentDisposition)
 	}
 	w.WriteHeader(r.status)
 	if len(r.body) == 0 {

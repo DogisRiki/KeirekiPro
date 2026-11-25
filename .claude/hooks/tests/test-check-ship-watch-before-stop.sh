@@ -1,6 +1,6 @@
 #!/bin/bash
 # =====================================================================
-# check-ship-watch-before-stop.sh(/ship の見届けを終えてはいけない状態で終えないようにするフック)のテスト
+# check-ship-watch-before-stop.sh(/ship-it の見届けを終えてはいけない状態で終えないようにするフック)のテスト
 #
 # 実行: bash .claude/hooks/tests/test-check-ship-watch-before-stop.sh
 # 一時的な git のリポジトリを作り、PATH の先頭に偽の gh を置いて、PR と必須の検査の状態を差し替える。

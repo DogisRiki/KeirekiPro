@@ -1,0 +1,69 @@
+# バックアップの操作のログインの状態と偽の送信の検査の筋書き(要件6の受入基準1)。手本は scenarios/users/require-login.yaml である。
+# 書き出しと戻しへの、ログインの Cookie の無い要求と、期限を切らしたログインの状態の値の要求が 401 で断られ、偽の送信の検査の
+# ヘッダを付けない戻しの要求が 403 で断られることを比べる。
+# ログインの Cookie の無い戻しの要求と期限を切らした値の戻しの要求は、偽の送信の検査のヘッダを付け、ログインの状態の検査で
+# 断られることを確かめる。ヘッダの値は、最初の段の答えが置く Cookie XSRF-TOKEN から写す。
+# 期限を切らした値の要求は、操作ごとにログインし直して期限を切らす。
+# ヘッダを付けない戻しの要求は、ログインした user1 で送る。断った要求のあとに経歴書が作られていないことは、データベースの比べ方で確かめる。
+name: backup-require-login
+group: 5
+fixtures: [users/basic.sql, resumes/fonts.sql]
+modes: [compare]
+steps:
+  # ログインの Cookie の無い要求
+  - name: backup-no-cookie
+    request:
+      method: GET
+      path: /api/resumes/00000000-0000-4000-8000-000000000401/backup
+      headers: {Accept: application/json}
+    expect: {status: 401}
+  - name: restore-no-cookie
+    request:
+      method: POST
+      path: /api/resumes/restore
+      csrf: true
+      json_file: backups/basic.json
+    expect: {status: 401}
+  # 期限を切らしたログインの状態の値の要求
+  - name: login-before-backup-expired
+    request:
+      method: POST
+      path: /api/auth/login
+      json: {email: user1@example.com, password: Passw0rd!}
+    expect: {status: 200}
+  - name: expire-before-backup
+    expire: {cookie: accessToken}
+  - name: backup-expired-token
+    request:
+      method: GET
+      path: /api/resumes/00000000-0000-4000-8000-000000000401/backup
+      headers: {Accept: application/json}
+    expect: {status: 401}
+  - name: login-before-restore-expired
+    request:
+      method: POST
+      path: /api/auth/login
+      json: {email: user1@example.com, password: Passw0rd!}
+    expect: {status: 200}
+  - name: expire-before-restore
+    expire: {cookie: accessToken}
+  - name: restore-expired-token
+    request:
+      method: POST
+      path: /api/resumes/restore
+      csrf: true
+      json_file: backups/basic.json
+    expect: {status: 401}
+  # 偽の送信の検査のヘッダを付けない戻しの要求
+  - name: login-user1
+    request:
+      method: POST
+      path: /api/auth/login
+      json: {email: user1@example.com, password: Passw0rd!}
+    expect: {status: 200}
+  - name: restore-without-csrf
+    request:
+      method: POST
+      path: /api/resumes/restore
+      json_file: backups/basic.json
+    expect: {status: 403}

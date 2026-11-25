@@ -65,6 +65,10 @@ resource "aws_ecs_task_definition" "backend" {
         {
           name  = "JAVA_TOOL_OPTIONS"
           value = "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0"
+        },
+        {
+          name  = "KEIREKIPRO_ENV"
+          value = "prod"
         }
       ]
 

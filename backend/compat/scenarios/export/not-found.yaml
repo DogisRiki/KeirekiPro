@@ -1,0 +1,57 @@
+# 出力の操作で、無い経歴書と、経歴書の ID の形でない値の筋書き(要件3の受入基準3)。
+# user1 が、無い経歴書(0000000009ff)と、経歴書の ID の形でない値(not-a-uuid)のそれぞれに、
+# 設定を付けない出力の PDF と Markdown と、設定を付けた出力の attachment を送る。
+# Accept は、画面と同じく application/json を含める。
+name: export-not-found
+group: 4
+fixtures: [users/basic.sql]
+modes: [compare]
+steps:
+  - name: login-user1
+    request:
+      method: POST
+      path: /api/auth/login
+      json: {email: user1@example.com, password: Passw0rd!}
+    expect: {status: 200}
+  # 無い経歴書
+  - name: default-pdf-missing
+    request:
+      method: GET
+      path: /api/resumes/00000000-0000-4000-8000-0000000009ff/export
+      headers: {Accept: 'application/pdf, application/json'}
+    expect: {status: 404, content_type: application/json}
+  - name: markdown-missing
+    request:
+      method: GET
+      path: /api/resumes/00000000-0000-4000-8000-0000000009ff/export
+      headers: {Accept: 'text/markdown, application/json'}
+    expect: {status: 404, content_type: application/json}
+  - name: save-pdf-missing
+    request:
+      method: POST
+      path: /api/resumes/00000000-0000-4000-8000-0000000009ff/export
+      csrf: true
+      headers: {Accept: 'application/pdf, application/json'}
+      json_file: resumes/fonts-NotoSansJP.json
+    expect: {status: 404, content_type: application/json}
+  # 経歴書の ID の形でない値
+  - name: default-pdf-not-uuid
+    request:
+      method: GET
+      path: /api/resumes/not-a-uuid/export
+      headers: {Accept: 'application/pdf, application/json'}
+    expect: {status: 404, content_type: application/json}
+  - name: markdown-not-uuid
+    request:
+      method: GET
+      path: /api/resumes/not-a-uuid/export
+      headers: {Accept: 'text/markdown, application/json'}
+    expect: {status: 404, content_type: application/json}
+  - name: save-pdf-not-uuid
+    request:
+      method: POST
+      path: /api/resumes/not-a-uuid/export
+      csrf: true
+      headers: {Accept: 'application/pdf, application/json'}
+      json_file: resumes/fonts-NotoSansJP.json
+    expect: {status: 404, content_type: application/json}

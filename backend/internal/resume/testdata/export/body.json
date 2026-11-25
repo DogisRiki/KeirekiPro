@@ -1,0 +1,1060 @@
+[
+  {
+    "body" : "{\"format\":\"pdf\",\"disposition\":\"attachment\",\"pdfSettings\":{\"fontFamily\":\"NotoSansJP\",\"fontSizes\":{\"title\":16,\"date\":10.5,\"fullName\":9.5,\"sectionHeading\":12},\"tableHeaderColor\":{\"rgb\":{\"r\":12,\"g\":34,\"b\":56}}}}",
+    "contentType" : "application/pdf",
+    "disposition" : "attachment",
+    "name" : "rgb.r=12",
+    "response" : null,
+    "status" : 200
+  },
+  {
+    "body" : "{\"format\":\"pdf\",\"disposition\":\"attachment\",\"pdfSettings\":{\"fontFamily\":\"NotoSansJP\",\"fontSizes\":{\"title\":16,\"date\":10.5,\"fullName\":9.5,\"sectionHeading\":12},\"tableHeaderColor\":{\"rgb\":{\"r\":12.7,\"g\":34,\"b\":56}}}}",
+    "contentType" : "application/pdf",
+    "disposition" : "attachment",
+    "name" : "rgb.r=12.7",
+    "response" : null,
+    "status" : 200
+  },
+  {
+    "body" : "{\"format\":\"pdf\",\"disposition\":\"attachment\",\"pdfSettings\":{\"fontFamily\":\"NotoSansJP\",\"fontSizes\":{\"title\":16,\"date\":10.5,\"fullName\":9.5,\"sectionHeading\":12},\"tableHeaderColor\":{\"rgb\":{\"r\":255.9,\"g\":34,\"b\":56}}}}",
+    "contentType" : "application/pdf",
+    "disposition" : "attachment",
+    "name" : "rgb.r=255.9",
+    "response" : null,
+    "status" : 200
+  },
+  {
+    "body" : "{\"format\":\"pdf\",\"disposition\":\"attachment\",\"pdfSettings\":{\"fontFamily\":\"NotoSansJP\",\"fontSizes\":{\"title\":16,\"date\":10.5,\"fullName\":9.5,\"sectionHeading\":12},\"tableHeaderColor\":{\"rgb\":{\"r\":-0.5,\"g\":34,\"b\":56}}}}",
+    "contentType" : "application/pdf",
+    "disposition" : "attachment",
+    "name" : "rgb.r=-0.5",
+    "response" : null,
+    "status" : 200
+  },
+  {
+    "body" : "{\"format\":\"pdf\",\"disposition\":\"attachment\",\"pdfSettings\":{\"fontFamily\":\"NotoSansJP\",\"fontSizes\":{\"title\":16,\"date\":10.5,\"fullName\":9.5,\"sectionHeading\":12},\"tableHeaderColor\":{\"rgb\":{\"r\":-0.9,\"g\":34,\"b\":56}}}}",
+    "contentType" : "application/pdf",
+    "disposition" : "attachment",
+    "name" : "rgb.r=-0.9",
+    "response" : null,
+    "status" : 200
+  },
+  {
+    "body" : "{\"format\":\"pdf\",\"disposition\":\"attachment\",\"pdfSettings\":{\"fontFamily\":\"NotoSansJP\",\"fontSizes\":{\"title\":16,\"date\":10.5,\"fullName\":9.5,\"sectionHeading\":12},\"tableHeaderColor\":{\"rgb\":{\"r\":12.0,\"g\":34,\"b\":56}}}}",
+    "contentType" : "application/pdf",
+    "disposition" : "attachment",
+    "name" : "rgb.r=12.0",
+    "response" : null,
+    "status" : 200
+  },
+  {
+    "body" : "{\"format\":\"pdf\",\"disposition\":\"attachment\",\"pdfSettings\":{\"fontFamily\":\"NotoSansJP\",\"fontSizes\":{\"title\":16,\"date\":10.5,\"fullName\":9.5,\"sectionHeading\":12},\"tableHeaderColor\":{\"rgb\":{\"r\":\" 12\",\"g\":34,\"b\":56}}}}",
+    "contentType" : "application/pdf",
+    "disposition" : "attachment",
+    "name" : "rgb.r=\" 12\"",
+    "response" : null,
+    "status" : 200
+  },
+  {
+    "body" : "{\"format\":\"pdf\",\"disposition\":\"attachment\",\"pdfSettings\":{\"fontFamily\":\"NotoSansJP\",\"fontSizes\":{\"title\":16,\"date\":10.5,\"fullName\":9.5,\"sectionHeading\":12},\"tableHeaderColor\":{\"rgb\":{\"r\":\"+12\",\"g\":34,\"b\":56}}}}",
+    "contentType" : "application/pdf",
+    "disposition" : "attachment",
+    "name" : "rgb.r=\"+12\"",
+    "response" : null,
+    "status" : 200
+  },
+  {
+    "body" : "{\"format\":\"pdf\",\"disposition\":\"attachment\",\"pdfSettings\":{\"fontFamily\":\"NotoSansJP\",\"fontSizes\":{\"title\":16,\"date\":10.5,\"fullName\":9.5,\"sectionHeading\":12},\"tableHeaderColor\":{\"rgb\":{\"r\":\"012\",\"g\":34,\"b\":56}}}}",
+    "contentType" : "application/pdf",
+    "disposition" : "attachment",
+    "name" : "rgb.r=\"012\"",
+    "response" : null,
+    "status" : 200
+  },
+  {
+    "body" : "{\"format\":\"pdf\",\"disposition\":\"attachment\",\"pdfSettings\":{\"fontFamily\":\"NotoSansJP\",\"fontSizes\":{\"title\":16,\"date\":10.5,\"fullName\":9.5,\"sectionHeading\":12},\"tableHeaderColor\":{\"rgb\":{\"r\":\"\",\"g\":34,\"b\":56}}}}",
+    "contentType" : "application/json",
+    "name" : "rgb.r=\"\"",
+    "response" : {
+      "errors" : {
+        "pdfSettings.tableHeaderColor.rgb.red" : [
+          "Rは入力必須です。"
+        ]
+      },
+      "message" : "入力エラーがあります。"
+    },
+    "status" : 400
+  },
+  {
+    "body" : "{\"format\":\"pdf\",\"disposition\":\"attachment\",\"pdfSettings\":{\"fontFamily\":\"NotoSansJP\",\"fontSizes\":{\"title\":16,\"date\":10.5,\"fullName\":9.5,\"sectionHeading\":12},\"tableHeaderColor\":{\"rgb\":{\"r\":256,\"g\":34,\"b\":56}}}}",
+    "contentType" : "application/json",
+    "name" : "rgb.r=256",
+    "response" : {
+      "errors" : {
+        "pdfSettings.tableHeaderColor.rgb.red" : [
+          "Rは255以下で入力してください。"
+        ]
+      },
+      "message" : "入力エラーがあります。"
+    },
+    "status" : 400
+  },
+  {
+    "body" : "{\"format\":\"pdf\",\"disposition\":\"attachment\",\"pdfSettings\":{\"fontFamily\":\"NotoSansJP\",\"fontSizes\":{\"title\":16,\"date\":10.5,\"fullName\":9.5,\"sectionHeading\":12},\"tableHeaderColor\":{\"rgb\":{\"r\":2147483647,\"g\":34,\"b\":56}}}}",
+    "contentType" : "application/json",
+    "name" : "rgb.r=2147483647",
+    "response" : {
+      "errors" : {
+        "pdfSettings.tableHeaderColor.rgb.red" : [
+          "Rは255以下で入力してください。"
+        ]
+      },
+      "message" : "入力エラーがあります。"
+    },
+    "status" : 400
+  },
+  {
+    "body" : "{\"format\":\"pdf\",\"disposition\":\"attachment\",\"pdfSettings\":{\"fontFamily\":\"NotoSansJP\",\"fontSizes\":{\"title\":16,\"date\":10.5,\"fullName\":9.5,\"sectionHeading\":12},\"tableHeaderColor\":{\"rgb\":{\"r\":300.5,\"g\":34,\"b\":56}}}}",
+    "contentType" : "application/json",
+    "name" : "rgb.r=300.5",
+    "response" : {
+      "errors" : {
+        "pdfSettings.tableHeaderColor.rgb.red" : [
+          "Rは255以下で入力してください。"
+        ]
+      },
+      "message" : "入力エラーがあります。"
+    },
+    "status" : 400
+  },
+  {
+    "body" : "{\"format\":\"pdf\",\"disposition\":\"attachment\",\"pdfSettings\":{\"fontFamily\":\"NotoSansJP\",\"fontSizes\":{\"title\":16,\"date\":10.5,\"fullName\":9.5,\"sectionHeading\":12},\"tableHeaderColor\":{\"rgb\":{\"r\":-1,\"g\":34,\"b\":56}}}}",
+    "contentType" : "application/json",
+    "name" : "rgb.r=-1",
+    "response" : {
+      "errors" : {
+        "pdfSettings.tableHeaderColor.rgb.red" : [
+          "Rは0以上で入力してください。"
+        ]
+      },
+      "message" : "入力エラーがあります。"
+    },
+    "status" : 400
+  },
+  {
+    "body" : "{\"format\":\"pdf\",\"disposition\":\"attachment\",\"pdfSettings\":{\"fontFamily\":\"NotoSansJP\",\"fontSizes\":{\"title\":16,\"date\":10.5,\"fullName\":9.5,\"sectionHeading\":12},\"tableHeaderColor\":{\"rgb\":{\"r\":-2147483648,\"g\":34,\"b\":56}}}}",
+    "contentType" : "application/json",
+    "name" : "rgb.r=-2147483648",
+    "response" : {
+      "errors" : {
+        "pdfSettings.tableHeaderColor.rgb.red" : [
+          "Rは0以上で入力してください。"
+        ]
+      },
+      "message" : "入力エラーがあります。"
+    },
+    "status" : 400
+  },
+  {
+    "body" : "{\"format\":\"pdf\",\"disposition\":\"attachment\",\"pdfSettings\":{\"fontFamily\":\"NotoSansJP\",\"fontSizes\":{\"title\":16,\"date\":10.5,\"fullName\":9.5,\"sectionHeading\":12},\"tableHeaderColor\":{\"rgb\":{\"r\":1e10,\"g\":34,\"b\":56}}}}",
+    "contentType" : "application/json",
+    "name" : "rgb.r=1e10",
+    "response" : {
+      "errors" : {},
+      "message" : "入力エラーがあります。"
+    },
+    "status" : 400
+  },
+  {
+    "body" : "{\"format\":\"pdf\",\"disposition\":\"attachment\",\"pdfSettings\":{\"fontFamily\":\"NotoSansJP\",\"fontSizes\":{\"title\":16,\"date\":10.5,\"fullName\":9.5,\"sectionHeading\":12},\"tableHeaderColor\":{\"rgb\":{\"r\":2147483648,\"g\":34,\"b\":56}}}}",
+    "contentType" : "application/json",
+    "name" : "rgb.r=2147483648",
+    "response" : {
+      "errors" : {},
+      "message" : "入力エラーがあります。"
+    },
+    "status" : 400
+  },
+  {
+    "body" : "{\"format\":\"pdf\",\"disposition\":\"attachment\",\"pdfSettings\":{\"fontFamily\":\"NotoSansJP\",\"fontSizes\":{\"title\":16,\"date\":10.5,\"fullName\":9.5,\"sectionHeading\":12},\"tableHeaderColor\":{\"rgb\":{\"r\":\"0x0c\",\"g\":34,\"b\":56}}}}",
+    "contentType" : "application/json",
+    "name" : "rgb.r=\"0x0c\"",
+    "response" : {
+      "errors" : {},
+      "message" : "入力エラーがあります。"
+    },
+    "status" : 400
+  },
+  {
+    "body" : "{\"format\":\"pdf\",\"disposition\":\"attachment\",\"pdfSettings\":{\"fontFamily\":\"NotoSansJP\",\"fontSizes\":{\"title\":16,\"date\":10.5,\"fullName\":9.5,\"sectionHeading\":12},\"tableHeaderColor\":{\"rgb\":{\"r\":\"1e2\",\"g\":34,\"b\":56}}}}",
+    "contentType" : "application/json",
+    "name" : "rgb.r=\"1e2\"",
+    "response" : {
+      "errors" : {},
+      "message" : "入力エラーがあります。"
+    },
+    "status" : 400
+  },
+  {
+    "body" : "{\"format\":\"pdf\",\"disposition\":\"attachment\",\"pdfSettings\":{\"fontFamily\":\"NotoSansJP\",\"fontSizes\":{\"title\":16,\"date\":10.5,\"fullName\":9.5,\"sectionHeading\":12},\"tableHeaderColor\":{\"rgb\":{\"r\":[12],\"g\":34,\"b\":56}}}}",
+    "contentType" : "application/json",
+    "name" : "rgb.r=[12]",
+    "response" : {
+      "errors" : {},
+      "message" : "入力エラーがあります。"
+    },
+    "status" : 400
+  },
+  {
+    "body" : "{\"format\":\"pdf\",\"disposition\":\"attachment\",\"pdfSettings\":{\"fontFamily\":\"NotoSansJP\",\"fontSizes\":{\"title\":16,\"date\":10.5,\"fullName\":9.5,\"sectionHeading\":12},\"tableHeaderColor\":{\"rgb\":{\"r\":{},\"g\":34,\"b\":56}}}}",
+    "contentType" : "application/json",
+    "name" : "rgb.r={}",
+    "response" : {
+      "errors" : {},
+      "message" : "入力エラーがあります。"
+    },
+    "status" : 400
+  },
+  {
+    "body" : "{\"format\":\"pdf\",\"disposition\":\"attachment\",\"pdfSettings\":{\"fontFamily\":\"NotoSansJP\",\"fontSizes\":{\"title\":16,\"date\":10.5,\"fullName\":9.5,\"sectionHeading\":12},\"tableHeaderColor\":{\"rgb\":{\"r\":true,\"g\":34,\"b\":56}}}}",
+    "contentType" : "application/json",
+    "name" : "rgb.r=true",
+    "response" : {
+      "errors" : {},
+      "message" : "入力エラーがあります。"
+    },
+    "status" : 400
+  },
+  {
+    "body" : "{\"format\":\"pdf\",\"disposition\":\"attachment\",\"pdfSettings\":{\"fontFamily\":\"NotoSansJP\",\"fontSizes\":{\"title\":16,\"date\":10.5,\"fullName\":9.5,\"sectionHeading\":12},\"tableHeaderColor\":{\"rgb\":{\"r\":false,\"g\":34,\"b\":56}}}}",
+    "contentType" : "application/json",
+    "name" : "rgb.r=false",
+    "response" : {
+      "errors" : {},
+      "message" : "入力エラーがあります。"
+    },
+    "status" : 400
+  },
+  {
+    "body" : "{\"format\":\"pdf\",\"disposition\":\"attachment\",\"pdfSettings\":{\"fontFamily\":\"NotoSansJP\",\"fontSizes\":{\"title\":16,\"date\":10.5,\"fullName\":9.5,\"sectionHeading\":12},\"tableHeaderColor\":{\"rgb\":{\"r\":null,\"g\":34,\"b\":56}}}}",
+    "contentType" : "application/json",
+    "name" : "rgb.r=null",
+    "response" : {
+      "errors" : {
+        "pdfSettings.tableHeaderColor.rgb.red" : [
+          "Rは入力必須です。"
+        ]
+      },
+      "message" : "入力エラーがあります。"
+    },
+    "status" : 400
+  },
+  {
+    "body" : "{\"format\":\"pdf\",\"disposition\":\"attachment\",\"pdfSettings\":{\"fontFamily\":\"NotoSansJP\",\"fontSizes\":{\"title\":16,\"date\":10.5,\"fullName\":9.5,\"sectionHeading\":12},\"tableHeaderColor\":{\"rgb\":{\"r\":1.2e1,\"g\":34,\"b\":56}}}}",
+    "contentType" : "application/pdf",
+    "disposition" : "attachment",
+    "name" : "rgb.r=1.2e1",
+    "response" : null,
+    "status" : 200
+  },
+  {
+    "body" : "{\"format\":\"pdf\",\"disposition\":\"attachment\",\"pdfSettings\":{\"fontFamily\":\"NotoSansJP\",\"fontSizes\":{\"title\":16,\"date\":10.5,\"fullName\":9.5,\"sectionHeading\":12},\"tableHeaderColor\":{\"rgb\":{\"r\":1E1,\"g\":34,\"b\":56}}}}",
+    "contentType" : "application/pdf",
+    "disposition" : "attachment",
+    "name" : "rgb.r=1E1",
+    "response" : null,
+    "status" : 200
+  },
+  {
+    "body" : "{\"format\":\"pdf\",\"disposition\":\"attachment\",\"pdfSettings\":{\"fontFamily\":\"NotoSansJP\",\"fontSizes\":{\"title\":16,\"date\":10.5,\"fullName\":9.5,\"sectionHeading\":12},\"tableHeaderColor\":{\"rgb\":{\"red\":12,\"g\":34,\"b\":56}}}}",
+    "contentType" : "application/json",
+    "name" : "rgb の鍵が red",
+    "response" : {
+      "errors" : {
+        "pdfSettings.tableHeaderColor.rgb.red" : [
+          "Rは入力必須です。"
+        ]
+      },
+      "message" : "入力エラーがあります。"
+    },
+    "status" : 400
+  },
+  {
+    "body" : "{\"format\":\"pdf\",\"disposition\":\"attachment\",\"pdfSettings\":{\"fontFamily\":\"NotoSansJP\",\"fontSizes\":{\"title\":16,\"date\":10.5,\"fullName\":9.5,\"sectionHeading\":12},\"tableHeaderColor\":{\"hex\":\"b4c7e7\"}}}",
+    "contentType" : "application/pdf",
+    "disposition" : "attachment",
+    "name" : "hex=\"b4c7e7\"",
+    "response" : null,
+    "status" : 200
+  },
+  {
+    "body" : "{\"format\":\"pdf\",\"disposition\":\"attachment\",\"pdfSettings\":{\"fontFamily\":\"NotoSansJP\",\"fontSizes\":{\"title\":16,\"date\":10.5,\"fullName\":9.5,\"sectionHeading\":12},\"tableHeaderColor\":{\"hex\":\"B4C7E7\"}}}",
+    "contentType" : "application/pdf",
+    "disposition" : "attachment",
+    "name" : "hex=\"B4C7E7\"",
+    "response" : null,
+    "status" : 200
+  },
+  {
+    "body" : "{\"format\":\"pdf\",\"disposition\":\"attachment\",\"pdfSettings\":{\"fontFamily\":\"NotoSansJP\",\"fontSizes\":{\"title\":16,\"date\":10.5,\"fullName\":9.5,\"sectionHeading\":12},\"tableHeaderColor\":{\"hex\":123456}}}",
+    "contentType" : "application/pdf",
+    "disposition" : "attachment",
+    "name" : "hex=123456",
+    "response" : null,
+    "status" : 200
+  },
+  {
+    "body" : "{\"format\":\"pdf\",\"disposition\":\"attachment\",\"pdfSettings\":{\"fontFamily\":\"NotoSansJP\",\"fontSizes\":{\"title\":16,\"date\":10.5,\"fullName\":9.5,\"sectionHeading\":12},\"tableHeaderColor\":{\"hex\":true}}}",
+    "contentType" : "application/json",
+    "name" : "hex=true",
+    "response" : {
+      "errors" : {
+        "pdfSettings.tableHeaderColor.hex" : [
+          "カラーコードが不正です。"
+        ]
+      },
+      "message" : "入力エラーがあります。"
+    },
+    "status" : 400
+  },
+  {
+    "body" : "{\"format\":\"pdf\",\"disposition\":\"attachment\",\"pdfSettings\":{\"fontFamily\":\"NotoSansJP\",\"fontSizes\":{\"title\":16,\"date\":10.5,\"fullName\":9.5,\"sectionHeading\":12},\"tableHeaderColor\":{\"hex\":1e5}}}",
+    "contentType" : "application/json",
+    "name" : "hex=1e5",
+    "response" : {
+      "errors" : {
+        "pdfSettings.tableHeaderColor.hex" : [
+          "カラーコードが不正です。"
+        ]
+      },
+      "message" : "入力エラーがあります。"
+    },
+    "status" : 400
+  },
+  {
+    "body" : "{\"format\":\"pdf\",\"disposition\":\"attachment\",\"pdfSettings\":{\"fontFamily\":\"NotoSansJP\",\"fontSizes\":{\"title\":16,\"date\":10.5,\"fullName\":9.5,\"sectionHeading\":12},\"tableHeaderColor\":{\"hex\":1.5E5}}}",
+    "contentType" : "application/json",
+    "name" : "hex=1.5E5",
+    "response" : {
+      "errors" : {
+        "pdfSettings.tableHeaderColor.hex" : [
+          "カラーコードが不正です。"
+        ]
+      },
+      "message" : "入力エラーがあります。"
+    },
+    "status" : 400
+  },
+  {
+    "body" : "{\"format\":\"pdf\",\"disposition\":\"attachment\",\"pdfSettings\":{\"fontFamily\":\"NotoSansJP\",\"fontSizes\":{\"title\":16,\"date\":10.5,\"fullName\":9.5,\"sectionHeading\":12},\"tableHeaderColor\":{\"hex\":\"12345\"}}}",
+    "contentType" : "application/json",
+    "name" : "hex=\"12345\"",
+    "response" : {
+      "errors" : {
+        "pdfSettings.tableHeaderColor.hex" : [
+          "カラーコードが不正です。"
+        ]
+      },
+      "message" : "入力エラーがあります。"
+    },
+    "status" : 400
+  },
+  {
+    "body" : "{\"format\":\"pdf\",\"disposition\":\"attachment\",\"pdfSettings\":{\"fontFamily\":\"NotoSansJP\",\"fontSizes\":{\"title\":16,\"date\":10.5,\"fullName\":9.5,\"sectionHeading\":12},\"tableHeaderColor\":{\"hex\":\"#b4c7e7\"}}}",
+    "contentType" : "application/json",
+    "name" : "hex=\"#b4c7e7\"",
+    "response" : {
+      "errors" : {
+        "pdfSettings.tableHeaderColor.hex" : [
+          "カラーコードが不正です。"
+        ]
+      },
+      "message" : "入力エラーがあります。"
+    },
+    "status" : 400
+  },
+  {
+    "body" : "{\"format\":\"pdf\",\"disposition\":\"attachment\",\"pdfSettings\":{\"fontFamily\":\"NotoSansJP\",\"fontSizes\":{\"title\":16,\"date\":10.5,\"fullName\":9.5,\"sectionHeading\":12},\"tableHeaderColor\":{\"hex\":null,\"rgb\":{\"r\":12,\"g\":34,\"b\":56}}}}",
+    "contentType" : "application/pdf",
+    "disposition" : "attachment",
+    "name" : "hex が null で rgb がある",
+    "response" : null,
+    "status" : 200
+  },
+  {
+    "body" : "{\"format\":\"pdf\",\"disposition\":\"attachment\",\"pdfSettings\":{\"fontFamily\":\"NotoSansJP\",\"fontSizes\":{\"title\":16,\"date\":10.5,\"fullName\":9.5,\"sectionHeading\":12},\"tableHeaderColor\":{\"hex\":\"b4c7e7\",\"rgb\":null}}}",
+    "contentType" : "application/pdf",
+    "disposition" : "attachment",
+    "name" : "rgb が null で hex がある",
+    "response" : null,
+    "status" : 200
+  },
+  {
+    "body" : "{\"format\":\"pdf\",\"disposition\":\"attachment\",\"pdfSettings\":{\"fontFamily\":\"NotoSansJP\",\"fontSizes\":{\"title\":16,\"date\":10.5,\"fullName\":9.5,\"sectionHeading\":12},\"tableHeaderColor\":{\"hex\":\"b4c7e7\",\"rgb\":{\"r\":12,\"g\":34,\"b\":56}}}}",
+    "contentType" : "application/json",
+    "name" : "hex と rgb の両方がある",
+    "response" : {
+      "errors" : {
+        "pdfSettings.tableHeaderColor.specifiedOnce" : [
+          "表ヘッダー色が不正です。"
+        ]
+      },
+      "message" : "入力エラーがあります。"
+    },
+    "status" : 400
+  },
+  {
+    "body" : "{\"format\":\"pdf\",\"disposition\":\"attachment\",\"pdfSettings\":{\"fontFamily\":\"NotoSansJP\",\"fontSizes\":{\"title\":16,\"date\":10.5,\"fullName\":9.5,\"sectionHeading\":12},\"tableHeaderColor\":{}}}",
+    "contentType" : "application/json",
+    "name" : "hex と rgb のどちらも無い",
+    "response" : {
+      "errors" : {
+        "pdfSettings.tableHeaderColor.specifiedOnce" : [
+          "表ヘッダー色が不正です。"
+        ]
+      },
+      "message" : "入力エラーがあります。"
+    },
+    "status" : 400
+  },
+  {
+    "body" : "{\"format\":\"pdf\",\"disposition\":\"attachment\",\"pdfSettings\":{\"fontFamily\":\"NotoSerifJP\",\"fontSizes\":{\"title\":16,\"date\":10.5,\"fullName\":9.5,\"sectionHeading\":12},\"tableHeaderColor\":{\"hex\":\"b4c7e7\"}}}",
+    "contentType" : "application/pdf",
+    "disposition" : "attachment",
+    "name" : "fontFamily=\"NotoSerifJP\"",
+    "response" : null,
+    "status" : 200
+  },
+  {
+    "body" : "{\"format\":\"pdf\",\"disposition\":\"attachment\",\"pdfSettings\":{\"fontFamily\":true,\"fontSizes\":{\"title\":16,\"date\":10.5,\"fullName\":9.5,\"sectionHeading\":12},\"tableHeaderColor\":{\"hex\":\"b4c7e7\"}}}",
+    "contentType" : "application/json",
+    "name" : "fontFamily=true",
+    "response" : {
+      "errors" : {
+        "pdfSettings.fontFamily" : [
+          "フォント種類が不正です。"
+        ]
+      },
+      "message" : "入力エラーがあります。"
+    },
+    "status" : 400
+  },
+  {
+    "body" : "{\"format\":\"pdf\",\"disposition\":\"attachment\",\"pdfSettings\":{\"fontFamily\":1e2,\"fontSizes\":{\"title\":16,\"date\":10.5,\"fullName\":9.5,\"sectionHeading\":12},\"tableHeaderColor\":{\"hex\":\"b4c7e7\"}}}",
+    "contentType" : "application/json",
+    "name" : "fontFamily=1e2",
+    "response" : {
+      "errors" : {
+        "pdfSettings.fontFamily" : [
+          "フォント種類が不正です。"
+        ]
+      },
+      "message" : "入力エラーがあります。"
+    },
+    "status" : 400
+  },
+  {
+    "body" : "{\"format\":\"pdf\",\"disposition\":\"attachment\",\"pdfSettings\":{\"fontFamily\":\"Arial\",\"fontSizes\":{\"title\":16,\"date\":10.5,\"fullName\":9.5,\"sectionHeading\":12},\"tableHeaderColor\":{\"hex\":\"b4c7e7\"}}}",
+    "contentType" : "application/json",
+    "name" : "fontFamily=\"Arial\"",
+    "response" : {
+      "errors" : {
+        "pdfSettings.fontFamily" : [
+          "フォント種類が不正です。"
+        ]
+      },
+      "message" : "入力エラーがあります。"
+    },
+    "status" : 400
+  },
+  {
+    "body" : "{\"format\":\"pdf\",\"disposition\":\"attachment\",\"pdfSettings\":{\"fontFamily\":\"notosansjp\",\"fontSizes\":{\"title\":16,\"date\":10.5,\"fullName\":9.5,\"sectionHeading\":12},\"tableHeaderColor\":{\"hex\":\"b4c7e7\"}}}",
+    "contentType" : "application/json",
+    "name" : "fontFamily=\"notosansjp\"",
+    "response" : {
+      "errors" : {
+        "pdfSettings.fontFamily" : [
+          "フォント種類が不正です。"
+        ]
+      },
+      "message" : "入力エラーがあります。"
+    },
+    "status" : 400
+  },
+  {
+    "body" : "{\"format\":\"pdf\",\"disposition\":\"attachment\",\"pdfSettings\":{\"fontFamily\":\"NotoSansJP\",\"fontSizes\":{\"title\":\"16\",\"date\":10.5,\"fullName\":9.5,\"sectionHeading\":12},\"tableHeaderColor\":{\"hex\":\"b4c7e7\"}}}",
+    "contentType" : "application/pdf",
+    "disposition" : "attachment",
+    "name" : "title=\"16\"",
+    "response" : null,
+    "status" : 200
+  },
+  {
+    "body" : "{\"format\":\"pdf\",\"disposition\":\"attachment\",\"pdfSettings\":{\"fontFamily\":\"NotoSansJP\",\"fontSizes\":{\"title\":\" 16\",\"date\":10.5,\"fullName\":9.5,\"sectionHeading\":12},\"tableHeaderColor\":{\"hex\":\"b4c7e7\"}}}",
+    "contentType" : "application/pdf",
+    "disposition" : "attachment",
+    "name" : "title=\" 16\"",
+    "response" : null,
+    "status" : 200
+  },
+  {
+    "body" : "{\"format\":\"pdf\",\"disposition\":\"attachment\",\"pdfSettings\":{\"fontFamily\":\"NotoSansJP\",\"fontSizes\":{\"title\":\"16 \",\"date\":10.5,\"fullName\":9.5,\"sectionHeading\":12},\"tableHeaderColor\":{\"hex\":\"b4c7e7\"}}}",
+    "contentType" : "application/pdf",
+    "disposition" : "attachment",
+    "name" : "title=\"16 \"",
+    "response" : null,
+    "status" : 200
+  },
+  {
+    "body" : "{\"format\":\"pdf\",\"disposition\":\"attachment\",\"pdfSettings\":{\"fontFamily\":\"NotoSansJP\",\"fontSizes\":{\"title\":\"16.\",\"date\":10.5,\"fullName\":9.5,\"sectionHeading\":12},\"tableHeaderColor\":{\"hex\":\"b4c7e7\"}}}",
+    "contentType" : "application/pdf",
+    "disposition" : "attachment",
+    "name" : "title=\"16.\"",
+    "response" : null,
+    "status" : 200
+  },
+  {
+    "body" : "{\"format\":\"pdf\",\"disposition\":\"attachment\",\"pdfSettings\":{\"fontFamily\":\"NotoSansJP\",\"fontSizes\":{\"title\":\"+16\",\"date\":10.5,\"fullName\":9.5,\"sectionHeading\":12},\"tableHeaderColor\":{\"hex\":\"b4c7e7\"}}}",
+    "contentType" : "application/pdf",
+    "disposition" : "attachment",
+    "name" : "title=\"+16\"",
+    "response" : null,
+    "status" : 200
+  },
+  {
+    "body" : "{\"format\":\"pdf\",\"disposition\":\"attachment\",\"pdfSettings\":{\"fontFamily\":\"NotoSansJP\",\"fontSizes\":{\"title\":\".5e2\",\"date\":10.5,\"fullName\":9.5,\"sectionHeading\":12},\"tableHeaderColor\":{\"hex\":\"b4c7e7\"}}}",
+    "contentType" : "application/pdf",
+    "disposition" : "attachment",
+    "name" : "title=\".5e2\"",
+    "response" : null,
+    "status" : 200
+  },
+  {
+    "body" : "{\"format\":\"pdf\",\"disposition\":\"attachment\",\"pdfSettings\":{\"fontFamily\":\"NotoSansJP\",\"fontSizes\":{\"title\":\"1.6e1\",\"date\":10.5,\"fullName\":9.5,\"sectionHeading\":12},\"tableHeaderColor\":{\"hex\":\"b4c7e7\"}}}",
+    "contentType" : "application/pdf",
+    "disposition" : "attachment",
+    "name" : "title=\"1.6e1\"",
+    "response" : null,
+    "status" : 200
+  },
+  {
+    "body" : "{\"format\":\"pdf\",\"disposition\":\"attachment\",\"pdfSettings\":{\"fontFamily\":\"NotoSansJP\",\"fontSizes\":{\"title\":1E1,\"date\":10.5,\"fullName\":9.5,\"sectionHeading\":12},\"tableHeaderColor\":{\"hex\":\"b4c7e7\"}}}",
+    "contentType" : "application/pdf",
+    "disposition" : "attachment",
+    "name" : "title=1E1",
+    "response" : null,
+    "status" : 200
+  },
+  {
+    "body" : "{\"format\":\"pdf\",\"disposition\":\"attachment\",\"pdfSettings\":{\"fontFamily\":\"NotoSansJP\",\"fontSizes\":{\"title\":1e400,\"date\":10.5,\"fullName\":9.5,\"sectionHeading\":12},\"tableHeaderColor\":{\"hex\":\"b4c7e7\"}}}",
+    "contentType" : "application/json",
+    "name" : "title=1e400",
+    "response" : {
+      "errors" : {
+        "pdfSettings.fontSizes.title" : [
+          "タイトルフォントサイズは72以下で入力してください。"
+        ]
+      },
+      "message" : "入力エラーがあります。"
+    },
+    "status" : 400
+  },
+  {
+    "body" : "{\"format\":\"pdf\",\"disposition\":\"attachment\",\"pdfSettings\":{\"fontFamily\":\"NotoSansJP\",\"fontSizes\":{\"title\":-0,\"date\":10.5,\"fullName\":9.5,\"sectionHeading\":12},\"tableHeaderColor\":{\"hex\":\"b4c7e7\"}}}",
+    "contentType" : "application/json",
+    "name" : "title=-0",
+    "response" : {
+      "errors" : {
+        "pdfSettings.fontSizes.title" : [
+          "タイトルフォントサイズは6以上で入力してください。"
+        ]
+      },
+      "message" : "入力エラーがあります。"
+    },
+    "status" : 400
+  },
+  {
+    "body" : "{\"format\":\"pdf\",\"disposition\":\"attachment\",\"pdfSettings\":{\"fontFamily\":\"NotoSansJP\",\"fontSizes\":{\"title\":\"0x10\",\"date\":10.5,\"fullName\":9.5,\"sectionHeading\":12},\"tableHeaderColor\":{\"hex\":\"b4c7e7\"}}}",
+    "contentType" : "application/json",
+    "name" : "title=\"0x10\"",
+    "response" : {
+      "errors" : {},
+      "message" : "入力エラーがあります。"
+    },
+    "status" : 400
+  },
+  {
+    "body" : "{\"format\":\"pdf\",\"disposition\":\"attachment\",\"pdfSettings\":{\"fontFamily\":\"NotoSansJP\",\"fontSizes\":{\"title\":\"NaN\",\"date\":10.5,\"fullName\":9.5,\"sectionHeading\":12},\"tableHeaderColor\":{\"hex\":\"b4c7e7\"}}}",
+    "contentType" : "application/json",
+    "name" : "title=\"NaN\"",
+    "response" : {
+      "errors" : {},
+      "message" : "入力エラーがあります。"
+    },
+    "status" : 400
+  },
+  {
+    "body" : "{\"format\":\"pdf\",\"disposition\":\"attachment\",\"pdfSettings\":{\"fontFamily\":\"NotoSansJP\",\"fontSizes\":{\"title\":\"１６\",\"date\":10.5,\"fullName\":9.5,\"sectionHeading\":12},\"tableHeaderColor\":{\"hex\":\"b4c7e7\"}}}",
+    "contentType" : "application/json",
+    "name" : "title=\"１６\"",
+    "response" : {
+      "errors" : {},
+      "message" : "入力エラーがあります。"
+    },
+    "status" : 400
+  },
+  {
+    "body" : "{\"format\":\"pdf\",\"disposition\":\"attachment\",\"pdfSettings\":{\"fontFamily\":\"NotoSansJP\",\"fontSizes\":{\"title\":true,\"date\":10.5,\"fullName\":9.5,\"sectionHeading\":12},\"tableHeaderColor\":{\"hex\":\"b4c7e7\"}}}",
+    "contentType" : "application/json",
+    "name" : "title=true",
+    "response" : {
+      "errors" : {},
+      "message" : "入力エラーがあります。"
+    },
+    "status" : 400
+  },
+  {
+    "body" : "{\"format\":\"pdf\",\"disposition\":\"attachment\",\"pdfSettings\":{\"fontFamily\":\"NotoSansJP\",\"fontSizes\":{\"title\":false,\"date\":10.5,\"fullName\":9.5,\"sectionHeading\":12},\"tableHeaderColor\":{\"hex\":\"b4c7e7\"}}}",
+    "contentType" : "application/json",
+    "name" : "title=false",
+    "response" : {
+      "errors" : {},
+      "message" : "入力エラーがあります。"
+    },
+    "status" : 400
+  },
+  {
+    "body" : "{\"format\":\"pdf\",\"disposition\":\"attachment\",\"pdfSettings\":{\"fontFamily\":\"NotoSansJP\",\"fontSizes\":{\"title\":72,\"date\":10.5,\"fullName\":9.5,\"sectionHeading\":12},\"tableHeaderColor\":{\"hex\":\"b4c7e7\"}}}",
+    "contentType" : "application/pdf",
+    "disposition" : "attachment",
+    "name" : "title=72",
+    "response" : null,
+    "status" : 200
+  },
+  {
+    "body" : "{\"format\":\"pdf\",\"disposition\":\"attachment\",\"pdfSettings\":{\"fontFamily\":\"NotoSansJP\",\"fontSizes\":{\"title\":72.01,\"date\":10.5,\"fullName\":9.5,\"sectionHeading\":12},\"tableHeaderColor\":{\"hex\":\"b4c7e7\"}}}",
+    "contentType" : "application/json",
+    "name" : "title=72.01",
+    "response" : {
+      "errors" : {
+        "pdfSettings.fontSizes.title" : [
+          "タイトルフォントサイズは72以下で入力してください。"
+        ]
+      },
+      "message" : "入力エラーがあります。"
+    },
+    "status" : 400
+  },
+  {
+    "body" : "{\"format\":\"pdf\",\"disposition\":\"attachment\",\"pdfSettings\":{\"fontFamily\":\"NotoSansJP\",\"fontSizes\":{\"title\":6,\"date\":10.5,\"fullName\":9.5,\"sectionHeading\":12},\"tableHeaderColor\":{\"hex\":\"b4c7e7\"}}}",
+    "contentType" : "application/pdf",
+    "disposition" : "attachment",
+    "name" : "title=6",
+    "response" : null,
+    "status" : 200
+  },
+  {
+    "body" : "{\"format\":\"pdf\",\"disposition\":\"attachment\",\"pdfSettings\":{\"fontFamily\":\"NotoSansJP\",\"fontSizes\":{\"title\":5.99,\"date\":10.5,\"fullName\":9.5,\"sectionHeading\":12},\"tableHeaderColor\":{\"hex\":\"b4c7e7\"}}}",
+    "contentType" : "application/json",
+    "name" : "title=5.99",
+    "response" : {
+      "errors" : {
+        "pdfSettings.fontSizes.title" : [
+          "タイトルフォントサイズは6以上で入力してください。"
+        ]
+      },
+      "message" : "入力エラーがあります。"
+    },
+    "status" : 400
+  },
+  {
+    "body" : "{\"format\":\"pdf\",\"disposition\":\"attachment\",\"pdfSettings\":{\"fontFamily\":\"NotoSansJP\",\"fontSizes\":{\"title\":\"\",\"date\":10.5,\"fullName\":9.5,\"sectionHeading\":12},\"tableHeaderColor\":{\"hex\":\"b4c7e7\"}}}",
+    "contentType" : "application/json",
+    "name" : "title=\"\"",
+    "response" : {
+      "errors" : {
+        "pdfSettings.fontSizes.title" : [
+          "タイトルフォントサイズは入力必須です。"
+        ]
+      },
+      "message" : "入力エラーがあります。"
+    },
+    "status" : 400
+  },
+  {
+    "body" : "{\"format\":\"pdf\",\"disposition\":\"attachment\",\"pdfSettings\":{\"fontFamily\":\"NotoSansJP\",\"fontSizes\":{\"title\":null,\"date\":10.5,\"fullName\":9.5,\"sectionHeading\":12},\"tableHeaderColor\":{\"hex\":\"b4c7e7\"}}}",
+    "contentType" : "application/json",
+    "name" : "title=null",
+    "response" : {
+      "errors" : {
+        "pdfSettings.fontSizes.title" : [
+          "タイトルフォントサイズは入力必須です。"
+        ]
+      },
+      "message" : "入力エラーがあります。"
+    },
+    "status" : 400
+  },
+  {
+    "body" : "{\"format\":\"pdf\",\"disposition\":\"attachment\",\"pdfSettings\":{\"fontFamily\":\"NotoSansJP\",\"fontSizes\":{\"title\":16,\"date\":true,\"fullName\":9.5,\"sectionHeading\":12},\"tableHeaderColor\":{\"hex\":\"b4c7e7\"}}}",
+    "contentType" : "application/json",
+    "name" : "date=true",
+    "response" : {
+      "errors" : {},
+      "message" : "入力エラーがあります。"
+    },
+    "status" : 400
+  },
+  {
+    "body" : "{\"format\":\"pdf\",\"disposition\":\"attachment\",\"pdfSettings\":{\"fontFamily\":\"NotoSansJP\",\"fontSizes\":{\"title\":16,\"date\":1.05e1,\"fullName\":9.5,\"sectionHeading\":12},\"tableHeaderColor\":{\"hex\":\"b4c7e7\"}}}",
+    "contentType" : "application/pdf",
+    "disposition" : "attachment",
+    "name" : "date=1.05e1",
+    "response" : null,
+    "status" : 200
+  },
+  {
+    "body" : "{\"format\":\"pdf\",\"disposition\":\"attachment\",\"pdfSettings\":{\"fontFamily\":\"NotoSansJP\",\"fontSizes\":{\"title\":16,\"date\":10.5,\"fullName\":9.5,\"sectionHeading\":12},\"tableHeaderColor\":{\"hex\":\"b4c7e7\"}}}",
+    "contentType" : "application/pdf",
+    "disposition" : "attachment",
+    "name" : "format=\"pdf\"",
+    "response" : null,
+    "status" : 200
+  },
+  {
+    "body" : "{\"format\":\"markdown\",\"disposition\":\"attachment\",\"pdfSettings\":{\"fontFamily\":\"NotoSansJP\",\"fontSizes\":{\"title\":16,\"date\":10.5,\"fullName\":9.5,\"sectionHeading\":12},\"tableHeaderColor\":{\"hex\":\"b4c7e7\"}}}",
+    "contentType" : "text/markdown;charset=utf-8",
+    "name" : "format=\"markdown\"",
+    "response" : null,
+    "status" : 200
+  },
+  {
+    "body" : "{\"format\":1.50,\"disposition\":\"attachment\",\"pdfSettings\":{\"fontFamily\":\"NotoSansJP\",\"fontSizes\":{\"title\":16,\"date\":10.5,\"fullName\":9.5,\"sectionHeading\":12},\"tableHeaderColor\":{\"hex\":\"b4c7e7\"}}}",
+    "contentType" : "application/json",
+    "name" : "format=1.50",
+    "response" : {
+      "errors" : {
+        "format" : [
+          "エクスポート形式が不正です。"
+        ]
+      },
+      "message" : "入力エラーがあります。"
+    },
+    "status" : 400
+  },
+  {
+    "body" : "{\"format\":[\"pdf\"],\"disposition\":\"attachment\",\"pdfSettings\":{\"fontFamily\":\"NotoSansJP\",\"fontSizes\":{\"title\":16,\"date\":10.5,\"fullName\":9.5,\"sectionHeading\":12},\"tableHeaderColor\":{\"hex\":\"b4c7e7\"}}}",
+    "contentType" : "application/json",
+    "name" : "format=[\"pdf\"]",
+    "response" : {
+      "errors" : {},
+      "message" : "入力エラーがあります。"
+    },
+    "status" : 400
+  },
+  {
+    "body" : "{\"format\":1e2,\"disposition\":\"attachment\",\"pdfSettings\":{\"fontFamily\":\"NotoSansJP\",\"fontSizes\":{\"title\":16,\"date\":10.5,\"fullName\":9.5,\"sectionHeading\":12},\"tableHeaderColor\":{\"hex\":\"b4c7e7\"}}}",
+    "contentType" : "application/json",
+    "name" : "format=1e2",
+    "response" : {
+      "errors" : {
+        "format" : [
+          "エクスポート形式が不正です。"
+        ]
+      },
+      "message" : "入力エラーがあります。"
+    },
+    "status" : 400
+  },
+  {
+    "body" : "{\"format\":true,\"disposition\":\"attachment\",\"pdfSettings\":{\"fontFamily\":\"NotoSansJP\",\"fontSizes\":{\"title\":16,\"date\":10.5,\"fullName\":9.5,\"sectionHeading\":12},\"tableHeaderColor\":{\"hex\":\"b4c7e7\"}}}",
+    "contentType" : "application/json",
+    "name" : "format=true",
+    "response" : {
+      "errors" : {
+        "format" : [
+          "エクスポート形式が不正です。"
+        ]
+      },
+      "message" : "入力エラーがあります。"
+    },
+    "status" : 400
+  },
+  {
+    "body" : "{\"format\":\"PDF\",\"disposition\":\"attachment\",\"pdfSettings\":{\"fontFamily\":\"NotoSansJP\",\"fontSizes\":{\"title\":16,\"date\":10.5,\"fullName\":9.5,\"sectionHeading\":12},\"tableHeaderColor\":{\"hex\":\"b4c7e7\"}}}",
+    "contentType" : "application/json",
+    "name" : "format=\"PDF\"",
+    "response" : {
+      "errors" : {
+        "format" : [
+          "エクスポート形式が不正です。"
+        ]
+      },
+      "message" : "入力エラーがあります。"
+    },
+    "status" : 400
+  },
+  {
+    "body" : "{\"format\":null,\"disposition\":\"attachment\",\"pdfSettings\":{\"fontFamily\":\"NotoSansJP\",\"fontSizes\":{\"title\":16,\"date\":10.5,\"fullName\":9.5,\"sectionHeading\":12},\"tableHeaderColor\":{\"hex\":\"b4c7e7\"}}}",
+    "contentType" : "application/json",
+    "name" : "format=null",
+    "response" : {
+      "errors" : {
+        "format" : [
+          "エクスポート形式は入力必須です。"
+        ]
+      },
+      "message" : "入力エラーがあります。"
+    },
+    "status" : 400
+  },
+  {
+    "body" : "{\"format\":\"pdf\",\"disposition\":\"inline\",\"pdfSettings\":{\"fontFamily\":\"NotoSansJP\",\"fontSizes\":{\"title\":16,\"date\":10.5,\"fullName\":9.5,\"sectionHeading\":12},\"tableHeaderColor\":{\"hex\":\"b4c7e7\"}}}",
+    "contentType" : "application/pdf",
+    "disposition" : "inline",
+    "name" : "disposition=\"inline\"",
+    "response" : null,
+    "status" : 200
+  },
+  {
+    "body" : "{\"format\":\"pdf\",\"disposition\":1E1,\"pdfSettings\":{\"fontFamily\":\"NotoSansJP\",\"fontSizes\":{\"title\":16,\"date\":10.5,\"fullName\":9.5,\"sectionHeading\":12},\"tableHeaderColor\":{\"hex\":\"b4c7e7\"}}}",
+    "contentType" : "application/json",
+    "name" : "disposition=1E1",
+    "response" : {
+      "errors" : {
+        "disposition" : [
+          "出力方法が不正です。"
+        ]
+      },
+      "message" : "入力エラーがあります。"
+    },
+    "status" : 400
+  },
+  {
+    "body" : "{\"format\":\"pdf\",\"disposition\":true,\"pdfSettings\":{\"fontFamily\":\"NotoSansJP\",\"fontSizes\":{\"title\":16,\"date\":10.5,\"fullName\":9.5,\"sectionHeading\":12},\"tableHeaderColor\":{\"hex\":\"b4c7e7\"}}}",
+    "contentType" : "application/json",
+    "name" : "disposition=true",
+    "response" : {
+      "errors" : {
+        "disposition" : [
+          "出力方法が不正です。"
+        ]
+      },
+      "message" : "入力エラーがあります。"
+    },
+    "status" : 400
+  },
+  {
+    "body" : "{\"format\":\"pdf\",\"disposition\":\"INLINE\",\"pdfSettings\":{\"fontFamily\":\"NotoSansJP\",\"fontSizes\":{\"title\":16,\"date\":10.5,\"fullName\":9.5,\"sectionHeading\":12},\"tableHeaderColor\":{\"hex\":\"b4c7e7\"}}}",
+    "contentType" : "application/json",
+    "name" : "disposition=\"INLINE\"",
+    "response" : {
+      "errors" : {
+        "disposition" : [
+          "出力方法が不正です。"
+        ]
+      },
+      "message" : "入力エラーがあります。"
+    },
+    "status" : 400
+  },
+  {
+    "body" : "{\"format\":\"pdf\",\"disposition\":null,\"pdfSettings\":{\"fontFamily\":\"NotoSansJP\",\"fontSizes\":{\"title\":16,\"date\":10.5,\"fullName\":9.5,\"sectionHeading\":12},\"tableHeaderColor\":{\"hex\":\"b4c7e7\"}}}",
+    "contentType" : "application/json",
+    "name" : "disposition=null",
+    "response" : {
+      "errors" : {
+        "disposition" : [
+          "出力方法は入力必須です。"
+        ]
+      },
+      "message" : "入力エラーがあります。"
+    },
+    "status" : 400
+  },
+  {
+    "body" : "{\"Format\":\"pdf\",\"disposition\":\"attachment\",\"pdfSettings\":{\"fontFamily\":\"NotoSansJP\",\"fontSizes\":{\"title\":16,\"date\":10.5,\"fullName\":9.5,\"sectionHeading\":12},\"tableHeaderColor\":{\"hex\":\"b4c7e7\"}}}",
+    "contentType" : "application/json",
+    "name" : "鍵が Format",
+    "response" : {
+      "errors" : {
+        "format" : [
+          "エクスポート形式は入力必須です。"
+        ]
+      },
+      "message" : "入力エラーがあります。"
+    },
+    "status" : 400
+  },
+  {
+    "body" : "{\"format\":\"markdown\",\"format\":\"pdf\",\"disposition\":\"attachment\",\"pdfSettings\":{\"fontFamily\":\"NotoSansJP\",\"fontSizes\":{\"title\":16,\"date\":10.5,\"fullName\":9.5,\"sectionHeading\":12},\"tableHeaderColor\":{\"hex\":\"b4c7e7\"}}}",
+    "contentType" : "application/pdf",
+    "disposition" : "attachment",
+    "name" : "format が2回(markdown のあとに pdf)",
+    "response" : null,
+    "status" : 200
+  },
+  {
+    "body" : "{\"format\":\"pdf\",\"disposition\":\"attachment\",\"pdfSettings\":{\"fontFamily\":\"NotoSansJP\",\"fontSizes\":{\"title\":16,\"date\":10.5,\"fullName\":9.5,\"sectionHeading\":12},\"tableHeaderColor\":{\"hex\":\"b4c7e7\"}}} x",
+    "contentType" : "application/pdf",
+    "disposition" : "attachment",
+    "name" : "本文のあとに x",
+    "response" : null,
+    "status" : 200
+  },
+  {
+    "body" : "{\"format\":\"pdf\",\"disposition\":\"attachment\",\"pdfSettings\":\"\"}",
+    "contentType" : "application/json",
+    "name" : "pdfSettings=\"\"",
+    "response" : {
+      "errors" : {},
+      "message" : "入力エラーがあります。"
+    },
+    "status" : 400
+  },
+  {
+    "body" : "{\"format\":\"pdf\",\"disposition\":\"attachment\",\"pdfSettings\":[]}",
+    "contentType" : "application/json",
+    "name" : "pdfSettings=[]",
+    "response" : {
+      "errors" : {},
+      "message" : "入力エラーがあります。"
+    },
+    "status" : 400
+  },
+  {
+    "body" : "{\"format\":\"pdf\",\"disposition\":\"attachment\",\"pdfSettings\":{\"fontFamily\":\"NotoSansJP\",\"fontSizes\":\"\",\"tableHeaderColor\":{\"hex\":\"b4c7e7\"}}}",
+    "contentType" : "application/json",
+    "name" : "fontSizes=\"\"",
+    "response" : {
+      "errors" : {},
+      "message" : "入力エラーがあります。"
+    },
+    "status" : 400
+  },
+  {
+    "body" : "{\"format\":\"pdf\",\"disposition\":\"attachment\",\"pdfSettings\":{\"fontFamily\":\"NotoSansJP\",\"fontSizes\":[],\"tableHeaderColor\":{\"hex\":\"b4c7e7\"}}}",
+    "contentType" : "application/json",
+    "name" : "fontSizes=[]",
+    "response" : {
+      "errors" : {},
+      "message" : "入力エラーがあります。"
+    },
+    "status" : 400
+  },
+  {
+    "body" : "{\"format\":\"pdf\",\"disposition\":\"attachment\",\"pdfSettings\":{\"fontFamily\":\"NotoSansJP\",\"fontSizes\":{\"title\":16,\"date\":10.5,\"fullName\":9.5,\"sectionHeading\":12},\"tableHeaderColor\":\"\"}}",
+    "contentType" : "application/json",
+    "name" : "tableHeaderColor=\"\"",
+    "response" : {
+      "errors" : {},
+      "message" : "入力エラーがあります。"
+    },
+    "status" : 400
+  },
+  {
+    "body" : "{\"format\":\"pdf\",\"disposition\":\"attachment\",\"pdfSettings\":{\"fontFamily\":\"NotoSansJP\",\"fontSizes\":{\"title\":16,\"date\":10.5,\"fullName\":9.5,\"sectionHeading\":12},\"tableHeaderColor\":[]}}",
+    "contentType" : "application/json",
+    "name" : "tableHeaderColor=[]",
+    "response" : {
+      "errors" : {},
+      "message" : "入力エラーがあります。"
+    },
+    "status" : 400
+  },
+  {
+    "body" : "{\"format\":\"pdf\",\"disposition\":\"attachment\",\"pdfSettings\":{\"fontFamily\":\"NotoSansJP\",\"fontSizes\":{\"title\":16,\"date\":10.5,\"fullName\":9.5,\"sectionHeading\":12},\"tableHeaderColor\":{\"rgb\":\"\"}}}",
+    "contentType" : "application/json",
+    "name" : "rgb=\"\"",
+    "response" : {
+      "errors" : {},
+      "message" : "入力エラーがあります。"
+    },
+    "status" : 400
+  },
+  {
+    "body" : "{\"format\":\"pdf\",\"disposition\":\"attachment\",\"pdfSettings\":{\"fontFamily\":\"NotoSansJP\",\"fontSizes\":{\"title\":16,\"date\":10.5,\"fullName\":9.5,\"sectionHeading\":12},\"tableHeaderColor\":{\"rgb\":[]}}}",
+    "contentType" : "application/json",
+    "name" : "rgb=[]",
+    "response" : {
+      "errors" : {},
+      "message" : "入力エラーがあります。"
+    },
+    "status" : 400
+  },
+  {
+    "body" : "{\"format\":\"pdf\",\"disposition\":\"attachment\",\"pdfSettings\":null}",
+    "contentType" : "application/json",
+    "name" : "pdfSettings=null",
+    "response" : {
+      "errors" : {
+        "pdfSettingsRequired" : [
+          "PDF設定は入力必須です。"
+        ]
+      },
+      "message" : "入力エラーがあります。"
+    },
+    "status" : 400
+  },
+  {
+    "body" : "{\"format\":\"pdf\",\"disposition\":\"attachment\"}",
+    "contentType" : "application/json",
+    "name" : "format が pdf で pdfSettings が無い",
+    "response" : {
+      "errors" : {
+        "pdfSettingsRequired" : [
+          "PDF設定は入力必須です。"
+        ]
+      },
+      "message" : "入力エラーがあります。"
+    },
+    "status" : 400
+  },
+  {
+    "body" : "{\"format\":\"markdown\",\"disposition\":\"inline\"}",
+    "contentType" : "text/markdown;charset=utf-8",
+    "name" : "format が markdown で pdfSettings が無い",
+    "response" : null,
+    "status" : 200
+  },
+  {
+    "body" : "",
+    "contentType" : "application/json",
+    "name" : "本文が空",
+    "response" : {
+      "errors" : {},
+      "message" : "入力エラーがあります。"
+    },
+    "status" : 400
+  },
+  {
+    "body" : "\"\"",
+    "contentType" : "application/json",
+    "name" : "本文が \"\"",
+    "response" : {
+      "errors" : {},
+      "message" : "入力エラーがあります。"
+    },
+    "status" : 400
+  },
+  {
+    "body" : "{\"format\":\"pdf\",\"disposition\":\"attachment\",\"pdfSettings\":{\"fontFamily\":\"Arial\",\"fontSizes\":{\"title\":100,\"date\":10.5,\"fullName\":9.5,\"sectionHeading\":12},\"tableHeaderColor\":{\"hex\":\"b4c7e7\",\"rgb\":{\"r\":12,\"g\":34,\"b\":56}}}}",
+    "contentType" : "application/json",
+    "name" : "3つの欄が同時に誤り",
+    "response" : {
+      "errors" : {
+        "pdfSettings.fontFamily" : [
+          "フォント種類が不正です。"
+        ],
+        "pdfSettings.fontSizes.title" : [
+          "タイトルフォントサイズは72以下で入力してください。"
+        ],
+        "pdfSettings.tableHeaderColor.specifiedOnce" : [
+          "表ヘッダー色が不正です。"
+        ]
+      },
+      "message" : "入力エラーがあります。"
+    },
+    "status" : 400
+  }
+]
