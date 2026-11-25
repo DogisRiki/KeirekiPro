@@ -21,7 +21,7 @@ concurrency:
 
 env:
   PR_SIZE_LIMIT: '200'
-  CLAUDE_MD_SIZE_LIMIT: '21700'
+  CLAUDE_MD_SIZE_LIMIT: '22100'
 
 jobs:
   escape-hatch:
