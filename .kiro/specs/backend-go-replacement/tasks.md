@@ -408,8 +408,8 @@
   - _要件: 9.8, 9.9_
   - _依存: 16.1, 16.2_
 
-- [ ] 6. 切り替えの出荷より前に入れる本番の設定の変更を入れる(PR 4-1)
-- [ ] 6.1 タスク定義と Redis の秘密の値に Go 版が読む値を足し、PR を出す
+- [x] 6. 切り替えの出荷より前に入れる本番の設定の変更を入れる(PR 4-1)
+- [x] 6.1 タスク定義と Redis の秘密の値に Go 版が読む値を足し、PR を出す
 
   Claude は、`terraform/modules/ecs/main.tf` のタスク定義に環境変数 `KEIREKIPRO_ENV=prod` を足し、`terraform/main.tf` の `keirekipro/redis` の秘密の値にキー `redis-username` を足す。Java 版が読む値は変えない。Claude は `/verify-terraform` を通して PR を出す。PR 4-1 は terraform のファイルだけを変えるので、所有者の承認を待たずに、品質チェックに通ると main に入る。本番の設定は、main に入っただけでは変わらない。
 
@@ -423,7 +423,6 @@
   - 完了の確かめ方: `/verify-terraform` が成功し、`git diff origin/main -- terraform/` の差分が、環境変数1つと秘密の値のキー1つの追加だけで、PR の本文に plan で変わるはずのリソースと値がある
   - 受入基準とテストの対応: 要件5の受入基準1(Java 版のままでも動く形で先に入れる)は、`git diff origin/main -- terraform/` の差分と、`plan_only` で動かした `terraform-apply.yaml` の plan の差分に、Java 版が読む値の変更と削除が無いことで確かめる
   - _要件: 5.1_
-  - _保留: 5つのまとまりの spec の PR がすべて main に入り、progress.md の5つのまとまりの状態が「比べる検査に通った」になったあと、所有者が `/kiro-impl backend-go-replacement` を打った会話で、Claude が大タスク6を行う_
 
 - [ ] 7. 出荷の版の選び方と切り替えの手順書を入れる(PR 4-2)
 - [ ] 7.1 出荷する版を決めるスクリプトを作る

@@ -96,6 +96,7 @@ resource "aws_secretsmanager_secret_version" "redis" {
     "redis-host"                      = module.elasticache.endpoint
     "redis-port"                      = tostring(module.elasticache.port)
     "redis-password"                  = module.secrets_manager.redis_password
+    "redis-username"                  = module.elasticache.username
     "spring.data.redis.cluster.nodes" = "${module.elasticache.endpoint}:${module.elasticache.port}"
     "spring.data.redis.username"      = module.elasticache.username
   })
