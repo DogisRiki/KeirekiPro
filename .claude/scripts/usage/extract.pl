@@ -28,9 +28,10 @@ use File::Basename ();
 use File::Spec ();
 use Time::HiRes ();
 use POSIX ();
+use Digest::SHA ();
 
 # 抜き出し方を変えたら上げる。.pos の版の番号が違う記録の鍵は、最初から読み直す
-use constant EXTRACT_VERSION => 2;
+use constant EXTRACT_VERSION => 3;
 
 my $JSON = JSON::PP->new->utf8->canonical;
 
@@ -55,6 +56,8 @@ my $ID_RE = qr/\A[A-Za-z0-9_-]{1,64}\z/;
 my $MERGED_COMMENT = do { my $s = ' に統合した。'; utf8::decode($s); $s };
 # 別に起こしたセッションの識別子の形
 my $LOCAL_RE = qr/(?<![A-Za-z0-9_])(local_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?![0-9a-f])/;
+# Bash の道具で、ファイルの中身を読むコマンドの名前。引数のファイルを読んだ印を書く
+my %READ_CMDS = map { $_ => 1 } qw(cat head tail sed nl less more);
 
 # データのファイルの wait_categories(待ちの分類)と stage_marks(段階の印の名前)。run_all が読む
 my ($WAIT_CATS, $STAGE_MARKS, $REVIEW_AGENTS);
@@ -762,6 +765,7 @@ sub extract_line {
                 $st->{calls}{$call->{id}} = $call if $call;
                 my $name = $b->{name} // '';
                 my $in = ref $b->{input} eq 'HASH' ? $b->{input} : {};
+                push @rows, read_rows($ts, $d->{cwd}, $name, $in);
                 if ($name eq 'Skill') {
                     push @rows, stage_row($ts, $in->{skill}, $in->{args});
                 } elsif ($name eq 'Read' && defined(my $sk = skill_of_path($in->{file_path}))) {
@@ -876,6 +880,97 @@ sub skill_of_path {
     my ($p) = @_;
     return undef unless defined $p && !ref $p;
     return $p =~ m{(?:\A|[/\\])\.claude[/\\]skills[/\\]([A-Za-z0-9_-]+)[/\\]SKILL\.md\z} ? $1 : undef;
+}
+
+# ファイルを読んだ行。Read の道具の file_path と、Bash の道具のファイルを読むコマンドの引数から作る。
+# report.pl が、要約のあとに同じファイルを読み直した回数を数えるために使う。
+# ファイルの場所は書かず、そろえた場所の SHA-1 の先頭16文字だけを書く
+sub read_rows {
+    my ($ts, $cwd, $name, $in) = @_;
+    $cwd = undef if ref $cwd;
+    my @p;
+    if ($name eq 'Read' && defined $in->{file_path} && !ref $in->{file_path}) {
+        @p = (abs_path_of($cwd, $in->{file_path}));
+    } elsif ($name eq 'Bash' && defined $in->{command} && !ref $in->{command}) {
+        @p = bash_read_paths($in->{command}, $cwd);
+    }
+    return map { my $b = $_; utf8::encode($b); { k => 'read', ts => $ts, f => substr(Digest::SHA::sha1_hex($b), 0, 16) } } grep { defined } @p;
+}
+
+# 場所を、$cwd を基にした絶対の場所にし、区切りを / に、Git Bash の /c/ の形をドライブ文字の形にそろえ、. と .. を畳む。
+# ドライブ文字の場所は小文字にし、.claude/worktrees/<名前> を除いて、本体のフォルダと worktree の同じファイルをそろえる。
+# 変数・置き換え・ワイルドカード・~ を含む場所と、$cwd が分からない相対の場所は undef を返す
+sub abs_path_of {
+    my ($cwd, $p) = @_;
+    return undef unless defined $p && length $p && $p ne '-' && $p !~ /[\$`*?]|\A~/;
+    $p =~ tr{\\}{/};
+    $p =~ s{\A/([A-Za-z])(?=/|\z)}{$1:};
+    if ($p !~ m{\A(?:[A-Za-z]:)?/}) {
+        my $base = abs_path_of(undef, $cwd);
+        return undef unless defined $base;
+        $p = "$base/$p";
+    }
+    my ($root, $rest) = $p =~ m{\A([A-Za-z]:)?/(.*)\z}s or return undef;
+    my @seg;
+    for (split m{/}, $rest) {
+        next if $_ eq '' || $_ eq '.';
+        if ($_ eq '..') { pop @seg } else { push @seg, $_ }
+    }
+    my $out = join '/', $root // '', @seg;
+    $out = lc $out if defined $root;
+    $out =~ s{/\.claude/worktrees/[^/]+(?=/|\z)}{};
+    return $out;
+}
+
+# Bash のコマンドの文字列から、ファイルを読むコマンド(%READ_CMDS)の引数のファイルの場所を、絶対の場所にして返す。
+# 区切り(改行 && || ; | & 括弧)ごとに単語に分け、引用符をくくりとして読み、cd の行き先を追う。
+# リダイレクトの後ろの単語、ヒアドキュメントの本文、sed のスクリプト、head と tail の -n -c の値は場所にしない
+sub bash_read_paths {
+    my ($cmd, $cwd) = @_;
+    my ($dir, @words, @paths, @heredoc) = ($cwd);
+    my $word = qr/((?:'[^']*'|"(?:[^"\\]|\\.)*"|\\.|[^ \t\n;&|<>()'"\\])+)/s;
+    my $flush = sub {
+        my @w = splice @words;
+        shift @w while @w && $w[0] =~ /\A(?:then|do|else|time|!|\{|[A-Za-z_][A-Za-z0-9_]*=.*)\z/s;
+        my ($c, @a) = @w;
+        return unless defined $c;
+        if ($c eq 'cd') { $dir = @a == 1 ? abs_path_of($dir, $a[0]) : undef; return }
+        return unless $READ_CMDS{$c};
+        return if $c eq 'sed' && grep { /\A-[A-Za-z]*i|\A--in-place/ } @a;
+        my $script = $c eq 'sed' && !grep { /\A-[ef]\z|\A--(?:expression|file)/ } @a;
+        while (defined(my $w = shift @a)) {
+            if ($w =~ /\A-./) {
+                shift @a if (($c eq 'head' || $c eq 'tail') && $w =~ /\A-[nc]\z/) || ($c eq 'sed' && $w =~ /\A-[ef]\z/);
+                next;
+            }
+            if ($script) { $script = 0; next }
+            push @paths, abs_path_of($dir, $w);
+        }
+    };
+    pos($cmd) = 0;
+    while (pos($cmd) < length $cmd) {
+        next if $cmd =~ /\G(?:[ \t]+|\\\n|#[^\n]*)/gc;
+        if ($cmd =~ /\G\n/gc) {
+            $flush->();
+            for my $end (splice @heredoc) {
+                $cmd =~ /\G.*?^[ \t]*\Q$end\E[ \t]*(?:\n|\z)/gcms or pos($cmd) = length $cmd;
+            }
+        } elsif ($cmd =~ /\G<<-?[ \t]*(['"]?)([A-Za-z0-9_]+)\1/gc) {
+            push @heredoc, $2;
+        } elsif ($cmd =~ /\G(?:<<<|[0-9]*(?:>>?|<|&>>?|>&))[ \t]*/gc) {
+            $cmd =~ /\G$word/gc;
+        } elsif ($cmd =~ /\G(?:&&|\|\||;;?|\||&|\(|\))/gc) {
+            $flush->();
+        } elsif ($cmd =~ /\G$word/gc) {
+            my $w = $1;
+            $w =~ s/'([^']*)'|"((?:[^"\\]|\\.)*)"|\\(.)/defined $1 ? $1 : defined $2 ? $2 =~ s{\\(.)}{$1}gsr : $3/gse;
+            push @words, $w;
+        } else {
+            $cmd =~ /\G./gcs;
+        }
+    }
+    $flush->();
+    return @paths;
 }
 
 # 受け持ちとまとめの出来事。結果が失敗でないときだけ、結果を読んだときに書く
