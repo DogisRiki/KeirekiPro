@@ -423,7 +423,6 @@
   - 完了の確かめ方: `/verify-terraform` が成功し、`git diff origin/main -- terraform/` の差分が、環境変数1つと秘密の値のキー1つの追加だけで、PR の本文に plan で変わるはずのリソースと値がある
   - 受入基準とテストの対応: 要件5の受入基準1(Java 版のままでも動く形で先に入れる)は、`git diff origin/main -- terraform/` の差分と、`plan_only` で動かした `terraform-apply.yaml` の plan の差分に、Java 版が読む値の変更と削除が無いことで確かめる
   - _要件: 5.1_
-  - _保留: 5つのまとまりの spec の PR がすべて main に入り、progress.md の5つのまとまりの状態が「比べる検査に通った」になったあと、所有者が `/kiro-impl backend-go-replacement` を打った会話で、Claude が大タスク6を行う_
 
 - [ ] 7. 出荷の版の選び方と切り替えの手順書を入れる(PR 4-2)
 - [ ] 7.1 出荷する版を決めるスクリプトを作る
