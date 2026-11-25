@@ -408,8 +408,8 @@
   - _要件: 9.8, 9.9_
   - _依存: 16.1, 16.2_
 
-- [ ] 6. 切り替えの出荷より前に入れる本番の設定の変更を入れる(PR 4-1)
-- [ ] 6.1 タスク定義と Redis の秘密の値に Go 版が読む値を足し、PR を出す
+- [x] 6. 切り替えの出荷より前に入れる本番の設定の変更を入れる(PR 4-1)
+- [x] 6.1 タスク定義と Redis の秘密の値に Go 版が読む値を足し、PR を出す
 
   Claude は、`terraform/modules/ecs/main.tf` のタスク定義に環境変数 `KEIREKIPRO_ENV=prod` を足し、`terraform/main.tf` の `keirekipro/redis` の秘密の値にキー `redis-username` を足す。Java 版が読む値は変えない。Claude は `/verify-terraform` を通して PR を出す。PR 4-1 は terraform のファイルだけを変えるので、所有者の承認を待たずに、品質チェックに通ると main に入る。本番の設定は、main に入っただけでは変わらない。
 
