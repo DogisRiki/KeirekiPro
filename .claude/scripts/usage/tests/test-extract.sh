@@ -609,6 +609,36 @@ perl -MJSON::PP -e 'local $/; my $d = decode_json(<STDIN>); delete $d->{stage_ma
 perl "$WORK/nomarks/extract.pl" --state "$WORK/nomarksstate" --all --skip-locked --repo "$REPO" 2>/dev/null
 check "データのファイルに stage_marks が無いときは 1 で終わり、抜き出した記録を作らない" "$?/$( [ -e "$WORK/nomarksstate/extract/s-ev.jsonl" ] && echo yes || echo no)" "1/no"
 
+printf '== 手順の本文を読んだ印と審査役を起動した印と要約の区切り\n'
+perl -MJSON::PP -e '
+    my ($file, $cwd) = @ARGV;
+    my $j = JSON::PP->new->utf8->canonical;
+    my $n = 0;
+    my $c = sub { $n++; return (cwd => $cwd, sessionId => "s-sk", timestamp => sprintf("2026-10-26T00:05:%02d.000Z", $n)) };
+    my $call = sub { my ($id, $name, $input) = @_; return {$c->(), type => "assistant",
+        message => {id => "msg_$id", model => "claude-opus-5-5", role => "assistant", stop_reason => "tool_use", usage => {input_tokens => 1, output_tokens => 1},
+            content => [{type => "tool_use", id => $id, name => $name, input => $input}]}} };
+    my @l = (
+        $call->("k1", "Read", {file_path => "C:\\work\\repo\\.claude\\skills\\kiro-spec-design\\SKILL.md"}),
+        $call->("k2", "Read", {file_path => "/work/repo/.claude/skills/simplify/SKILL.md"}),
+        $call->("k3", "Read", {file_path => "/work/repo/.claude/skills/spec-review/README.md"}),
+        $call->("k4", "Agent", {subagent_type => "spec-style-checker", prompt => "- FEATURE: x\n- STAGE: design\nSECRET-PROMPT"}),
+        $call->("k5", "Agent", {subagent_type => "general-purpose", prompt => "- STAGE: tasks\nSECRET-PROMPT"}),
+        {$c->(), type => "system", subtype => "compact_boundary", content => "SECRET-SUMMARY"},
+        $call->("k6", "Edit", {file_path => "/work/repo/.claude/skills/start/SKILL.md", old_string => "SECRET-OLD", new_string => "SECRET-NEW"}),
+        $call->("k7", "Write", {file_path => "/work/repo/.claude/skills/simplify/SKILL.md", content => "SECRET-CONTENT"}),
+    );
+    open my $f, ">", $file or die "$file: $!";
+    print $f $j->encode($_), "\n" for @l;
+' "$D/s-sk.jsonl" "$REPO"
+run_all
+SK="$EX/s-sk.jsonl"
+check "stage_marks に載ったスキルの SKILL.md を読んだ行と、審査役か点検役を起動した行だけが、via を付けた段階の印になる" \
+    "$(kall "$SK" stage name)|$(kall "$SK" stage via)|$(kall "$SK" stage spec_stage)" "kiro-spec-design,spec-review|read,agent|null,design"
+check "stage_marks に載ったスキルの SKILL.md を書き換えた行だけが skill_edit の行になり、要約の区切りが compact の行になる" \
+    "$(kall "$SK" skill_edit name)|$(kcount "$SK" compact)" "start|1"
+check "依頼文と書き換えた文と要約の文が、抜き出した記録に残らない" "$(grep -c SECRET "$SK")" "0"
+
 printf '== デスクトップアプリの手元の記録\n'
 # desktop.jsonl の行を local>session の形にしてつなぐ。ファイルが無ければ nofile
 dpairs() {

@@ -41,6 +41,8 @@ use constant SPEC_MAKING => { map { (Encode::decode('UTF-8', $_), 1) } qw(要件
 use constant OTHER_STAGE    => Encode::decode('UTF-8', 'その他');
 use constant IMPL_STAGE     => Encode::decode('UTF-8', '実装');
 use constant SPEC_FIX_STAGE => Encode::decode('UTF-8', '実装中の spec の直し');
+# spec の段階の名前(依頼文の STAGE の名前)ごとの、その段階の本文を作る段階の名前
+use constant MAKING_OF => { map { my ($k, $v) = split /=/; ($k, Encode::decode('UTF-8', $v)) } qw(requirements=要件 design=設計 tasks=タスク) };
 use constant ROLE_MAIN      => Encode::decode('UTF-8', '本体の会話');
 use constant ROLE_SPAWNED   => Encode::decode('UTF-8', '別に起こしたセッション');
 use constant ROLE_SUB       => Encode::decode('UTF-8', '補助役');
@@ -578,7 +580,8 @@ sub recv_issue {
 
 sub is_request {
     my ($r) = @_;
-    return ($r->{k} // '') eq 'stage' && ($r->{name} // '') eq 'request' ? 1 : 0;
+    # 手順の本文を読んだだけの印は、/request を始めたことに数えない
+    return ($r->{k} // '') eq 'stage' && ($r->{name} // '') eq 'request' && !defined $r->{via} ? 1 : 0;
 }
 
 # 補助役の会話の記録の鍵(<親の記録の鍵>.agent-<id>)の、親の記録の鍵。補助役の会話でなければ undef
@@ -885,10 +888,15 @@ sub stage_lines {
     my $irec = $ctx->{irec};
     my $claim_impl = !$ctx->{spec}{json} || $ctx->{spec}{switched};
     my $impl;
-    for my $r (map { @$_ } values %$irec) {
-        next unless ($r->{k} // '') eq 'stage' && ($r->{name} // '') eq 'kiro-impl';
-        my $t = row_ts($r);
-        $impl = $t if defined $t && (!defined $impl || $t < $impl);
+    for my $rows (values %$irec) {
+        # kiro-impl の手順の本文を書き換えた会話では、その本文を読んだ印を数えない
+        my $ed = grep { ($_->{k} // '') eq 'skill_edit' && ($_->{name} // '') eq 'kiro-impl' } @$rows;
+        for my $r (@$rows) {
+            next unless ($r->{k} // '') eq 'stage' && ($r->{name} // '') eq 'kiro-impl';
+            next if $ed && ($r->{via} // '') eq 'read';
+            my $t = row_ts($r);
+            $impl = $t if defined $t && (!defined $impl || $t < $impl);
+        }
     }
     my $fix = sub {
         my ($name, $t) = @_;
@@ -907,22 +915,41 @@ sub stage_lines {
             }
         }
     }
+    # spec を作る途中の審査が終わった印を、印の会話ごとに、時刻と審査した段階の組で集める
+    my (%rends, @rends_any);
+    for my $m (@{ $ctx->{marks} || [] }) {
+        next unless ($m->{kind} // '') eq 'spec-review-end' && defined $m->{stage} && !ref $m->{stage} && mark_in_issue($ctx, $m);
+        my $s = $m->{session};
+        push @{ defined $s && !ref $s && length $s ? ($rends{$s} //= []) : \@rends_any }, [ row_ts($m), $m->{stage} ];
+    }
+    my $review = $ctx->{cfg}{stage_marks}{'spec-review'};
     my %lines;
     for my $key (sort grep { !defined parent_key($_) } keys %$irec) {
         my @l;
-        for my $r (timed_rows($irec->{$key})) {
+        my @rows = timed_rows($irec->{$key});
+        my %edited = map { ($_->{name} // '') => 1 } grep { ($_->{k} // '') eq 'skill_edit' } @rows;
+        # %seen は会話で印が現れたスキル、$before は要約の区切りの時点の %seen の写し(区切りのあと所有者が話すまで持つ)
+        my (%seen, $before);
+        for my $i (0 .. $#rows) {
+            my $r = $rows[$i];
             my ($k, $t) = ($r->{k} // '', row_ts($r));
-            if ($k eq 'stage') {
-                push @l, [ $t, $fix->(stage_of_mark($ctx, $r), $t) // OTHER_STAGE ];
+            if ($k eq 'compact') {
+                $before = { %seen };
+            } elsif ($k eq 'turn' && ($r->{from} // '') eq 'owner') {
+                undef $before;
+            } elsif ($k eq 'stage') {
+                my $mark = read_mark($r, \%edited, $before, \@rows, $i);
+                $seen{ $r->{name} // '' } = 1;
+                push @l, [ $t, $fix->(stage_of_mark($ctx, $mark), $t) // OTHER_STAGE ] if $mark;
             } elsif ($k eq 'recv' && $claim_impl && ($r->{how} // '') eq 'claim') {
                 push @l, [ $t, IMPL_STAGE ];
             }
         }
         back_after_review(\@l, $_, $impl) for sort { $a <=> $b } @{ $ends{$key} || [] }, @ends_any;
+        back_to_making(\@l, @$_, $review) for sort { $a->[0] <=> $b->[0] } @{ $rends{$key} || [] }, @rends_any;
         $lines{$key} = \@l;
     }
     my $types = $ctx->{cfg}{roles}{agent_types} || {};
-    my $review = $ctx->{cfg}{stage_marks}{'spec-review'};
     for my $key (sort grep { defined parent_key($_) } keys %$irec) {
         my ($meta) = grep { ($_->{k} // '') eq 'meta' } @{ $irec->{$key} };
         my ($first) = sort { $a <=> $b } grep { defined } map { row_ts($_) } @{ $irec->{$key} };
@@ -953,6 +980,44 @@ sub back_after_review {
         $back = $l->[$i][1] if $l->[$i][0] >= $impl && $l->[$i][1] ne SPEC_FIX_STAGE;
     }
     splice @$l, $at, 0, [ $t, $back // IMPL_STAGE ];
+}
+
+# spec の段階 $st の審査が終わった印の時刻 $t で、その時点の段階が $st の審査で、審査を始める前の段階が $st の本文を作る段階でないなら、
+# 段階の並び $l に、審査を始める前の段階を足す。後ろの段階を作る途中で前の段階を審査し直したあと、後ろの段階の作業に戻った時間を、
+# 前の段階の審査に数えないためである。審査を始める前の段階は、$t 以前で、どの審査の段階でもない最も後の段階とする
+sub back_to_making {
+    my ($l, $t, $st, $review) = @_;
+    return unless defined $t && ref $review eq 'HASH' && defined $review->{$st} && defined MAKING_OF->{$st};
+    my $now = stage_at($l, $t);
+    return unless defined $now && $now eq $review->{$st};
+    my %is_review = map { ($_ => 1) } grep { defined } values %$review;
+    my ($back, $at) = (undef, 0);
+    for my $i (0 .. $#$l) {
+        last if $l->[$i][0] > $t;
+        $at = $i + 1;
+        $back = $l->[$i][1] unless $is_review{ $l->[$i][1] };
+    }
+    return unless defined $back && $back ne MAKING_OF->{$st};
+    splice @$l, $at, 0, [ $t, $back ];
+}
+
+# 段階を決めるのに使う段階の印。使わない印なら undef を返す。
+# 手順の本文を読んだ印(via が read)は、同じ会話でその本文を書き換えたとき(%$edited)と、
+# 要約の区切りのあと所有者が話すまでに、区切りより前に印が現れたスキルの本文を読み直したとき(%$before)は使わない。
+# 段階の名前の無い spec-review の印は、あとに続く段階の印のうち最初の、段階の名前のある spec-review の印の段階にする。
+# その前に別のスキルの印が来るか、続く印が無ければ使わない
+sub read_mark {
+    my ($r, $edited, $before, $rows, $i) = @_;
+    my $name = $r->{name} // '';
+    if (($r->{via} // '') eq 'read') {
+        return undef if $edited->{$name} || ($before && $before->{$name});
+    }
+    return $r unless $name eq 'spec-review' && !defined $r->{spec_stage};
+    for my $n (grep { ($_->{k} // '') eq 'stage' } @$rows[ $i + 1 .. $#$rows ]) {
+        return undef unless ($n->{name} // '') eq 'spec-review';
+        return { %$r, spec_stage => $n->{spec_stage} } if defined $n->{spec_stage};
+    }
+    return undef;
 }
 
 # 段階の印の段階の名前。stage_marks の名前と同じ名前か、* で終わる名前の頭に当たる名前を使う。

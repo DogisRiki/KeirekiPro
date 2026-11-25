@@ -30,7 +30,7 @@ use Time::HiRes ();
 use POSIX ();
 
 # 抜き出し方を変えたら上げる。.pos の版の番号が違う記録の鍵は、最初から読み直す
-use constant EXTRACT_VERSION => 1;
+use constant EXTRACT_VERSION => 2;
 
 my $JSON = JSON::PP->new->utf8->canonical;
 
@@ -57,7 +57,7 @@ my $MERGED_COMMENT = do { my $s = ' に統合した。'; utf8::decode($s); $s };
 my $LOCAL_RE = qr/(?<![A-Za-z0-9_])(local_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?![0-9a-f])/;
 
 # データのファイルの wait_categories(待ちの分類)と stage_marks(段階の印の名前)。run_all が読む
-my ($WAIT_CATS, $STAGE_MARKS);
+my ($WAIT_CATS, $STAGE_MARKS, $REVIEW_AGENTS);
 
 # 錠を待つ上限、錠を古いとみなす時間、読んでいる間に錠の時刻を直す間隔(秒)。テストだけが環境変数で短くする
 my $LOCK_WAIT  = test_secs(q(KP_USAGE_TEST_LOCK_WAIT),  600);
@@ -142,7 +142,7 @@ sub hook_event {
         print STDERR "extract.pl: $ev のフックの入力に、読める形の会話の記録の場所が無い\n";
         return;
     }
-    ($WAIT_CATS, $STAGE_MARKS) = load_config();
+    ($WAIT_CATS, $STAGE_MARKS, $REVIEW_AGENTS) = load_config();
     if (!$WAIT_CATS) {
         print STDERR "extract.pl: データのファイル usage-config.json の wait_categories か stage_marks を読めない\n";
         return;
@@ -254,7 +254,7 @@ sub git_common_dir {
 sub run_all {
     my ($o) = @_;
     # 待ちの分類と段階の印の名前が分からないまま抜き出すと、分類と印の無い行が残るので、何も書かずに終わる
-    ($WAIT_CATS, $STAGE_MARKS) = load_config();
+    ($WAIT_CATS, $STAGE_MARKS, $REVIEW_AGENTS) = load_config();
     if (!$WAIT_CATS) {
         print STDERR "extract.pl: データのファイル usage-config.json の wait_categories か stage_marks を読めない\n";
         return 1;
@@ -764,6 +764,18 @@ sub extract_line {
                 my $in = ref $b->{input} eq 'HASH' ? $b->{input} : {};
                 if ($name eq 'Skill') {
                     push @rows, stage_row($ts, $in->{skill}, $in->{args});
+                } elsif ($name eq 'Read' && defined(my $sk = skill_of_path($in->{file_path}))) {
+                    # スキルの手順の本文を読んだ時点も段階の印にする。Skill の道具を使わずに手順を進めることがあるため
+                    push @rows, stage_row($ts, $sk, '', 'read');
+                } elsif (($name eq 'Edit' || $name eq 'Write') && defined(my $ek = skill_of_path($in->{file_path}))) {
+                    # 手順の本文を書き換えた印。同じ会話でその本文を読んだ印を、report.pl が段階の印に数えない
+                    push @rows, { k => 'skill_edit', ts => $ts, name => $ek } if is_stage_mark($ek);
+                } elsif ($name eq 'Agent' && defined $in->{subagent_type} && !ref $in->{subagent_type}
+                    && $REVIEW_AGENTS->{ $in->{subagent_type} }) {
+                    # spec の審査役か書き方の点検役を起動した時点も審査の段階の印にする。審査の段階は依頼文の STAGE で決める
+                    my $p = defined $in->{prompt} && !ref $in->{prompt} ? $in->{prompt} : '';
+                    my $stage = $p =~ /^[ \t]*(?:[-*][ \t]*)?STAGE:[ \t]*([A-Za-z_-]{1,40})[ \t]*\r?$/m ? $1 : '';
+                    push @rows, stage_row($ts, 'spec-review', $stage, 'agent');
                 } elsif ($name eq 'SubagentHandback' && $st->{sub} && defined $in->{message} && !ref $in->{message}) {
                     $st->{report} = [$in->{message}, $ts];
                 }
@@ -802,6 +814,9 @@ sub extract_line {
             push @rows, stage_row($ts, $name, $args);
         }
         push @rows, result_rows($d, $ts, $st);
+    } elsif ($type eq 'system' && ($d->{subtype} // '') eq 'compact_boundary') {
+        # 会話の要約の区切り。要約のあとに手順の本文を読み直した印を、report.pl が見分けるために使う
+        push @rows, { k => 'compact', ts => $ts };
     } elsif ($type eq 'system' && ($d->{subtype} // '') eq 'api_error') {
         my $ms = num_or_undef($d->{retryInMs});
         push @rows, { k => 'retry', ts => $ts, ms => $ms } if defined $ms;
@@ -842,15 +857,25 @@ sub turn_row {
 }
 
 # 段階の印の行。stage_marks に載った名前だけを残し、引数からは Issue の番号と spec-review の段階の名前だけを取り出す
+# $via は、手順の本文を読んだ印なら read、審査役を起動した印なら agent。コマンドと Skill の道具の印には付けない
 sub stage_row {
-    my ($ts, $name, $args) = @_;
+    my ($ts, $name, $args, $via) = @_;
     return () unless defined $name && !ref $name;
     $name =~ s{\A/}{};
     return () unless length $name && is_stage_mark($name);
     $args = '' unless defined $args && !ref $args;
     my $issue = $args =~ /#(\d{1,9})(?!\d)/ ? $1 + 0 : undef;
     my $spec_stage = $name eq 'spec-review' && $args =~ /(?<![A-Za-z0-9_-])(requirements|design|tasks)(?![A-Za-z0-9_-])/ ? $1 : undef;
-    return { k => 'stage', ts => $ts, name => $name, issue => $issue, spec_stage => $spec_stage };
+    my $row = { k => 'stage', ts => $ts, name => $name, issue => $issue, spec_stage => $spec_stage };
+    $row->{via} = $via if defined $via;
+    return $row;
+}
+
+# リポジトリの .claude/skills/<名前>/SKILL.md の場所なら、スキルの名前。ほかの場所なら undef
+sub skill_of_path {
+    my ($p) = @_;
+    return undef unless defined $p && !ref $p;
+    return $p =~ m{(?:\A|[/\\])\.claude[/\\]skills[/\\]([A-Za-z0-9_-]+)[/\\]SKILL\.md\z} ? $1 : undef;
 }
 
 # 受け持ちとまとめの出来事。結果が失敗でないときだけ、結果を読んだときに書く
@@ -1001,7 +1026,9 @@ sub load_config {
             $marks{exact}{$k} = 1;
         }
     }
-    return (\@cats, \%marks);
+    # spec の審査役と書き方の点検役の種類(roles.agent_types の名前)。無ければ空にする
+    my $roles = ref $d->{roles} eq 'HASH' && ref $d->{roles}{agent_types} eq 'HASH' ? $d->{roles}{agent_types} : {};
+    return (\@cats, \%marks, { map { ($_ => 1) } keys %$roles });
 }
 
 # 名前が stage_marks に載っているか
