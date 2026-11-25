@@ -100,6 +100,7 @@ sub build {
     my $lines = stage_lines($ctx);
     my ($totals, $by_stage) = count_times($ctx, $lines);
     my $models = count_tokens($ctx, $lines, $totals, $by_stage);
+    @$totals{qw(compacts rereads)} = count_rereads($ctx);
     my $rework = count_rework($ctx);
     my ($uncountable, $partial) = uncountable_rows($ctx, $rework);
     my $list = read_list($o->{list});
@@ -728,6 +729,28 @@ sub push_limit {
 sub unknown_turns {
     my ($ctx) = @_;
     return scalar grep { ($_->{k} // '') eq 'turn' && ($_->{from} // '') eq 'unknown' } map { @$_ } values %{ $ctx->{irec} };
+}
+
+# 会話の要約の回数と、要約のあとに、その要約より前に読んだファイルを読み直した回数を、会話の記録の鍵ごとに数えて足す。
+# 読み直しは、要約と次の要約の間で、ファイルごとに1回と数える
+sub count_rereads {
+    my ($ctx) = @_;
+    my ($compacts, $rereads) = (0, 0);
+    for my $key (sort keys %{ $ctx->{irec} }) {
+        my (%before, %now);
+        for my $r (timed_rows($ctx->{irec}{$key})) {
+            my $k = $r->{k} // '';
+            if ($k eq 'compact') {
+                $compacts++;
+                %before = (%before, %now);
+                %now = ();
+            } elsif ($k eq 'read' && defined $r->{f} && !ref $r->{f}) {
+                $rereads++ if $before{ $r->{f} } && !$now{ $r->{f} };
+                $now{ $r->{f} } = 1;
+            }
+        }
+    }
+    return ($compacts, $rereads);
 }
 
 # 時刻のある行を、時刻の順に並べる。同じ時刻の行は、記録の順のままにする
@@ -1549,7 +1572,9 @@ sub report_md {
             [ ja('トークン数'), commas($t->{tokens}) ],
             [ ja('使用料'), $sum_usd ],
             [ ja('使う量の上限で止まった回数'), $t->{limit_count} // 0 ],
-            [ ja('使う量の上限で止まっていた時間'), hm($t->{limit_sec}) ]),
+            [ ja('使う量の上限で止まっていた時間'), hm($t->{limit_sec}) ],
+            [ ja('会話の要約の回数'), $t->{compacts} // 0 ],
+            [ ja('要約のあとに同じ資料を読み直した回数'), $t->{rereads} // 0 ]),
         '', ja('### 段階ごと'), '',
         table([ map { ja($_) } qw(段階 AIの作業時間 そのうち待ち時間 審査役などが同時に動いた時間 トークン数 使用料) ],
             (map { [ $_->{name}, hm($_->{work_sec}), hm($_->{wait_sec}), hm($_->{concurrent_sec}), commas($_->{tokens}), usd_text($_->{usd}) ] }
