@@ -897,3 +897,11 @@
   go: Content-Type のヘッダを見ずに本文を JSON として読み、201 で戻す
   画面に影響が無い理由: 画面は、戻しの要求の Content-Type のヘッダを application/json にして送る。所有者が 2026-11-24 に決めた(requirements の承認)
   # match を書かない。比べる検査はこの要求を送らない。Go 版の答えは internal/httpapi/resumes_test.go が確かめる。
+
+- id: CB-075
+  group: 1
+  変えた動き: 偽の送信の検査のトークンを、ヘッダでなく要求の欄 _csrf で送った要求
+  java: ヘッダ X-XSRF-TOKEN が無いと、フォームの形で送った本文の欄 _csrf か、URL の後ろに付けた欄 _csrf の値を Cookie XSRF-TOKEN と比べ、一致すれば受け付ける
+  go: ヘッダ X-XSRF-TOKEN の値だけを Cookie XSRF-TOKEN と比べるので、欄 _csrf だけで送った要求を 403 と「アクセス権限がありません。」で断る
+  画面に影響が無い理由: 画面は、Cookie XSRF-TOKEN の値をヘッダ X-XSRF-TOKEN に写して送り、欄 _csrf を使わない。所有者が 2026-11-14 に受け入れた(Issue #839)
+  # match を書かない。比べる検査は欄 _csrf を送らない。
