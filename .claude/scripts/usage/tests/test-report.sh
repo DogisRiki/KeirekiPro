@@ -427,11 +427,11 @@ check "上限の印のあとに応答が来てから、デスクトップアプ�
     "$(tot 1015)" "0:[190,0,0,1,1000,0]"
 
 echo "== 段階とモデルと役割ごとのトークン数と使用料"
-# 時刻は T0 からの秒数で書く。#2001 と #2007 だけが spec ありの Issue である
+# 時刻は T0 からの秒数で書く。#2001 と #2007 と #2008 と #2009 だけが spec ありの Issue である
 newrepo
-commit 2026-09-01T00:00:00Z "$CFGPATH={}" '.kiro/specs/feat-s/spec.json={"feature_name":"feat-s","issue":2001,"additional_issues":[2007]}'
+commit 2026-09-01T00:00:00Z "$CFGPATH={}" '.kiro/specs/feat-s/spec.json={"feature_name":"feat-s","issue":2001,"additional_issues":[2007,2008,2009]}'
 newgh tokens
-mkdb 'prs => [ closes("'"$SHA"'", 2001 .. 2007) ]'
+mkdb 'prs => [ closes("'"$SHA"'", 2001 .. 2009) ]'
 newstate
 # 段階の印: rst <記録の鍵> <時刻> <名前> [<spec-review の段階>]
 rst() {
@@ -549,6 +549,36 @@ rend 650 null 2007; rend 660 w2 2007; rend 670 w1 2099; rm1 w1 700 true
 check "実装の途中で動かした spec の審査が終わった印のあとが、spec を直し始める前の段階に戻り、spec を作る途中の審査の終わりの印は段階を変えない" \
     "$(stg 2007)" \
     '0:[[["着手の判断",50,0,1],["要件",0,0,0],["要件の審査",0,0,0],["設計",0,0,0],["設計の審査",0,0,0],["タスク",0,0,0],["タスクの審査",100,0,2],["実装",200,10,4],["実装中の spec の直し",200,0,2],["出荷とレビュー対応",150,0,2],["その他",0,0,0]],700,10,11]'
+# #2008: Skill の道具を使わずに、手順の本文を読んで審査を始める(150)。審査役を起動した印(250)が審査の段階を決める。
+# 要約の区切り(350)のあと所有者が話すまでは、区切りより前に印が現れたスキルの本文の読み直し(360)で段階を変えず、
+# 初めて読むスキルの本文(450)で段階を変える。段階の名前の続かない審査の本文(550)と、同じ会話で書き換えたスキルの本文(600)では段階を変えない。
+# 所有者が話したあと(680)は、要約の前に印が現れたスキルの本文を読んでも段階を変える(700)。
+# 同じ会話で書き換えた kiro-impl の本文を読んだ印(720)は、段階を変えず、実装中の spec の直しの始まりにも数えない
+rsv() { rec "$1" "{\"k\":\"stage\",\"ts\":$((T0 + $2)),\"name\":\"$3\",\"issue\":null,\"spec_stage\":$4,\"via\":\"$5\"}"; }
+rec v1 "{\"k\":\"stage\",\"ts\":$T0,\"name\":\"start\",\"issue\":2008,\"spec_stage\":null}"
+rm1 v1 30 false; rst v1 50 kiro-spec-design; rm1 v1 100 false
+rsv v1 150 spec-review null read; rm1 v1 200 false; rsv v1 250 spec-review '"design"' agent; rm1 v1 300 false
+rec v1 "{\"k\":\"compact\",\"ts\":$((T0 + 350))}"; rsv v1 360 kiro-spec-design null read; rm1 v1 400 false
+rsv v1 450 kiro-spec-tasks null read; rm1 v1 500 false
+rsv v1 550 spec-review null read; rsv v1 600 kiro-spec-requirements null read
+rec v1 "{\"k\":\"skill_edit\",\"ts\":$((T0 + 620)),\"name\":\"kiro-spec-requirements\"}"; rm1 v1 650 true
+rturn v1 680 owner; rsv v1 700 kiro-spec-design null read; rsv v1 720 kiro-impl null read
+rec v1 "{\"k\":\"skill_edit\",\"ts\":$((T0 + 730)),\"name\":\"kiro-impl\"}"; rm1 v1 750 true
+check "手順の本文を読んだ印と審査役を起動した印で段階が変わり、要約のあとの読み直しと、段階の名前の続かない審査の本文と、書き換えたスキルの本文では段階が変わらない" \
+    "$(stg 2008)" \
+    '0:[[["着手の判断",50,0,1],["要件",0,0,0],["要件の審査",0,0,0],["設計",150,0,2],["設計の審査",300,0,3],["タスク",220,0,2],["タスクの審査",0,0,0],["実装",0,0,0],["実装中の spec の直し",0,0,0],["出荷とレビュー対応",0,0,0],["その他",0,0,0]],720,0,8]'
+# #2009: 設計を作る途中(50)で要件を審査し直し(150)、要約の区切り(250)のあとに設計の本文を読み直す(260)。
+# 要件の審査が終わった印(300)で設計に戻る。設計の審査(400)が終わった印(500)は、審査を始める前の段階が設計なので段階を変えない
+rendst() { mark "{\"ts\":$((T0 + $1)),\"session\":\"$2\",\"kind\":\"spec-review-end\",\"stage\":\"$3\",\"issue\":null,\"branch\":null}"; }
+rec y1 "{\"k\":\"stage\",\"ts\":$T0,\"name\":\"start\",\"issue\":2009,\"spec_stage\":null}"
+rm1 y1 30 false; rst y1 50 kiro-spec-design; rm1 y1 100 false
+rsv y1 150 spec-review '"requirements"' agent; rm1 y1 200 false
+rec y1 "{\"k\":\"compact\",\"ts\":$((T0 + 250))}"; rsv y1 260 kiro-spec-design null read; rm1 y1 280 false
+rendst 300 y1 requirements; rm1 y1 350 false
+rsv y1 400 spec-review '"design"' agent; rm1 y1 450 false; rendst 500 y1 design; rm1 y1 550 true
+check "後ろの段階を作る途中で前の段階を審査し直したあと、審査が終わった印で後ろの段階に戻り、その段階の本文の審査の終わりでは段階が変わらない" \
+    "$(stg 2009)" \
+    '0:[[["着手の判断",50,0,1],["要件",0,0,0],["要件の審査",150,0,2],["設計",200,0,2],["設計の審査",150,0,2],["タスク",0,0,0],["タスクの審査",0,0,0],["実装",0,0,0],["実装中の spec の直し",0,0,0],["出荷とレビュー対応",0,0,0],["その他",0,0,0]],550,0,7]'
 
 echo "== 印と spec の記録と補助役の報告から数える往復と手戻り"
 # 時刻は T0 からの秒数で書く。#2010 は spec ありの Issue で、#2013 は spec 無しの Issue、#2015 は #2014 を分けた Issue である
