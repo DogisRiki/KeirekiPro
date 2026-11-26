@@ -40,12 +40,15 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} go build -trimpath \
 # Chromium は /headless-shell にあり、PATH に入っているので、chromedp の既定の探し方で見つかる。
 FROM chromedp/headless-shell:157.0.8103.27@sha256:7bee201478b2f6266aae01243740ee85c16281e32f42d3aed9fdf04f4eace7a1
 
-# OS のパッケージを最新にし、生きているかの確認に使う curl と、フォントを探す fontconfig を入れる。
+# OS のパッケージを最新にし、生きているかの確認に使う curl と、フォントを探す fontconfig と、
+# 認証局の証明書の束 ca-certificates を入れる。
 # 土台のイメージの作り直しは、OS の配布元が修正版を出してから遅れるので、
 # その間も修正版を取り込むために、組み立てのたびに upgrade する(Java 版と同じ。#453)。
+# 土台のイメージには証明書の束が無く、--no-install-recommends では curl と一緒にも入らない。
+# 束が無いと、Go 版は Secrets Manager などの AWS の HTTPS の相手の証明書を確かめられず、起動に失敗する。
 RUN apt-get update && \
     apt-get upgrade -y --no-install-recommends && \
-    apt-get install -y --no-install-recommends curl fontconfig && \
+    apt-get install -y --no-install-recommends ca-certificates curl fontconfig && \
     rm -rf /var/lib/apt/lists/*
 
 # fonts-noto-cjk は入れず、Java 版が使う4つのフォントのファイルだけを置く。
