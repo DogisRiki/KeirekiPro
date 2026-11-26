@@ -74,7 +74,7 @@ flowchart LR
 
     Q & Z & H & A --> M[4系統すべて成功したら<br>auto-mergeでmainブランチへ<br>予約はワークフローが行い、外れたら付け直す<br>マージ後は対応するIssueを閉じる]
 
-    M -->|人間が Production Release を実行| App[本番環境<br>アプリケーション]
+    M -->|人間が Production Release を実行<br>backendのJava版とGo版を選べる| App[本番環境<br>アプリケーション]
     M -->|人間が Terraform Apply を実行<br>plan_onlyでは差分の表示だけ| Infra[本番環境<br>インフラ]
     M -->|ラベルの一覧のファイルが変わったとき| Labels[sync-labels<br>GitHubのラベルを<br>ラベルの一覧のファイルのとおりに合わせる]
 
@@ -114,7 +114,7 @@ claude-auto-fix-target.yamlは、Claude CodeのCLIをdownloads.claude.aiから�
 | 品質の検査 | container-scan.yaml | pull_request | paths-filterによる変更検知。backendのJava版とGo版の本番用のイメージをそれぞれarm64で組み立ててTrivyで検査し、修正版が公開されているCRITICALとHIGHの脆弱性を検出する。検出した脆弱性は抑制の状態と判定をあわせて全件を実行結果に表示する。判定スクリプトの単体テストも同じワークフローで実行する |
 | 品質の検査 | codeql.yaml | pull_request / push (main) / 週次 (schedule) / 手動 | CodeQLでソースコードの脆弱性を診断し、結果をGitHubのコードスキャンに送る。診断する言語は、`.github/codeql/languages.tsv`と照らして実行のたびに見つける。プルリクエストでは、言語ごとの診断がすべて成功し、そのプルリクエストが持ち込んだ重さが中以上の警告が無いときだけ、`codeql-complete`が緑になる。所有者が却下した警告は数えない。診断の対象からファイルやクエリを外す設定は置かない。mainへのpushと週1回の実行で、mainに残った警告を見つける |
 | 品質の検査 | codeql-recheck.yaml | codeql.yamlが赤で終わったとき (workflow_run) / 10分ごと (schedule) / 手動 | 所有者がCodeQLの警告を却下したあとに、赤のままの`codeql-complete`を動かし直す。GitHub Actionsは警告の却下で起動できないため、`codeql-complete`が赤か動いている途中のプルリクエストがあるあいだ、10分ごとに確かめ、所有者が却下し、却下の時刻が判定の終わった時刻よりあとの警告があるプルリクエストだけを動かし直す。GitHubの定期実行は混んでいると数時間遅れるので、codeql.yamlが赤で終わったときに動き始め、確かめたあとに実行の中で10分待ってから、次の実行を自分で起動する。10分ごとの定期実行は、起動を取りこぼしたときの予備である。プルリクエストのコードは取り出さない |
-| ずるの検査 | guardrails.yaml | pull_request / pull_request_review | テスト無効化や検査回避にあたる変更の検知、差分サイズの検査(上限超過時はspecの実在・必須ファイル・承認状態を検証)、ワークフローの静的検証(actionlint)とアクション参照のSHA固定の検査、CIの道具の版を決まった書き場所に書いているかの検査、リリースゲートのテスト、backend-testの判定のスクリプトのテスト、Node.jsとTerraformとTrivyの署名とCodex CLIの来歴を確かめて入れるスクリプトのテスト、DBマイグレーションのラベル付け、シークレットスキャン、品質レポート(未使用コード・重複)の生成、Gradle本体が公式のものかの検証、どの会話の始めにも読み込まれる文書の量の検査 |
+| ずるの検査 | guardrails.yaml | pull_request / pull_request_review | テスト無効化や検査回避にあたる変更の検知、差分サイズの検査(上限超過時はspecの実在・必須ファイル・承認状態を検証)、ワークフローの静的検証(actionlint)とアクション参照のSHA固定の検査、CIの道具の版を決まった書き場所に書いているかの検査、リリースゲートのテスト、backend-testの判定のスクリプトのテスト、本番に出すbackendの版を決めるスクリプトのテスト、Node.jsとTerraformとTrivyの署名とCodex CLIの来歴を確かめて入れるスクリプトのテスト、DBマイグレーションのラベル付け、シークレットスキャン、品質レポート(未使用コード・重複)の生成、Gradle本体が公式のものかの検証、どの会話の始めにも読み込まれる文書の量の検査 |
 | 人間の関門 | dependency-gate.yaml | pull_request / pull_request_review | `.npmrc`・`.pnpmfile.cjs`・`pnpm-workspace.yaml`・`*.gradle` の変更と、backendのGo版の品質チェックとコード生成の設定(`backend/Makefile`・`.golangci.yml`・`.testcoverage.yml`・`.gremlins.yaml`・`api/oapi-codegen.yaml`・`sqlc.yaml`)の変更と、開発環境のNode.jsとTerraformのイメージの版の変更を検知し、リポジトリ所有者が承認するまでマージを保留。ライブラリのバージョンを上げるだけの変更と、イメージの版を変えずに中身(digest)だけを変える変更は対象外 |
 | 人間の関門 | pre-merge-check.yaml | pull_request / pull_request_review | pre-merge-checkラベルの付いたPRを、所有者がローカル確認して承認するまでマージ保留 |
 | 人間の関門 | rerun-approval-gated-checks.yaml | pull_request_review (approved) | PRの最新のコミットで、承認前に失敗したままか取り消されたゲートチェックを再実行し、承認結果を反映させる |
@@ -129,9 +129,9 @@ claude-auto-fix-target.yamlは、Claude CodeのCLIをdownloads.claude.aiから�
 | 自動の修正 | claude-auto-fix.yaml | workflow_run (frontend-vuln-fix.yaml・backend-vuln-fix.yaml・audit-weekly.yaml・container-scan-scheduled.yamlの完了) / 1時間ごと (schedule) / 手動 | 対象ごとの実行を起動する専用のブランチ`claude-auto-fix/run`を、mainの最新のコミットに合わせる。合わせられなかった実行では、対象ごとの実行を起動しない。今ある検査とワークフローが自分では直せずに残した警告と脆弱性と、止まったDependabotのプルリクエストから、Claudeに直させる対象を選び、対象ごとにclaude-auto-fix-target.yamlを起動する。1時間ごとの実行では、Claudeが動けなかった対象を動かし直す実行と、Claudeの変更のプルリクエストの赤の検査を直させる実行も起動し、対象が消えたClaudeの変更のプルリクエストと、直せなかったことを知らせるIssueを閉じる。このワークフローはClaudeを動かさない |
 | 自動の修正 | claude-auto-fix-target.yaml | claude-auto-fix.yamlからの起動 (workflow_dispatch。専用のブランチ`claude-auto-fix/run`の上で起動する) | 1つの対象について材料を集め、Claude CodeのCLIに直させる。Claude CodeのCLIは配布元の署名を確かめてから使い、ClaudeにはGitHubの中身を変える権限を渡さない。警告か脆弱性を直す新しいプルリクエストは、その警告か脆弱性が残らないことと、変えた領域の品質チェックに通ることを確かめた変更だけで作る。新しいプルリクエストには、ラベル`claude-auto-fix`を付ける。Claudeの変更に、ゲートの設定のファイルの変更か検査を弱める変更が含まれるときは、その変更をプルリクエストに出さない。直せなかった対象と、Claudeを動かす鍵が無いか切れていることは、Issueかコメントで所有者に知らせる。専用のブランチのほかで起動された実行は、対象を扱わずに失敗で終わる |
 | ラベル | sync-labels.yaml | push (main、`.github/labels.json` などの変更) / 手動 | ラベルの一覧のファイル`.github/labels.json`のとおりに、GitHubのラベルを作り・直し・名前を変え・消す。ファイルに前の名前が書かれたラベルは、消さずに名前だけを変える。先に合わせ込みのスクリプトのテストを流し、ファイルが検証に通らなければラベルを1つも変えずに失敗で終わる |
-| リリース | release.yaml | 手動 (workflow_dispatch) | アプリの本番リリース。mainブランチからの起動に限り、CIが成功したコミットを対象にbackend、frontendの順に配布 |
+| リリース | release.yaml | 手動 (workflow_dispatch) | アプリの本番リリース。mainブランチからの起動に限り、CIが成功したコミットを対象にbackend、frontendの順に配布。backendの版は、起動するときに選ぶ。既定のcurrentは今の本番と同じ版を配布し、javaはJava版、goはGo版に切り替えるか戻す |
 | リリース | terraform-apply.yaml | 手動 (workflow_dispatch) | インフラの本番反映。Terraformは配布元の署名を確かめてから使う。apply直前にplanで差分を表示し、そのplanをそのまま適用。plan_onlyを選んで動かすと、差分を表示したところで止まり、適用しない |
-| リリース | backend-deploy.yaml | 呼び出し専用 (workflow_call) | ECSへのバックエンドデプロイ(release.yamlから呼び出し)。本番用のイメージは、arm64のランナーでGitHubのキャッシュを使わずに組み立てる |
+| リリース | backend-deploy.yaml | 呼び出し専用 (workflow_call) | ECSへのバックエンドデプロイ(release.yamlから呼び出し)。サービスが今動かしているタスク定義を読んで配布する版を決め、その版のDockerfileでイメージを組み立てる。Go版のイメージのタグには`go-`を付ける。決めた版はワークフローの要約に書く。本番用のイメージは、arm64のランナーでGitHubのキャッシュを使わずに組み立てる |
 | リリース | frontend-deploy.yaml | 呼び出し専用 (workflow_call) | S3配布とCloudFrontキャッシュ無効化(release.yaml / frontend-rollback.yamlから呼び出し) |
 | リリース | frontend-rollback.yaml | 手動 (workflow_dispatch) | 成功済みmain CI runの`frontend-dist`を検証して再配布 |
 | 定期 | mutation-report.yaml | 週次 (schedule) / 手動 | Stryker(frontend)とPIT(backendのJava版)とgremlins(backendのGo版)によるテスト有効性の測定レポート。frontendは前回の結果を使い回して変わった箇所だけを測り直し、毎月最初の定期実行で全件を測り直す。backendはJava版もGo版も毎回全件を測る。レポートは90日間保持する。実行のたびにスコアと測定方式(全件か差分か)をIssue「メトリクス台帳: mutationスコア」に1行追記する。Go版のスコアは、test efficacyと変異のカバーの2つを同じ行に書く。全件を測り直した回は、前回の全件の回との差と、mainで最後にテストを実行したCIのカバレッジ(実測と基準値。Go版の文の割合を含む)を同じIssueにコメントして所有者に知らせる。良し悪しの判定はしない |

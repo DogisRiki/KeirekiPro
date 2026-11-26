@@ -432,7 +432,7 @@
   - 受入基準とテストの対応: 要件5の受入基準2(1回の出荷で切り替えと戻し)は、`test-backend-deploy-impl.sh` の「go を選ぶと Go 版の Dockerfile と go- のタグ」「java を選ぶと Java 版の Dockerfile と SHA のタグ」の場合で、要件1の受入基準3と4(切り替えるまでは Java 版のまま出荷が成功する)と要件5の受入基準7(失敗したら Java 版のまま)は「current で今のタグが SHA なら Java 版」「current で今のタグが go- なら Go 版」の場合で確かめる
   - _要件: 1.3, 1.4, 5.2, 5.7_
 
-- [ ] 7.2 出荷のワークフローに入力 backend_impl を足す
+- [x] 7.2 出荷のワークフローに入力 backend_impl を足す
 
   Claude は、`.github/workflows/release.yaml` と `backend-deploy.yaml` の完成版を、置き場に作る。`release.yaml` は、入力 `backend_impl` を受け取り、`backend-deploy.yaml` に渡す。`backend_impl` の既定の値は `current` である。`backend-deploy.yaml` は、最初のステップで `aws ecs describe-task-definition` を動かして今のタスク定義を読み、タスク7.1の `backend-deploy-impl.sh` で版を決め、決めた版をワークフローの要約に書く。Claude は、`backend-deploy.yaml` のそのあとの4つのステップを変えない。
   - 完了の確かめ方: 検査用の写しで、actionlint と `check-action-pinning.sh` と `node .github/scripts/tests/test-release-gate.mjs` が成功する
