@@ -561,6 +561,7 @@ jobs:
   # 検証はamd64で行う。本番のデプロイ先はarm64だが、書いてあるのはmanifest listの
   # digestであり、arm64のmanifestが存在することは固定時に確認している。
   # ここで捉えるのは、Dockerfileの記述の破綻とベースイメージの中身の変化。
+  # Go 版の本番イメージは、組み立てたあとに起動もし、本番イメージだけにある欠けを捉える。
   # arm64に固有の破綻は release.yaml のビルドで検知する。
   docker-smoke:
     needs: detect-changes
@@ -571,11 +572,16 @@ jobs:
     # 逐次ビルドの合計が収まる値にする(Dockerfile.prodのGradleビルドが最長で10分強)。
     timeout-minutes: 45
 
+    env:
+      # Go 版の本番イメージに付ける名前。組み立てる工程と起動する工程が使う
+      GO_PROD_IMAGE: keirekipro-backend-go:docker-smoke
+
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Build changed Dockerfiles
+        id: build
         env:
           DOCKERFILES: ${{ needs.detect-changes.outputs.dockerfile_files }}
           # docker/terraform/Dockerfile の tflint --init がログインして GitHub の API に問い合わせるためのトークン。
@@ -613,7 +619,43 @@ jobs:
               secret_args=(--secret "id=github_token,env=GITHUB_TOKEN")
             fi
 
+            # Go 版の本番イメージには名前を付け、次の工程で起動する
+            tag_args=()
+            if [ "$f" = docker/backend-go/Dockerfile.prod ]; then
+              tag_args=(--tag "$GO_PROD_IMAGE")
+            fi
+
             echo "::group::docker build -f $f $context"
-            docker build "${secret_args[@]}" --file "$f" "$context"
+            docker build "${secret_args[@]}" "${tag_args[@]}" --file "$f" "$context"
             echo "::endgroup::"
+
+            if [ "$f" = docker/backend-go/Dockerfile.prod ]; then
+              echo "go_prod_built=true" >>"$GITHUB_OUTPUT"
+            fi
           done < <(jq -r '.[]' <<<"$DOCKERFILES")
+
+      # 組み立てるだけでは、本番イメージだけにある欠けは本番で起動するまで分からない(#953)。
+      # 証明書の束が無かったときは、Go 版が本番で起動に失敗した(#951)。
+      #
+      # Go 版を本番の設定で起動し、ダミーの資格情報で本物の Secrets Manager に HTTPS でつながせる。
+      # AWS が「資格情報が正しくない」と答えたら、プログラムが動き、証明書を確かめて AWS とやり取りできたことになる。
+      # 証明書を確かめられないときと、それより前で止まったときは、この答えが出ないので赤にする。
+      # 送るのは、ダミーの資格情報と、terraform に書いてある秘密の値の名前だけである。
+      - name: Start Go production image
+        if: steps.build.outputs.go_prod_built == 'true'
+        run: |
+          set -euo pipefail
+
+          rc=0
+          output=$(timeout 120 docker run --rm \
+            -e KEIREKIPRO_ENV=prod \
+            -e AWS_ACCESS_KEY_ID=keirekipro-ci-dummy \
+            -e AWS_SECRET_ACCESS_KEY=keirekipro-ci-dummy \
+            "$GO_PROD_IMAGE" 2>&1) || rc=$?
+          echo "$output"
+
+          if ! grep -q 'UnrecognizedClientException' <<<"$output"; then
+            echo "::error::Go 版の本番イメージが、Secrets Manager とやり取りする前に止まりました(終了コード ${rc})。上の起動のログを確かめてください。"
+            exit 1
+          fi
+          echo "::notice::Go 版の本番イメージが起動し、Secrets Manager と HTTPS でやり取りできました。"
