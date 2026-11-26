@@ -5,7 +5,10 @@
 # いまのブランチのPRが、/ship-it の手順7で見届けを続ける状態にあるときに、停止をブロックする(exit 2)。
 # 止める状態は次の5つ。どれも .claude/skills/ship-it/SKILL.md の手順7の判定で「見届けを続ける」側に当たる。
 #   - PRが開いていて、main と衝突している(mergeStateStatus が DIRTY)
-#   - PRが開いていて、必須の検査に結果が出ていないもの(bucket が pending)がある
+#   - PRが開いていて、必須の検査に結果が出ていないもの(bucket が pending)があるのに、検査の結果を待つスクリプト
+#     (.claude/scripts/ship/wait-checks.sh)が動いていない。スクリプトが動いているかは、スクリプトが読み直しのたびに書く
+#     .claude/.state/ship-watch/checks-wait-<PR番号> の時刻が5分以内かで見分ける。
+#     このスクリプトは、PR がマージされたときにも終わって Claude を呼び戻すので、動いていれば、返答を終えても見届けは途切れない
 #   - PRが開いていて、必須の検査がすべて通り、自動マージの予約があり、承認待ち(REVIEW_REQUIRED)でない
 #     (マージの途中か、main の取り込みが要る)
 #   - PRが開いていて、所有者の承認を待っているのに、承認を待つスクリプト(.claude/scripts/ship/wait-approval.sh)が
@@ -114,8 +117,11 @@ verdict=$(perl -MJSON::PP -e '
     exit 0 unless ref $checks eq "ARRAY" && @$checks;
     my @pending = map { $_->{name} // "" } grep { ref $_ eq "HASH" && ($_->{bucket} // "") eq "pending" } @$checks;
     if (@pending) {
+        my $wait;
+        if (open my $fh, "<", "$state_dir/checks-wait-$n") { $wait = <$fh>; close $fh; }
+        exit 0 if defined $wait && $wait =~ /\A([0-9]+)\s*\z/ && abs(time - $1) <= 300;
         my %seen; my $names = join("、", grep { !$seen{$_}++ } @pending);
-        print "pending|$n|$sha\tPR #$n の必須の検査に、結果がまだ出ていないものがあります($names)。/ship-it の手順7の判定のとおり、gh pr checks $n --watch --required で結果が出るのを待ち、見届けを続けてください。\n";
+        print "pending|$n|$sha\tPR #$n の必須の検査に、結果がまだ出ていないものがあります($names)が、検査の結果を待つコマンドが動いていません。/ship-it の手順7の2のとおり、bash .claude/scripts/ship/wait-checks.sh $n を Bash の run_in_background で動かしてから返答を終えてください。\n";
         exit 0;
     }
     my $all_pass = !grep { !(ref $_ eq "HASH" && ($_->{bucket} // "") =~ /\A(?:pass|skipping)\z/) } @$checks;
