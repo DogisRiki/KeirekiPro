@@ -136,6 +136,8 @@ t_pending_blocks_once() {
     run_hook p-1
     expect_rc 2 "結果の出ていない検査がある"
     expect_err "PR #42 の必須の検査に、結果がまだ出ていないもの"
+    expect_err "検査の結果を待つコマンドが動いていません"
+    expect_err "bash .claude/scripts/ship/wait-checks.sh 42 を Bash の run_in_background で"
     expect_err "escape-hatch"
     expect_err "同じ状態では1回だけ止めます"
     expect_err "問いをもう一度全部書いてください"
@@ -143,6 +145,47 @@ t_pending_blocks_once() {
     expect_rc 0 "同じ返答の中で同じ状態の2回目"
     run_hook p-2
     expect_rc 2 "所有者の次の依頼の返答で同じ状態"
+}
+
+# 検査の結果を待つスクリプトの心拍のファイルに、いまから <秒> 前の時刻を書く
+set_checks_beat() { # <秒>
+    mkdir -p "$REPO/.claude/.state/ship-watch"
+    echo $(($(date +%s) - $1)) >"$REPO/.claude/.state/ship-watch/checks-wait-42"
+}
+
+t_pending_with_checks_wait_passes() {
+    set_pr OPEN BLOCKED APPROVED yes
+    set_checks size-check=pass escape-hatch=pending
+    set_checks_beat 30
+    run_hook
+    expect_rc 0 "検査の結果を待つコマンドが動いている"
+}
+
+t_pending_with_stale_checks_wait_blocks() {
+    set_pr OPEN BLOCKED APPROVED yes
+    set_checks size-check=pending
+    set_checks_beat 600
+    run_hook
+    expect_rc 2 "心拍が10分前で、検査の結果を待つコマンドが止まっている"
+    expect_err "検査の結果を待つコマンドが動いていません"
+}
+
+t_pending_with_other_pr_checks_wait_blocks() {
+    set_pr OPEN BLOCKED APPROVED yes
+    set_checks size-check=pending
+    mkdir -p "$REPO/.claude/.state/ship-watch"
+    date +%s >"$REPO/.claude/.state/ship-watch/checks-wait-43"
+    run_hook
+    expect_rc 2 "別の PR の検査を待つコマンドだけが動いている"
+}
+
+t_approval_beat_does_not_pass_pending() {
+    set_pr OPEN BLOCKED REVIEW_REQUIRED yes
+    set_checks size-check=pending
+    set_beat 0
+    run_hook
+    expect_rc 2 "承認を待つコマンドだけが動いていて、結果の出ていない検査がある"
+    expect_err "検査の結果を待つコマンドが動いていません"
 }
 
 t_new_head_blocks_again() {
@@ -310,6 +353,10 @@ t_main_branch_passes() {
 }
 
 run_test "結果待ちの検査があれば、同じ返答の中で1回だけ止める" t_pending_blocks_once
+run_test "結果待ちの検査があっても、検査の結果を待つコマンドが動いていれば通す" t_pending_with_checks_wait_passes
+run_test "結果待ちの検査があり、検査の結果を待つコマンドの心拍が古ければ止める" t_pending_with_stale_checks_wait_blocks
+run_test "別の PR の検査を待つコマンドの心拍では通さない" t_pending_with_other_pr_checks_wait_blocks
+run_test "承認を待つコマンドの心拍では、結果待ちの検査を通さない" t_approval_beat_does_not_pass_pending
 run_test "head が変われば、同じ返答の中でもまた止める" t_new_head_blocks_again
 run_test "main と衝突していれば止める" t_dirty_blocks
 run_test "検査がすべて通り予約があれば止める" t_merging_blocks
