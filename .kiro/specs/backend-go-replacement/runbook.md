@@ -117,13 +117,20 @@ Java 版に戻したあと、Claude が原因を直す PR を出し、その PR 
 
 Claude が「5xx の行は無い」と書いたら、操作3に進めます。Claude が「5xx の行がある」と書いたときは、操作3に進まないでください。Claude が原因を調べて、原因を直す PR を出します。その PR が main に入ったら、操作2をやり直します。
 
+### 出荷の前に、frontend の組み立ての結果のある実行の番号を受け取る
+
+「Production Release」の一番上の欄「frontend-dist を含む main の CI Workflow run ID」を空にすると、出荷のワークフローは、main で成功した新しい100件の実行の中から、frontend の組み立ての結果を探します。frontend/ を2日ほど変えていない時期は、組み立ての結果のある実行が100件から外れ、出荷が最初の仕事 `resolve-source` で止まります(2026-11-26 の切り替えで起きた。直すのは Issue #952)。
+
+そのため、Claude は、操作3と操作6の手順を所有者に示すときに、組み立ての結果がまだ残っている実行の番号を探して、手順に書き添えます。所有者は、その番号を一番上の欄に入れます。Issue #952 が直ったあとは、この欄を空のままにできます。
+
 ### 操作3: 切り替えの出荷をする
 
 1. GitHub のリポジトリの「Actions」タブを開き、左の一覧の「Production Release」を押します。
 2. 右の「Run workflow」を押し、「Branch」が `main` であることを見ます。
-3. 「バックエンドの版」の選び欄で `go` を選びます。ほかの欄は、初めの値のままにします。
-4. 緑の「Run workflow」を押します。
-5. 起動した実行を開き、「Review deployments」が出たら押します。`production` にチェックを付けて、「Approve and deploy」を押します。「Review deployments」は、backend の出荷と frontend の出荷で1回ずつ、合わせて2回出ます。2回目は、backend の出荷が終わってから出るので、実行の画面を開いたまま待ってください。
+3. 一番上の欄「frontend-dist を含む main の CI Workflow run ID」に、Claude が書き添えた実行の番号を入れます。
+4. 「バックエンドの版」の選び欄で `go` を選びます。ほかの欄は、初めの値のままにします。
+5. 緑の「Run workflow」を押します。
+6. 起動した実行を開き、「Review deployments」が出たら押します。`production` にチェックを付けて、「Approve and deploy」を押します。「Review deployments」は、backend の出荷と frontend の出荷で1回ずつ、合わせて2回出ます。2回目は、backend の出荷が終わってから出るので、実行の画面を開いたまま待ってください。
 
 うまくいったかの見分け方: 実行の画面を下に送ると、「Backend の出荷の版」の欄に「出荷する版: `go`」が出ています。そして、`backend-release` と `frontend-release` の仕事が、どちらも緑のチェックで終わっています。
 
@@ -163,10 +170,11 @@ Java 版に戻したあとで見分け方と違ったときも、違った操作
 
 1. GitHub のリポジトリの「Actions」タブを開き、左の一覧の「Production Release」を押します。
 2. 右の「Run workflow」を押し、「Branch」が `main` であることを見ます。
-3. 「バックエンドの版」の選び欄で `java` を選びます。
-4. 「フロントエンドをデプロイする」のチェックを外します。Java 版に戻すときは、画面を出し直す必要が無いためです。
-5. 緑の「Run workflow」を押します。
-6. 起動した実行を開き、「Review deployments」が出たら押します。`production` にチェックを付けて、「Approve and deploy」を押します。
+3. 一番上の欄「frontend-dist を含む main の CI Workflow run ID」に、Claude が書き添えた実行の番号を入れます。「フロントエンドをデプロイする」のチェックを外しても、出荷のワークフローは最初の仕事でこの番号の実行を探すので、この欄が要ります。
+4. 「バックエンドの版」の選び欄で `java` を選びます。
+5. 「フロントエンドをデプロイする」のチェックを外します。Java 版に戻すときは、画面を出し直す必要が無いためです。
+6. 緑の「Run workflow」を押します。
+7. 起動した実行を開き、「Review deployments」が出たら押します。`production` にチェックを付けて、「Approve and deploy」を押します。
 
 うまくいったかの見分け方: 実行の画面を下に送ると、「Backend の出荷の版」の欄に「出荷する版: `java`」が出ています。そして、`backend-release` の仕事が緑のチェックで終わっています。
 

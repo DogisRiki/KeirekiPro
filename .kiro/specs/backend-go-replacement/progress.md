@@ -10,8 +10,8 @@ Claude は、まとまりの状態と段階の行を、その状態にした PR 
 | 1 | 今と同じにできるかが分からない動きを洗い出し、試しに作って確かめる | 終えた | design を書く前(design の承認は 2026-11-08) | 無い。試作のコードはリポジトリに入れない。記録は `research.md` の「段階1 試作の記録」 |
 | 2 | Go 版の品質チェックと、Java 版と Go 版を比べる検査をそろえる | 終えた | 2026-11-10 | #786 |
 | 3 | 機能のまとまりごとの spec で Go 版を作り、Java 版と同じ動きになることを確かめる | 終えた | 2026-11-24 | #934 |
-| 4 | 本番を切り替える準備をする | 未着手 | | |
-| 5 | 本番を切り替える | 未着手 | | |
+| 4 | 本番を切り替える準備をする | 終えた | 2026-11-26 | #949 |
+| 5 | 本番を切り替える | 終えた | 2026-11-26 | #951 |
 | 6 | Java 版を削除し、Java と Spring を前提にした記述を書き換え、使っていないものを消す | 未着手 | | |
 
 段階4〜6は、段階ごとに Issue #445 の子の Issue を持つ。子の Issue は sub-issues で Issue #445 につないである。
@@ -43,11 +43,11 @@ Claude は、まとまりの状態と段階の行を、その状態にした PR 
 
 | まとまり | 子の Issue | spec | 状態 |
 |---|---|---|---|
-| 認証 | #770 | `.kiro/specs/backend-go-auth` | 比べる検査に通った |
-| 利用者 | #771 | `.kiro/specs/backend-go-users` | 比べる検査に通った |
-| マスタと経歴書 | #772 | `.kiro/specs/backend-go-master-resumes` | 比べる検査に通った |
-| 出力 | #773 | `.kiro/specs/backend-go-resume-export` | 比べる検査に通った |
-| バックアップ | #774 | `.kiro/specs/backend-go-resume-backup` | 比べる検査に通った |
+| 認証 | #770 | `.kiro/specs/backend-go-auth` | 本番で動いている |
+| 利用者 | #771 | `.kiro/specs/backend-go-users` | 本番で動いている |
+| マスタと経歴書 | #772 | `.kiro/specs/backend-go-master-resumes` | 本番で動いている |
+| 出力 | #773 | `.kiro/specs/backend-go-resume-export` | 本番で動いている |
+| バックアップ | #774 | `.kiro/specs/backend-go-resume-backup` | 本番で動いている |
 
 - spec の列には、まとまりの spec を作ったときに `.kiro/specs/<名前>` を書く
 - 認証のまとまりの spec で、Claude は、ログインした開発者の要求がログインの状態の検査を通ることを、未実装の答えに変わることで確かめた。ログインした開発者への応答が返ることは、利用者のまとまりの spec で確かめた
