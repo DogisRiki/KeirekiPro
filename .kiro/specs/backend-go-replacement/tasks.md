@@ -4,7 +4,7 @@
 
 大タスク15は PR 2-6 である。大タスク15は、大タスク4の PR が main に入ったあとに足したタスクなので、番号が最後になっている。Claude は、大タスク15を大タスク5より先に行う。そのため、大タスク15は、この一覧の大タスク4と大タスク5の間に置いてある。
 
-大タスク16は、大タスク3の PR 2-3 が main に入ったあとに、所有者が要件9と要件10の直しを承認し、Claude が設計の「pdfcmp」と「changed-behaviors.yaml」の節を直したために足したタスクである。大タスク16の PR は、PR 2-3 で main に入れた PDF の比べ方と、比べるデータと、変えた動きの一覧を、直した要件と設計に合わせる。design.md の「段階ごとの PR」の表には、大タスク16の PR の行が無い。大タスク16の PR が変えるファイルは、`backend/compat/` の下のファイルと progress.md だけなので、所有者の承認は要らない。Claude は、大タスク16を、出力のまとまりの spec の実装と大タスク6より先に行う。出力のまとまりの spec は、大タスク16で直した PDF の比べ方と、足したデータを使うためである。そのため、大タスク16は、この一覧の大タスク5と大タスク6の間に置いてある。
+大タスク16は、大タスク3の PR 2-3 が main に入ったあとに、所有者が、変えた動きの一覧を決める要件9と、PDF と Markdown の出力の見た目を決める要件10の直しを承認し、Claude が設計の「pdfcmp」と「changed-behaviors.yaml」の節を直したために足したタスクである。大タスク16の PR は、PR 2-3 で main に入れた PDF の比べ方と、比べるデータと、変えた動きの一覧を、直した要件と設計に合わせる。design.md の「段階ごとの PR」の表には、大タスク16の PR の行が無い。大タスク16の PR が変えるファイルは、`backend/compat/` の下のファイルと progress.md だけなので、所有者の承認は要らない。Claude は、大タスク16を、出力のまとまりの spec の実装と大タスク6より先に行う。出力のまとまりの spec は、大タスク16で直した PDF の比べ方と、足したデータを使うためである。そのため、大タスク16は、この一覧の大タスク5と大タスク6の間に置いてある。
 
 段階3の機能のまとまりの Go 版は、まとまりの spec で作るので、この tasks.md には無い。
 
@@ -315,7 +315,7 @@
 
 - [x] 15.2 API の説明画面に Cookie を付けて送らせ、変えた動きの一覧と手順の文書を直し、PR を出す
 
-  Claude は、`compose.yaml` の `api-docs` に環境変数 `WITH_CREDENTIALS=true` を足す。Claude は、`backend/compat/changed-behaviors.yaml` に CB-010 を、`match` を持たない記録だけの項目として足す。Claude は、`doc/開発フロー/参加者セットアップ手順.md` に、design.md の api-docs の節の3つの手順を書き、Go 版のログインの API は認証のまとまりの spec で作るまで 501 を返すので、それまで手順1のログインは使えないことを書く。Claude は、`.kiro/specs/backend-go-replacement/progress.md` の認証のまとまりの決まりに、認証のまとまりの spec の確認で、API の説明画面の「Try it out」でログインし、ログインの要る API に要求を送って、ログインした開発者への応答が返ることを確かめると書く。
+  Claude は、`compose.yaml` の `api-docs` に環境変数 `WITH_CREDENTIALS=true` を足す。Claude は、`backend/compat/changed-behaviors.yaml` に、開発環境の CORS の許す送り元の違いの項目 CB-010 を、`match` を持たない記録だけの項目として足す。Claude は、`doc/開発フロー/参加者セットアップ手順.md` に、design.md の api-docs の節の3つの手順を書き、Go 版のログインの API は認証のまとまりの spec で作るまで 501 を返すので、それまで手順1のログインは使えないことを書く。Claude は、`.kiro/specs/backend-go-replacement/progress.md` の認証のまとまりの決まりに、認証のまとまりの spec の確認で、API の説明画面の「Try it out」でログインし、ログインの要る API に要求を送って、ログインした開発者への応答が返ることを確かめると書く。
   最後に、Claude は、`start-dev.sh` で開発環境を起動し、Claude Code の中のブラウザで `http://localhost:8082` を開いて、次の2つを確かめ、PR を出す。Claude Code の中のブラウザが使えないときも、Claude は、次の2つの確認に使うブラウザを Playwright のブラウザに替えない。Playwright のブラウザに替えない理由は、次のとおりである。Playwright のブラウザは別のコンテナで動き、API の説明画面を `http://localhost:8082` でなく別の送り元で開く。その送り元は Go 版の CORS の処理が許す送り元に当たらないので、Claude は、Playwright のブラウザでは次の2つを確かめられない。Claude Code の中のブラウザが使えないときは、Claude は、次の2つの確認の手順を所有者に示して止まり、所有者が確かめた結果を受けてから PR を出す。
   1. 読み取りの操作の「Try it out」の要求が、CORS のエラーで止まらずに Go 版に届き、Go 版の応答が画面に出る。Go 版は、この要求の応答で `XSRF-TOKEN` の Cookie を付ける
   2. Claude は、書き込みの操作の「Try it out」で、ヘッダ `X-XSRF-TOKEN` の欄に、読み取りの操作の応答で Go 版が付けた `XSRF-TOKEN` の Cookie の値を入れて送る。ブラウザは、この要求に Cookie を付けて送る。画面には、偽の送信の検査の 403 でなく、まだ作っていない操作の 501 が出る
@@ -417,7 +417,7 @@
 
     - 1つ目は、PR が main に入ったあと、所有者が `terraform-apply.yaml` を `plan_only` にチェックを付けて動かすことと、うまくいったときに実行の概要に「本番には適用していません」が出ることである
     - 2つ目は、その実行の plan の差分で変わるはずのリソースと値である。変わるはずのものは、タスク定義の環境変数 `KEIREKIPRO_ENV` の追加と、`keirekipro/redis` のキー `redis-username` の追加の2つである
-    - 3つ目は、Claude がその実行の記録を確かめたあとに、所有者が `plan_only` を付けずに `terraform-apply.yaml` を動かすことと、反映されたかの見分け方(`keirekipro/redis` に `redis-username` がある)である
+    - 3つ目は、Claude がその実行の記録を確かめたあとに、所有者が `plan_only` を付けずに `terraform-apply.yaml` を動かすことと、本番に反映されたかの見分け方である。見分け方は、`keirekipro/redis` に `redis-username` があることである
 
   所有者が `plan_only` で動かしたあと、Claude は、`gh run view --log` でその実行の「Terraform Plan (差分の事前表示)」の記録を読み、plan の差分が PR の本文に書いたリソースと値だけであることを所有者に示す。
   - 完了の確かめ方: `/verify-terraform` が成功し、`git diff origin/main -- terraform/` の差分が、環境変数1つと秘密の値のキー1つの追加だけで、PR の本文に plan で変わるはずのリソースと値がある
@@ -443,10 +443,16 @@
 
 - [ ] 7.3 切り替えの手順書を書く (並行可)
 
-  Claude は、`.kiro/specs/backend-go-replacement/runbook.md` に、切り替え、Java 版に戻す、もう一度切り替える、の3つの場面ごとに、design.md の「runbook.md」の5つの操作を、押す場所か打つコマンドと、うまくいったかの見分け方と一緒に書く。Claude は、要件5の受入基準3で決めた出荷の時間帯と、出荷を 20:00 の30分前までに終えることも、runbook.md に書く。Claude は、操作1(段階4の本番の設定の変更の反映)を、design.md の「段階ごとの PR」に書いた `terraform-apply.yaml` の2回の起動の手順のとおりに、`plan_only` にチェックを付けた1回目と、チェックを外した2回目に分けて書く。
-  - 完了の確かめ方: runbook.md に3つの場面と5つの操作があり、操作ごとに見分け方があり、操作1に1回目と2回目の起動がある
-  - 受入基準とテストの対応: 要件5の受入基準3と4(切り替えの手順書を作り、出荷の時刻を所有者が選ぶ)と要件7の受入基準1(所有者がする6つの操作)は、テストでなく、runbook.md の本文で確かめる。手順書は文書なので、テストは無い
-  - _要件: 5.3, 5.4, 7.1_
+  Claude は、`.kiro/specs/backend-go-replacement/runbook.md` に、次の6つを書く。
+  1. Claude は、切り替え、Java 版に戻す、もう一度切り替える、の3つの場面ごとに、design.md の「runbook.md」の6つの操作を、押す場所か打つコマンドと、うまくいったかの見分け方と一緒に書く
+  2. Claude は、切り替えともう一度切り替えるの場面で、操作2(切り替えの前の手元での画面の確認)を操作3(切り替えの出荷)より前に置く
+  3. Claude は、操作2で Claude がすることと、所有者が操作2で見分け方と違う操作か画面を見つけたら切り替えの出荷をしないことを書く
+  4. Claude は、操作2に、design.md の「runbook.md」の節の操作2の段落に書いた、操作2が要る理由と、Claude が操作2を自分でできない理由を書く
+  5. Claude は、要件5の受入基準3で決めた出荷の時間帯と、出荷を 20:00 の30分前までに終えることを書く
+  6. Claude は、操作1(段階4の本番の設定の変更の反映)を、design.md の「段階ごとの PR」に書いた `terraform-apply.yaml` の2回の起動の手順のとおりに、`plan_only` にチェックを付けた1回目と、チェックを外した2回目に分けて書く
+  - 完了の確かめ方: runbook.md に3つの場面と6つの操作があり、操作ごとに見分け方があり、操作1に1回目と2回目の起動があり、切り替えともう一度切り替えるの場面で操作2が操作3より前にあり、操作2に、操作2が要る理由と、Claude が操作2を自分でできない理由がある
+  - 受入基準とテストの対応: 要件5の受入基準3と4(切り替えの手順書を作り、出荷の時刻を所有者が選ぶ)と要件7の受入基準1(所有者がする6つの操作)と受入基準2(6つのほかの操作を、理由を添えて所有者に頼む)は、テストでなく、runbook.md の本文で確かめる。手順書は文書なので、テストは無い
+  - _要件: 5.3, 5.4, 7.1, 7.2_
   - _対象の部品: runbook.md_
   - _保留: 7.1 と同じ_
 
@@ -484,21 +490,38 @@
   - _保留: 8.1 と同じ_
 
 - [ ] 9. 本番の切り替えを確かめて記録する(段階5)
-- [ ] 9.1 切り替えの出荷の結果を確かめて所有者に報告する
+- [ ] 9.1 切り替えの前に、手元で Go 版に繋いだ画面を所有者に確かめてもらう
 
-  Claude は、所有者が会話で「切り替えた」と書いたら、`gh run view` で出荷の結果を読み、`aws ecs describe-services` と `describe-task-definition` で動いているタスクのイメージのタグが `go-` で始まることを確かめ、CloudWatch Logs の `/ecs/keirekipro-backend` で出荷のあとの Go 版のログに 5xx の行が無いかを読む。Claude は、確かめた結果と、所有者が画面で確かめる操作(runbook.md の操作4)を、1つの返事で示す。AWS を読む権限が無いときは、所有者に打つコマンドを1つずつ示す。
+  Claude は、design.md の「runbook.md」の「手元での画面の確認で Claude がすること」の9つの箇条のとおりに、次の順に進める。
+  1. Claude は、本体のフォルダを main の最新にし、compose のプロジェクト名が `keirekipro` でないコンテナと `backend-go` のコンテナを消す
+  2. Claude は、本体のフォルダで `bash start-dev.sh` を動かす
+  3. Claude は、`backend-go` の差し込みの元が本体のフォルダの `backend` であることを確かめ、`react` のコンテナを止め、繋ぎ先を Go 版にした画面の開発サーバをホストの 5173 に起動する
+  4. Claude は、runbook.md の操作2である切り替えの前の手元での画面の確認が要る理由と、Claude がその確認を自分でできない理由を添えて、所有者が開く URL `http://localhost:5173` と操作2を示す
+  5. Claude は、所有者の「確かめた」を受けて、確認の間の `backend-go` のログに 5xx の行が無いかを読み、読んだ結果を所有者に示す
+  6. Claude は、繋ぎ先を Go 版にした画面の開発サーバを動かしている1回きりのコンテナを止め、本体のフォルダで `bash start-dev.sh` を動かして、Java 版に繋いだ画面の開発サーバを起動し直す
+
+  所有者が、runbook.md の操作2の見分け方と違った操作と画面に出た文を会話に書いたときは、Claude は、切り替えを進めず、その違いの原因を直す PR を出し、その PR が main に入ってからこのタスクをやり直す。
+  - 完了の確かめ方: 所有者が会話で「確かめた」と書き、Claude の返事に Go 版のログの 5xx の行の有無があり、1回きりのコンテナが止まり、`react` のコンテナで Java 版に繋いだ画面が動いている
+  - 受入基準とテストの対応: 要件7の受入基準2(6つのほかの操作を、理由を添えて所有者に頼む)は、テストでなく、所有者への返事で確かめる
+  - _要件: 7.2_
+  - _保留: 大タスク8の PR が main に入り、所有者が会話で切り替えを始めると書いたあと、Claude が大タスク9を行う_
+
+- [ ] 9.2 切り替えの出荷の結果を確かめて所有者に報告する
+
+  Claude は、所有者が会話で「切り替えた」と書いたら、`gh run view` で出荷の結果を読み、`aws ecs describe-services` と `describe-task-definition` で動いているタスクのイメージのタグが `go-` で始まることを確かめ、CloudWatch Logs の `/ecs/keirekipro-backend` で出荷のあとの Go 版のログに 5xx の行が無いかを読む。Claude は、確かめた結果と、所有者が画面で確かめる操作(runbook.md の操作5)を、1つの返事で示す。AWS を読む権限が無いときは、所有者に打つコマンドを1つずつ示す。
   - 完了の確かめ方: 所有者への返事に、出荷の結果、タスクのイメージのタグ、5xx の行の有無、画面で確かめる操作がある
   - 受入基準とテストの対応: 要件5の受入基準5(切り替えの出荷の結果を確かめて所有者に報告する)は、テストでなく、所有者への返事で確かめる
   - _要件: 5.5_
-  - _保留: 所有者が runbook.md のとおりに切り替えの出荷をして、会話で「切り替えた」と書いたあと、Claude が大タスク9を行う_
+  - _依存: 9.1_
+  - _保留: 所有者が runbook.md のとおりに切り替えの出荷をして、会話で「切り替えた」と書いたあと、Claude がこのタスクを行う_
 
-- [ ] 9.2 進み具合の表を「本番で動いている」にして PR を出す
+- [ ] 9.3 進み具合の表を「本番で動いている」にして PR を出す
 
   Claude は、所有者が画面での確認を終えたと書いたら、`progress.md` の5つのまとまりの状態を「本番で動いている」にし、段階5の終えた日を書いて PR を出す。
   - 完了の確かめ方: progress.md の5つのまとまりが「本番で動いている」で、PR が main に入る
   - 受入基準とテストの対応: 要件7の受入基準4(まとまりごとの進み具合を1か所で見られる)は、テストでなく、progress.md の本文で確かめる
   - _要件: 7.4_
-  - _保留: 9.1 と同じ_
+  - _保留: 9.2 と同じ_
 
 - [ ] 10. Java 版のコードと、Java 版と Go 版を比べる検査を消し、開発環境の名前を戻す(PR 6-1)
 - [ ] 10.1 Java 版を消してよいかを所有者に尋ねる
@@ -576,7 +599,7 @@
 - [ ] 11. 段階6の本番の設定の変更を入れる(PR 6-2)
 - [ ] 11.1 タスク定義と ALB と Redis の秘密の値から Java 版の値を消し、PR を出す
 
-  Claude は、`terraform/modules/ecs/main.tf` から `SPRING_PROFILES_ACTIVE` と `JAVA_TOOL_OPTIONS` を消し、コンテナのヘルスチェックのパスを `/healthz` にする。Claude は、`terraform/modules/alb/` のターゲットグループのヘルスチェックのパスを `/healthz` にし、`terraform/main.tf` の `keirekipro/redis` から `spring.data.redis.*` のキーを消す。Claude は `/verify-terraform` を通して PR を出す。反映されたかの見分け方は、`aws elbv2 describe-target-groups` で読んだターゲットグループのヘルスチェックのパスが `/healthz` であることである。PR 6-2 は、PR 4-1 と同じく terraform のファイルだけを変えるので、所有者の承認を待たずに、品質チェックに通ると main に入る。
+  Claude は、`terraform/modules/ecs/main.tf` から `SPRING_PROFILES_ACTIVE` と `JAVA_TOOL_OPTIONS` を消し、コンテナのヘルスチェックのパスを `/healthz` にする。Claude は、`terraform/modules/alb/` のターゲットグループのヘルスチェックのパスを `/healthz` にし、`terraform/main.tf` の `keirekipro/redis` から `spring.data.redis.*` のキーを消す。Claude は `/verify-terraform` を通して PR を出す。所有者が PR 6-2 の terraform の変更を本番に反映したかの見分け方は、`aws elbv2 describe-target-groups` で読んだターゲットグループのヘルスチェックのパスが `/healthz` であることである。PR 6-2 は、PR 4-1 と同じく terraform のファイルだけを変えるので、所有者の承認を待たずに、品質チェックに通ると main に入る。
 
   Claude は、PR の本文と所有者への返事に、タスク6.1と同じ形で、次の3つを書く。
 
@@ -695,7 +718,7 @@
 - PR の本文: この spec の PR の本文には、`Spec: .kiro/specs/backend-go-replacement` と `Refs: #445` を書く。所有者の承認が要る PR では、「承認が要る理由」と「main に入れたときに本番で起きること」の2つの欄を書き、PR を作ったときの所有者への返事に、この2つの欄をそのまま写す
 - 公開のリポジトリ: Claude は、まだ直していないセキュリティの穴を、Issue、PR、コミット、spec の本文に書かない
 - 公開の時刻の検査のテストの環境(タスク1.7で分かったこと): `test-check-dependency-cooldown.sh` は openssl と gnupg を使う。Linux のコンテナで流すときは、`apk add` に `openssl gnupg` を足す
-- Go のモジュールの索引の読み方(タスク1.8で分かったこと): index.golang.org は1回の問い合わせに約4秒かかり、73時間分を順に読むと約10分かかって、判定の手順の5分の上限に収まらない。そのため `lib-gomod-index.sh` は、73時間を4時間ずつの区間(`GOMOD_INDEX_SEGMENT_HOURS`)に分け、約19本を同時に読む。design.md の「Dependabot と公開の時刻の検査と脆弱性の直し」にも、この読み方を書いた。`lib-gomod-index.sh` は、区間の中で、最後の行の時刻を秒に切り上げた値が区間の終わりと同じときも、次のページを読む(`-le`)。check-release-age.sh は、go.mod の go・toolchain・module・exclude・retract・tool・godebug・ignore の行を照らさない。Dependabot が toolchain の行を変えるかは確かめていない
+- Go のモジュールの索引の読み方(タスク1.8で分かったこと): index.golang.org は1回の問い合わせに約4秒かかり、73時間分を順に読むと約10分かかって、判定の手順の5分の上限に収まらない。そのため `lib-gomod-index.sh` は、73時間を4時間ずつの区間(`GOMOD_INDEX_SEGMENT_HOURS`)に分け、約19本を同時に読む。design.md の「Dependabot と公開の時刻の検査と脆弱性の直し」にも、この読み方を書いた。`lib-gomod-index.sh` は、区間の中で、最後の行の時刻を秒に切り上げた値が区間の終わりと同じときも、次のページを読む(`-le`)。check-release-age.sh は、go.mod の go・toolchain・module・exclude・retract・tool・godebug・ignore の行を照らさない。Claude は、Dependabot が toolchain の行を変えるかを確かめていない
 - Go の検査の外しの検知(タスク1.9で決めたこと): `check-escape-hatches.sh` は、`backend/` の下のすべての `.go` で、足した `.Skip(` `.SkipNow(` `.Skipf(` と `//nolint` と `// coverage-ignore`(go-test-coverage がカバレッジから外すコメント)を見つける。受け手の名前は `t` に限らない。gosec の `// #nosec` は見つけない。そのため、Claude は、タスク2.3で `.golangci.yml` を作るとき、gosec が `#nosec` のコメントに従わない設定にする。Claude は、タスク2.3で `Makefile` から golangci-lint と gremlins を呼ぶとき、設定のファイルを名前で指定する。承認の対象の6つのファイルと別の名前の設定のファイルを、道具が読まないようにするためである
 - design の審査で残った記録: 次の5つを、それぞれ次のタスクで扱う。
   - D3-3-1: Java 版のコードを消す PR 6-1 の `backend-vuln-fix` が版を上げる場所の一覧である。design.md の「Dependabot と公開の時刻の検査と脆弱性の直し」に書き足したとおりに、タスク10.7で扱う
@@ -733,7 +756,7 @@
   - 紙の大きさ: 紙の大きさは、CSS の `@page` が無いページのために A4 を既定にし、`preferCSSPageSize` で CSS の大きさを優先する
   - Chromium が異常で終わったことの見分け方: Chromium が異常で終わったかは、ブラウザの context の終わりと `Browser.LostConnection` で見る
   - DOM の追跡の知らせの扱い: chromedp の DOM の追跡は、`setDocumentContent` のたびに「top-level frame が無い」という知らせを誤りとして書く。部品は DOM の追跡を使わないので、chromedp の知らせを DEBUG のログに回す。同じ理由で、テストで DOM を読むときは `chromedp.Text` でなく `Runtime.evaluate` を使う(`chromedp.Text` は終わらない)
-  - ブラウザが無いことの確かめ方: ブラウザが無いことを確かめるテストは、CI の機械に `/usr/bin/google-chrome` があり PATH を空にしても見つかるので、実行ファイルの場所を存在しない場所に替えて確かめる
+  - ブラウザが無いことの確かめ方: CI の機械には `/usr/bin/google-chrome` があり、PATH を空にしても、このブラウザは見つかる。そのため、ブラウザが無いことを確かめるテストは、実行ファイルの場所を存在しない場所に替えて確かめる
   - 要求の期限切れの見分け方: 要求の context が部品の打ち切りより先に期限で終わったときは、`Render` は chromedp の Canceled を包んで返すので、呼び出し側は要求の期限切れを `ctx.Err()` で見分ける
 - 起動の入口(タスク2.10で分かったこと): 次の5つが分かった。
   - gremlins の制約: gremlins v0.6.0 は、パッケージの名前が main でフォルダの名前と違うと、最上位のパッケージのテストを流すので、`cmd/keirekipro/main.go` の変異は、すべて LIVED か NOT COVERED になる。この動きは https://github.com/go-gremlins/gremlins/issues/268 に書かれていて、直す PR はまだマージされていない。Claude は、入口を design のとおり `cmd/keirekipro` に置き、PR の CI の `make mutation-diff` が赤になったら所有者の判断を受ける
@@ -742,7 +765,7 @@
   - Chromium の処理の数え方: Chromium の処理は、名前でなく、テストの処理の子孫を `/proc/<pid>/status` の PPid でたどって数える。同時に流れる pdf のテストの Chromium を数えないためである。
   - ReadHeaderTimeout の扱い: ReadHeaderTimeout はテストせず、gosec の G112 が守る
 - 本番のイメージ(タスク2.11で決めたこと): 次の5つを決めた。
-  - 土台のイメージの版: 土台の `chromedp/headless-shell` は、2026-11-08 公開の 158.0.8127.18 が72時間たっていなかったので、1つ前の 157.0.8103.27(index の digest `7bee2014…`、amd64 と arm64 の両方を持つ)にした。research.md の digest `830fa77…` は 158 のものである
+  - 土台のイメージの版: Claude は、土台の `chromedp/headless-shell` を、1つ前の 157.0.8103.27 にした。2026-11-08 公開の 158.0.8127.18 は、72時間たっていなかったためである。157.0.8103.27 の index の digest は `7bee2014…` で、この版は amd64 と arm64 の両方を持つ。research.md の digest `830fa77…` は 158 のものである
   - Chromium の場所: Chromium は `/headless-shell` にあり、土台の PATH に入っているので、chromedp の既定の探し方で見つかる
   - フォントの設定: fontconfig のパッケージは依存として DejaVu のフォントを入れるので、`backend/assets/fonts.conf` の `<rejectfont>` で `/usr/share/fonts/truetype/*` を使わせず、sans-serif と serif と monospace を Noto に向けた
   - `run-check.sh` のコンテナで書ける場所: `run-check.sh` のコンテナでは `/repo` は読むだけで、`/app`(backend)には書ける
@@ -756,7 +779,7 @@
   - 版の分け方: fakeaws は、要求の宛先のホスト名で版を分ける。`fakeaws-java` なら java、`fakeaws-go` なら go で、そのほかの名前(版をまたぐ確認で両方がつなぐ `fakeaws` など)は共有の版 `shared` になる。harness の `ContainerSpec` は名前を1つしか持たないので、Java 版と Go 版を比べる検査では、fakeaws のコンテナに `fakeaws-java` と `fakeaws-go` の2つの名前を付けられるようにする
   - Java 版と Go 版を比べる検査の口: 秘密の値の登録は `PUT /_compat/<版>/secrets/<名前>`、覚えたものの読み出しは `GET /_compat/<版>/objects` と `GET /_compat/<版>/emails`、記録を空にするのは `DELETE /_compat/records`(秘密の値は残す)。S3 と SES と Secrets Manager の受けると決めていない操作と、どの口にも当たらないパスは、501 で断り、`fakeaws_unexpected_request` をログに出す。ログの `operation` に、断った操作の名前が入る。ただし、`/_compat/` の下の決めていないパスへの GET と PUT と DELETE は、S3 のオブジェクトの操作として扱われるので、harness は `/_compat/` の口の名前を書き誤らないようにする
   - Java 版の署名付きの URL: Java 版の開発の設定(`LocalstackPresignedUrlTransformer`)は、署名付きの URL のホストを localhost に置き換えるので、harness がその URL を読むときは、宛先と Host を fakeaws の版の名前に直して読む
-  - 本文の形: AWS の SDK が aws-chunked の形で送る本文は、fakeaws が中身を取り出して覚える。ETag は本文の SHA-256 の先頭から作る(SDK は ETag でなく CRC32 で本文を確かめる)。Java 版の SDK がこの形で読み書きできるかは、タスク3.10で Java 版を動かすまで確かめられない
+  - 本文の形: AWS の SDK が aws-chunked の形で送る本文は、fakeaws が中身を取り出して覚える。fakeaws は、ETag を本文の SHA-256 の先頭から作る。AWS の SDK は、ETag でなく CRC32 で本文を確かめる。Java 版の SDK がこの形で読み書きできるかは、タスク3.10で Java 版を動かすまで確かめられない
 - ログインの代わり(タスク3.3で分かったこと): 次の4つが分かった。
   - 口のパス: fakeoidc は、本物と同じパスで受ける。Google は `/o/oauth2/v2/auth` と `/token` と `/v1/userinfo`、GitHub は `/login/oauth/authorize` と `/login/oauth/access_token` と `/user` と `/user/emails` である。どの口にも当たらないパスは、501 で断り、`fakeoidc_unexpected_request` をログに出す
   - クライアントと利用者の登録: fakeoidc は、クライアントの値を固定で持たない。harness は、筋書きの前に、`PUT /_compat/clients/<google|github>` に `Client.Form()` の本文で、クライアントの ID と秘密の値と転送先の一覧を登録し、同じ ID と秘密の値を fakeaws の `keirekipro/oidc/google` と `keirekipro/oidc/github` にも登録する。登録の本文を JSON でなく URL の形にしたのは、gosec の G117 が、秘密の値の項目を JSON にすることを止めるためである。利用者は `PUT /_compat/users/<google|github>` に JSON で登録する。認可の口は、登録した転送先と同じ redirect_uri にだけ転送する
@@ -766,7 +789,7 @@
   - 乱数のトークン: Java 版は、ログインを続けるためのトークン、パスワードの再設定のトークン、外部のログインの state と code_verifier を、32バイトの乱数を base64url にした43文字で作り、URL と Redis のキーに書く。Java 版と Go 版を比べる検査は、base64url の文字だけでできたちょうど43文字の語を `<token:N>` に置き換える。置き換えるのは、URL(`Location` のヘッダとメールの本文)のパスの区切りと問い合わせの値の中と、Redis のキーと値の中だけである。問い合わせの名前は置き換えない。N は版ごとに現れた順の番号で、メールに出たトークンと Redis のキーのトークンは同じ番号になる。長さを43文字に絞るのは、`error=unverified_email` のような画面が読む値と、`code_challenge_method` のような問い合わせの名前を置き換えると、版の本当の違いを見逃すためである。Go 版が43文字でないトークンを作ると、Java 版と Go 版を比べる検査はその違いを報告する
   - パスワードのハッシュ: bcrypt のハッシュは塩が乱数なので、`<bcrypt:$2a$10$>` のように版と強さだけを残す
   - S3 のキーと Redis のキー: 表は S3 を「正規化なし」としているが、キーに UUID が入るので、S3 のキーの中の UUID だけは番号に置き換えてから、キーの形として比べる。S3 のキーのほかの部分と中身のバイトは置き換えない。正規化したあとのキーが重なったとき(例: 日時だけが違う Redis のキー)、Java 版と Go 版を比べる検査は、2つ目からのキーに「同じ形の N 個目」を付けて、記録を捨てずに比べる
-  - 日時: 小数の秒の桁は形に入れない(Java 版の ISO 8601 の書き方は末尾の0を書かないので、同じ形でも値によって桁の数が変わる)。日付だけの値(例: 生年月日や職歴の年月)は置き換えずにそのまま比べる。暦に無い日時は形が誤っているので置き換えない
+  - 日時: Java 版と Go 版を比べる検査は、日時の小数の秒の桁を形に入れない。Java 版の ISO 8601 の書き方は末尾の0を書かないので、同じ形の日時でも、値によって小数の秒の桁の数が変わるためである。日付だけの値(例: 生年月日や職歴の年月)は置き換えずにそのまま比べる。暦に無い日時は形が誤っているので置き換えない
   - メール: 表の「送り元と宛先と件名と本文」に加えて、Cc と Bcc と返信先と HTML の本文も比べる
   - 行の並び: データベースの行は、応答に現れない UUID を仮の記号にして並べ、その順に番号を付けてから、もう一度並べる。UUID だけが違ってほかの列がすべて同じ行どうしは、番号の付く順が決まらないので、そうした行を作る筋書きでは、行のほかの列で区別できるようにする
   - 2段階の認証のコード: Java 版の `TwoFactorAuthIssueUseCase` は、2段階の認証のコードを6桁の乱数で作り、Redis に置き、メールにも書く。Java 版と Go 版を比べる検査は6桁の数を置き換えないので、2段階の認証の筋書きでは、メールの本文と Redis の値に毎回違いが出る。Claude は、タスク3.10で筋書きを組むときに扱いを決める。6桁の数を一律に置き換えると、本当の違いを隠すおそれがあるので、置き換えるのはコードが入る場所だけに絞る
@@ -781,7 +804,7 @@
   - 表の色の箱: 語の箱を1画素広げて除いたあと、白でない同じ色の画素が上下左右でつながった広がりを、1つの箱とする。9画素より小さい広がりは数えない。Java 版の箱のそれぞれに、中心が最も近い Go 版の箱を組にして色を比べ、組にならない箱は違いにする
   - ページの文字: `pdftotext -layout` の行の中の空白の続きを1つの空白にし、行の前後の空白と空の行を除いてから比べる。-layout は文字の位置から空白と空の行の数を決めるので、許す幅の中のずれでも数が変わるためである。位置の違いは語の位置で比べる
   - フォント: `pdffonts` の名前だけを、付け足しを除き、重ならないように並べて比べる。種類、文字コード、埋め込みの有無の欄は比べない。design.md が、名前で比べると決めているためである。Java 版と Go 版を比べる検査で、名前が同じで種類などが違うことが見つかったら、所有者に報告する
-  - 道具の動かし方: poppler-utils の道具は、版ごとの作業のフォルダで、引数をすべて決まった文字にして動かす。静的な検査(gosec)が、変数の文字を引数にして外の道具を動かすことを止めるためである。`pdfinfo` の最後のページの番号には、どの PDF のページの数よりも大きい 1000000 を渡す(pdfinfo は、ページの数に縮める)
+  - 道具の動かし方: poppler-utils の道具は、版ごとの作業のフォルダで、引数をすべて決まった文字にして動かす。静的な検査(gosec)が、変数の文字を引数にして外の道具を動かすことを止めるためである。pdfcmp は、`pdfinfo` の最後のページの番号に、どの PDF のページの数よりも大きい 1000000 を渡す。`pdfinfo` は、渡された番号を、その PDF のページの数に縮めて扱う
 - 初めのデータ(タスク3.7で決めたこと): 次の5つを決めた。
   - フォントの経歴書: フォントは経歴書に保存されず、書き出しの要求の `pdfSettings.fontFamily` で選ぶ。そのため、4種類目の経歴書は、`resumes/fonts.sql` の1つの経歴書と、画面の初めの設定にフォントだけを替えた2つの書き出しの設定 `resumes/fonts-NotoSansJP.json` と `resumes/fonts-NotoSerifJP.json` で表す。筋書きは、同じ経歴書を2つの設定で書き出して比べる
   - 3ページ以上: `resumes/many-pages.sql` は、職歴12件と案件24件と資格8件を持つ。実際に3ページ以上になるかは、Java 版を動かすタスク3.10で確かめ、足りなければ件数を増やす
@@ -800,7 +823,7 @@
   - メモリを測る筋書き: PDF の出力の筋書きには `measure_memory: true` を書く。時間を測ったあと、最後の段を同じ利用者として同時に2件 Go 版に送り、Go 版のコンテナのメモリの最大を読む
   - メモリの最大の読み方: コンテナの中の `/sys/fs/cgroup/memory.peak` を読む。これはコンテナを起動してからの最大なので、同時に送ったときの最大より小さくならない。上限を超えたと出たときは、ほかの操作で増えた分も含むことに気をつけて調べる
   - 環境: 版ごとに別の Docker のネットワークに、その版だけの Postgres・Redis・fakeaws・fakeoidc を起動する。筋書きごとに、Java 版、Go 版の順に、保存された内容を空にして初めのデータを読み込んでから測る。Postgres などを起動する部分は、版をまたぐ確認と共通にした
-  - テストの名前: Makefile の `compat` は `TestCross_` と `TestPerf_` で始まるテストを飛ばし、`compat-cross` と `compat-perf` はそれぞれ `TestCross_` と `TestPerf_` で始まるテストだけを動かす。tasks.md が名前を決めた `TestPerfJudge_*` と、harness の `TestCrossReport_*` は、下線が付かないので、PR の検査(`make compat`)で動く。初めは下線の無い `TestPerf` で見分けていて `TestPerfJudge_*` が PR の検査で動かなかったので、spec 全体の確認のあとに所有者が Makefile を置き換えた
+  - テストの名前: Makefile の `compat` は `TestCross_` と `TestPerf_` で始まるテストを飛ばし、`compat-cross` と `compat-perf` はそれぞれ `TestCross_` と `TestPerf_` で始まるテストだけを動かす。tasks.md が名前を決めた `TestPerfJudge_*` と、harness の `TestCrossReport_*` は、下線が付かないので、PR の検査(`make compat`)で動く。初めの Makefile は、下線の無い `TestPerf` でテストを見分けていたので、`TestPerfJudge_*` は PR の検査で動かなかった。そのため、所有者は、spec 全体の確認のあとに Makefile を置き換えた
 - Java 版と Go 版を比べる検査の入口(タスク3.10で決めたこと): 次の8つを決めた。
   - 環境: 1つの Docker のネットワークに、版ごとの Postgres と Redis と、共有の fakeaws と fakeoidc を起動する。fakeaws には別名 `fakeaws-java` と `fakeaws-go` を付け、版ごとの別名で呼ばせて、オブジェクトとメールの記録を版ごとに分ける。Postgres と Redis を起動する部分(`Store`)と fakeaws と fakeoidc を起動する部分(`fakes`)は、版をまたぐ確認と応答の時間の比べ方と共通にした
   - 段の操作の名前: 仕様書の `paths` から操作を読み、段の `method` と `path` で操作の名前を引く。筋書きの `{名前}` は、前の段で取り出す値なので、仕様書の `{名前}` の部分にだけ当たる。当たる形が2つ以上あれば、決まった文字の部分の多い形を選ぶ
@@ -810,7 +833,7 @@
   - 筋書きに出てくる操作の確認: `progress.md` のまとまりの表の状態が「作り終えた」「比べる検査に通った」「本番で動いている」のどれかなら、完了と読む。知らないまとまりと知らない状態と、表に無いまとまりは、誤りにする。書き誤りで確かめる操作が減らないようにするためである
   - Java 版の Flyway の validate の確かめ方: `Apply` で表を作ったデータベースに Java 版を起動する。Java 版は起動のときに validate を動かすので、起動の確認が 200 を返せば validate が通っている。加えて、起動のあとも履歴が7行のままで、BASELINE の行が無く、Go 版の確かめるだけの動かし方が7つをすべて適用済みと読むことを確かめる
   - まとまりの spec に残すこと: 外部のログインの筋書きで、応答が fakeoidc を指す URL を返したときの送り直し方、GitHub のメールの取り方の違い、2段階の確認の6桁の数の扱いは、認証のまとまりの spec で決める。`resumes/many-pages.sql` の経歴書が PDF で3ページ以上になるかは、PDF の筋書きがまだ無いので確かめていない。出力のまとまりの spec で確かめる。筋書きから fakeoidc の利用者を決める欄と、筋書きごとに fakeoidc の利用者と認可の状態を消す処理は、まだ無い。外部のログインの筋書きを足す認証のまとまりの spec で作る。Java 版の署名付きの URL の宛先と Host を fakeaws の版の名前に直す処理と、署名の値の正規化も、まだ無い。署名付きの URL を返す操作の筋書きを足すまとまりの spec で作る
-- spec 全体の確認で見つけた、spec の約束に届いていない3つのこと(2026-11-10 に所有者が、このまま出荷してよいと決めた): どれも、その操作の筋書きをまだ1つも書いていないので、今の Java 版と Go 版を比べる検査の結果は変わらない。筋書きを足すまとまりの spec で作る
+- spec 全体の確認で見つけた、spec の約束に届いていない3つのこと: 所有者は、2026-11-10 に、このまま出荷してよいと決めた。どれも、その操作の筋書きをまだ1つも書いていないので、今の Java 版と Go 版を比べる検査の結果は変わらない。筋書きを足すまとまりの spec で作る
   - 変えた動きの一覧のうち、プロフィール画像の形式の違い、作りかけの経歴書を出力したときの誤りの違い、PDF の文字の位置の違いの3つを、Java 版と Go 版を比べる検査は許してよい違いとして扱えない。Java 版と Go 版を比べる検査が、これらの違いを見分ける比べ方をまだ持たないためである
   - 日本語の氏名の並びの違いを、Markdown と PDF の出力の比べ方では許せない
   - Google と GitHub のログインで、応答が示すログインの画面へ進む動き(送り直し)は作っていない。認証のまとまりの spec で作る
@@ -818,7 +841,7 @@
 - Java 版の CORS の応答と design の CORS の処理の5つの箇条の食い違い(タスク15.1で分かったこと): Claude は、次の4つを Java 版の応答に合わせた。
   - 1つ目に、Java 版は、`Vary` の3つの値を、1行でなく値ごとに別の行で返す
   - 2つ目に、Java 版は、許したプリフライトの応答にも `Access-Control-Expose-Headers` を付けるので、プリフライトの応答のヘッダは4つでなく5つになる
-  - 3つ目に、Java 版は、`Invalid CORS request` の 403 に `Content-Type` を付けない。Go の標準の受け口は本文から推した `Content-Type` を付けるので、Go 版はその値を空にして止める。テストの記録用の応答の部品はこの推しをしないので、この動きは本物の受け口を立てて確かめる
+  - 3つ目に、Java 版は、`Invalid CORS request` の 403 に `Content-Type` を付けない。Go の標準の受け口は、本文から推し量った `Content-Type` を応答に付ける。そのため、Go 版は、`Content-Type` のヘッダの値を空にして、`Content-Type` が付かないようにする。テストの記録用の応答の部品は、本文から `Content-Type` を推し量らない。そのため、Claude は、`Content-Type` が付かないことを、本物の受け口を立てて確かめる
   - 4つ目に、Java 版は、`Access-Control-Allow-Headers` を、要求の名前を「, 」でつなぎ直した値で返す
   - このほかに、許す送り元からのプリフライトでない `TRACE` に、Java 版は 401 を返し、Go 版は design のとおり 403 を返す。Java 版の 401 の応答には `Vary` が無いので、この 401 は Java 版の CORS の処理より前で返っている。Go 版の CORS の処理ではこの 401 を作れない
   - 8つの要求でメソッドを確かめる代表は `HEAD` で、`HEAD` では両方の版が 403 を返す

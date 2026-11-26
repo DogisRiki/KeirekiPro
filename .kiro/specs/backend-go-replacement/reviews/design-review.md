@@ -993,3 +993,168 @@
 なし
 
 - 往復: 2回で収束 / 未解決: 0件
+
+## サイクル13 往復1(2026-11-26)
+
+### 審査の範囲
+
+範囲: 差分
+
+- design.md「runbook.md(切り替えの手順書)」の節(742〜759行目): 差分の本体。操作2の追加と番号の繰り下げ、要件7の受入基準2を使う理由の段、「手元での画面の確認で Claude がすること」の段、「使う部品」の操作5への言い換えを読んだ
+- design.md「移行」の流れの図(1035〜1055行目): 差分の本体。段階5の手元の確認と、直したあとに手元の確認へ戻る線を読んだ
+- design.md「移行」の「Java 版に戻す条件」(1081〜1084行目)と「失敗したときの扱い」の切り替えのあとの箇条(991行目): 「5xx」「画面での確認」「もう一度切り替える」で検索して見つけた。操作の番号の繰り下げと、もう一度切り替える場面に手元の確認が入ったことと食い違わないかを見た
+- design.md「使う既存の仕組み」の開発環境の箇条(34行目)と「ファイルの構成」の compose と runbook の行(231行目、235行目): 「compose」「runbook」で検索して見つけた。差分が新しく使う開発環境のサービス(`backend-go` `frontend`)と、変えるファイルが載っているかを見た
+- design.md「変えた動きの一覧」の CB-010(927行目)と「安全」の CORS の箇条(1021行目): 「5173」で検索して見つけた。差分の「CORS の許す送り元を `http://localhost:5173` と API の説明画面に限る」と食い違わないかを見た
+- design.md「progress.md」の節(765行目): 「7.2」で検索して見つけた。対応する要件の書き方を比べた
+- requirements.md 要件5(172〜183行目)と要件7(194〜208行目): 差分が対応する要件に 7.2 を足し、操作2を 7.1 の6つの外として 7.2 で頼むとしたので、受入基準の文を読んだ
+- 前の段階の requirements-review.md と requirements-response.md を「design」「手順書」「runbook」「7.2」で検索した。手順書と要件7の受入基準2について、design で書くと記録された食い違いは無かった
+
+### 実ファイルで確かめた文
+
+- runbook の段「本体のフォルダで `docker compose restart backend-go` を打って、`backend-go` を main の最新のコードで動かし直す」: compose.yaml 40〜55行(`container_name: backend-go`、`command: go run ./cmd/keirekipro`、`./backend` を `/app` に差し込む)、compose.yaml に `name:` の行が無い(計画の名前はフォルダの名前で決まる)、.claude/scripts/parallel/run-check.sh 162行(本体のフォルダを `-p keirekipro --project-directory` で指す)、メモリ recreate-dev-containers-from-main(2026-11-10 PR #785 で、worktree で起動したコンテナが worktree のファイルをつないだまま残った) / 食い違っていた(D13-1-1)。コンテナを本体のフォルダから作ったときだけ成り立つ
+- runbook の段「サービス `frontend` のコンテナは、動いている間ホストの 5173 を使う」: compose.yaml 97〜104行(`container_name: react`、`5173:5173`) / 合っていた
+- runbook の段「このコンテナでは、`start-dev.sh` が起動した、Java 版に繋いだ画面が動いている」: start-dev.sh 171〜173行(`docker compose exec -d ... pnpm run dev`)、frontend/.env.development 3行(`VITE_API_URL=http://localhost:8080/api/`) / 合っていた
+- runbook の段「止めた `frontend` のコンテナを `docker compose start frontend` で戻す」: docker/frontend/Dockerfile 1〜8行(開発サーバを動かす CMD が無い)、compose.yaml 97〜119行(`command` が無い)、start-dev.sh 17〜20行と 171〜173行(開発サーバは exec で起動したプロセスで、コンテナの主のプロセスではない) / 食い違っていた(D13-1-2)。コンテナを動かし直しても、5173 で画面は開かない
+- runbook の段「`docker compose -p keirekipro run ... frontend pnpm dev` でホストの 5173 に開発サーバを起動できる」: frontend/package.json 8行(`"dev": "vite --host"`)、frontend/vite.config.ts 56〜58行(`host: true`、ポートの指定が無いので既定の 5173)、docker/frontend/Dockerfile 5〜6行(利用者 node、作業のフォルダ `/home/node/app`) / 合っていた
+- runbook の段「画面は、`VITE_API_URL` で Go 版の 8081 を呼ぶ」: frontend/src/lib/baseApiClient.ts 8行(`baseURL: import.meta.env.VITE_API_URL`)、frontend/vite.config.ts(`loadEnv` で値を上書きしない)、compose.yaml 46行(`8081:8080`)。起動時の環境変数が `.env.development` より先に使われることは、リポジトリのファイルでなく Vite の公式文書の記載である / 合っていた
+- runbook の段「Go 版の dev の設定が、CORS の許す送り元を `http://localhost:5173` と API の説明画面に限る」: backend/internal/platform/config/config.go 166〜167行、compose.yaml 59行(`KEIREKIPRO_ENV=dev`) / 合っていた
+- 操作2「手元の開発環境で PDF を出力する」: docker/backend-go/Dockerfile 9行と 15〜20行(開発サーバの PDF の出力のために chromium と fonts-noto-cjk を入れる) / 合っていた
+- runbook の段「`docker compose -p keirekipro logs backend-go` で、Go 版のログに 5xx の行が無いかを読む」: compose.yaml 49行(主のプロセスが `go run` なので、ログは compose のログに流れる)、backend/internal/httpapi/server_test.go 112行と 171行(要求のログに `status_code` がある) / 合っていた
+
+### 受入基準ごとの確かめ方
+
+| 受入基準 | 確かめる道具 | 動かす場所 | 動かすのに要るもの | design の箇所 |
+|---|---|---|---|---|
+| 5.3 | runbook.md を読み、6つの操作に、押す場所か打つコマンドと見分け方があるかを見る | 文書の確認(PR 4-2) | 操作2の開く URL `http://localhost:5173` | 「runbook.md」の操作2(749行目)。URL は「手元での画面の確認で Claude がすること」(757行目)にあり、操作2の行には無い(D13-1-4) |
+| 5.5 | Claude の切り替えのあとの確かめ(`gh run view`、`aws ecs`、CloudWatch Logs)と所有者の操作5 | Claude の会話と本番 | AWS を読む権限、操作5 | 「runbook.md」の「使う部品」(759行目) |
+| 7.1 | runbook.md の操作が、6つの操作か、7.2 で頼む操作のどちらかに当たるかを読む | 文書の確認(PR 4-2) | 要らない | 「runbook.md」の 755行目 |
+| 7.2 | 操作2を頼む返事に、要る理由と Claude ができない理由があるかを見る。手元の Go 版の画面を、所有者がブラウザで開く | 本体のフォルダの開発環境(`backend-go` と、1回きりの `frontend` のコンテナ) | `backend-go` を main の最新のコードで動かすこと、ホストの 5173 を空けること、`VITE_API_URL`、CORS の許す送り元、手元の利用者、確認のあとに元の画面に戻すこと | 「手元での画面の確認で Claude がすること」(757行目)。`backend-go` を main の最新のコードで動かす手順(D13-1-1)と、元の画面に戻す手順(D13-1-2)が成り立たない |
+
+### 申告
+
+**1. 手元の確認で、Java 版に繋いだ画面のコンテナを止めて 5173 を Go 版の画面に貸す** — design.md「手元での画面の確認で Claude がすること」
+
+- Issue の記載: なし(Issue #445 の本文に、手元の確認は書かれていない。直しの理由は Issue #935 の会話の所有者の決定とされる)
+- 決めたこと: Go 版の開発環境の CORS が許す送り元が `http://localhost:5173` と `http://localhost:8082` だけなので、Java 版に繋いだ画面を止め、同じ 5173 で Go 版に繋いだ画面を1回きりのコンテナで動かす
+- 他にありえた選択肢: 別のポート(たとえば 5174)で Go 版の画面を動かし、Go 版の dev の許す送り元に足す(変えた動きの一覧 CB-010 と config の変更が要る)。Java 版の画面のコンテナの中で開発サーバだけを入れ替える
+- 外れていた場合: 確認の間、手元の Java 版の画面が使えない。止めたコンテナと開発サーバの戻し方を誤ると、確認のあとに手元の開発環境が元の形に戻らない(D13-1-2)
+
+**2. 操作2を Claude でなく所有者がする理由を、手元の利用者のパスワードとする** — design.md 755行目
+
+- Issue の記載: なし
+- 決めたこと: Claude は手元の利用者のパスワードを入れられないので、所有者が操作2をする
+- 他にありえた選択肢: Claude が手元の開発環境に自分の利用者を登録し、ブラウザを操る道具で確かめ、所有者は結果を見るだけにする。理由を「所有者が自分の目で確かめると決めたため」だけにする
+- 外れていた場合: 所有者が、自分の手を使わない確かめ方を選べることに気づかない。作るものは変わらない(D13-1-3)
+
+### 指摘
+
+| ID | レベル | 該当箇所 | 内容 | 直し方の案 |
+|---|---|---|---|---|
+| D13-1-1 | 中 | design.md「手元での画面の確認で Claude がすること」(757行目) | `docker compose restart backend-go` は、コンテナを作り直さず、イメージも組み立て直さない。動き直したコンテナは、作ったときに差し込んだフォルダの `backend` を読む。compose.yaml には `name:` が無いので、計画の名前は compose を打ったフォルダの名前で決まり、本体のフォルダでは `keirekipro`、worktree では worktree のフォルダの名前になる(run-check.sh 162行が本体を `-p keirekipro --project-directory` で指すのと同じ)。`container_name` は `backend-go` と `react` に固定されている。Claude の会話は worktree で動くので、`/verify-ui` などで worktree から開発環境を起動すると、`backend-go` と `react` のコンテナは worktree の計画のまま worktree のファイルを差し込んで残る(メモリ recreate-dev-containers-from-main。2026-11-10 PR #785 で起きた)。そのとき、本体のフォルダの `docker compose restart backend-go` は計画 `keirekipro` のコンテナを探すので、worktree の計画のコンテナを動かし直さない。所有者は、main の最新でない Go 版の画面を確かめたまま「確かめた」と書きうる。同じ理由で、「`frontend` のコンテナが動いていれば止める」と `docker compose start frontend` と `docker compose -p keirekipro logs backend-go` も、worktree の計画のコンテナに届かず、`run -p 5173:5173` はポートが空かずに失敗しうる。design の文は、コンテナを本体のフォルダから作ったときだけ成り立ち、事実の誤りに当たる | Claude は、本体のフォルダを指して `docker compose -p keirekipro --project-directory <本体> -f <本体>/compose.yaml up -d --build --force-recreate --no-deps backend-go` を打つ、と書く。続けて、`docker inspect backend-go` の差し込みの元(または計画の作業フォルダのラベル)が本体のフォルダであることを確かめる、と書く。`react` のコンテナは、計画によらず止められるように、コンテナの名前で止める(`docker stop react`)と書く |
+| D13-1-2 | 中 | design.md「手元での画面の確認で Claude がすること」(757行目)の最後から3文目 | 「止めた `frontend` のコンテナを `docker compose start frontend` で戻す」としているが、Java 版に繋いだ画面の開発サーバは、コンテナの主のプロセスではない。start-dev.sh 171〜173行が `docker compose exec -d` で起動したプロセスであり、docker/frontend/Dockerfile と compose.yaml の `frontend` には開発サーバを動かす CMD と `command` が無い。コンテナを止めると開発サーバも終わり、`docker compose start frontend` で動かし直しても、ホストの 5173 で画面は開かない。手元の開発環境が、確認の前の形(5173 で Java 版に繋いだ画面が開く)に戻らない。所有者が次に手元の画面を開いたときに必ず発覚する | 1回きりのコンテナを止めたあと、Claude は本体のフォルダで `bash start-dev.sh` を動かし、止めていた `frontend` のコンテナの起動と、Java 版に繋いだ開発サーバの起動を行う、と書く。start-dev.sh 43〜58行が止まっているサービスを起動し、138〜190行が 5173 が開いていなければ開発サーバを起動する。D13-1-1 の直しで worktree の計画のコンテナを本体から作り直すなら、それも合わせて書く |
+| D13-1-3 | 低 | design.md「runbook.md」755行目 | Claude が操作2を代われない理由を「手元の利用者のパスワードは所有者のもの」としているが、Claude は手元の開発環境に自分の利用者を登録して同じ操作をすることはできる。操作2の目的は、所有者が Go 版の画面を自分の目で確かめることなので、Claude が代われない本当の理由は、目的が所有者自身の確かめであることである。要件7の受入基準2の判定は変わらない | 代われない理由を、「操作2の目的は、所有者が自分の目で Go 版の画面を確かめることであり、Claude が確かめても目的を満たさないため」と書く(パスワードの理由は添えてもよい) |
+| D13-1-4 | 低 | design.md「runbook.md」の操作2(749行目) | 要件5の受入基準3は、手順書の操作ごとに押す場所か打つコマンドを書くとする。操作2の行には、開く URL `http://localhost:5173` が無く、757行目の Claude がすることの段にだけある。手順書を作るときに、操作2の行から URL が落ちうる | 操作2の行に「作業PCのブラウザで `http://localhost:5173` を開く」と書く |
+| D13-1-5 | 低 | design.md「使う既存の仕組み」の開発環境の箇条(34行目) | この設計が今のまま使う開発環境のサービスを `db` `redis` `localstack` `dind` としているが、差分の手元の確認は、`frontend` のサービスと `start-dev.sh` が起動した開発サーバも使う。`backend-go` はこの spec で足すサービスなので載せなくてよい | 開発環境の箇条に、手元の確認で `frontend` のサービスと `start-dev.sh` を使うことを足す |
+
+### 前の段階への指摘
+
+なし
+
+- 往復: 1回目 / 高0 中2 低3
+
+## サイクル13 往復2(2026-11-26)
+
+### 審査の範囲
+
+範囲: 差分
+
+- design.md「runbook.md」の「手元での画面の確認で Claude がすること」(757〜766行目): 差分の本体。1段落を8つの箇条に分け、箇条1〜3と7を書き換えた。8つの箇条をすべて読んだ
+- design.md「runbook.md」の操作2の行と、操作2を所有者に頼む理由の段(749行目、755行目): 差分の箇条5(所有者に URL を示す)と箇条8(違いがあったときに操作2をやり直す)が、操作2の見分け方を使うので、前後を読んだ。往復1から変わっていない
+- design.md「runbook.md」の「使う部品」(768行目): 差分の直後の段で、Claude が確かめる道具の書き方が手元の確認の箇条と食い違わないかを見た。変わっていない
+- requirements.md 要件7(194〜208行目): 差分の段が、要件7の受入基準2のとおりに操作2を頼む手順なので、受入基準2の文を読んだ
+- 前の段階の requirements-review.md と requirements-response.md を「手元」「runbook」「手順書」「7.2」で検索した。手順書と要件7の受入基準2について、design で書くと記録された食い違いは無かった
+- 差分は `backend-go` と `react` のコンテナと `start-dev.sh` の動きを新しく前提にしたので、compose.yaml の `frontend` と `backend-go` のサービスと start-dev.sh の全体を読んだ。design.md のほかの節は、差分の語(`docker rm` `docker stop react` `start-dev.sh` `react`)が出てこないので読み直さない
+
+### 実ファイルで確かめた文
+
+- 箇条1「`docker compose restart` は、コンテナを作り直さず、作ったときに差し込んだフォルダのコードを読み続ける」: compose.yaml 49〜51行(`command: go run ./cmd/keirekipro`、`./backend` を `/app` に差し込む) / 合っていた
+- 箇条1「worktree で作られていると、名前 `backend-go` が `keirekipro` と違うプロジェクト名のコンテナに使われていて、本体のフォルダの `up` が名前の重なりで失敗する」: compose.yaml 41行(`container_name: backend-go`)、compose.yaml に `name:` の行が無い(プロジェクト名は compose を打ったフォルダの名前で決まる) / 合っていた
+- 箇条1「本体のフォルダで `-p keirekipro` を打つ」: 本体のフォルダの名前 `KeirekiPro` を小文字にした名前が `keirekipro` であること、.claude/scripts/parallel/run-check.sh 162行と ui.sh 151行が本体のフォルダを `-p keirekipro --project-directory` で指していること / 合っていた
+- 箇条2「`docker inspect backend-go` で差し込みの元が本体のフォルダの `backend` であることを確かめる」: compose.yaml 50〜51行 / 合っていた
+- 箇条3「`react` のコンテナは、動いている間ホストの 5173 を使い、`start-dev.sh` が起動した Java 版に繋いだ画面の開発サーバが動いている」: compose.yaml 97〜104行(`container_name: react`、`5173:5173`)、start-dev.sh 171〜173行 / 合っていた
+- 箇条6「`docker compose -p keirekipro logs backend-go` で Go 版のログを読む」: compose.yaml 49行(主のプロセスが `go run`)。箇条1のあと、コンテナはプロジェクト `keirekipro` にある / 合っていた
+- 箇条7「`react` のコンテナを止めていたときは、本体のフォルダで `bash start-dev.sh` を動かし、`react` のコンテナと Java 版に繋いだ画面の開発サーバを起動し直す」: start-dev.sh 40行(`REQUIRED_SERVICES` に `backend` `api-docs` `frontend` がある)、43〜58行(`docker compose ps` で本体のフォルダのプロジェクトの中だけを探し、見つからないサービスを `docker compose up -d` で起動し、失敗したら `exit 1`)、compose.yaml 16行と 77行と 98行(`spring` `api-docs` `react` の `container_name` が固定) / 食い違っていた(D13-2-1)。`react` のコンテナがプロジェクト `keirekipro` にあるときだけ成り立つ
+- 箇条7「`docker compose start frontend` では、開発サーバが起動しない」: docker/frontend/Dockerfile 1〜8行(開発サーバを動かす `CMD` が無い)、compose.yaml 97〜119行(`command` が無い)、start-dev.sh 17〜19行 / 合っていた
+- 箇条1「`up -d` でコンテナを作り直す」のうちイメージの扱い: compose.yaml 42〜44行(`build` の指定だけで、`up` に `--build` が無い) / 合っていた。ただし D13-2-2
+
+### 受入基準ごとの確かめ方
+
+| 受入基準 | 確かめる道具 | 動かす場所 | 動かすのに要るもの | design の箇所 |
+|---|---|---|---|---|
+| 5.3 | runbook.md を読み、操作2に、開く場所と見分け方があるかを見る | 文書の確認(PR 4-2) | 操作2の開く URL `http://localhost:5173` | 「手元での画面の確認で Claude がすること」の箇条5(763行目)。操作2の行(749行目)には無いまま(D13-1-4 は記録のみで、tasks で書くとされた) |
+| 7.2 | 操作2を頼む返事に、要る理由と Claude ができない理由があるかを見る。手元の Go 版の画面を、所有者がブラウザで開く | 本体のフォルダの開発環境(プロジェクト `keirekipro` の `backend-go` と、1回きりの `frontend` のコンテナ) | `backend-go` を本体のフォルダから作り直すこと(箇条1、2)、`backend-go` が受け付けを始めていること(D13-2-3)、ホストの 5173 を空けること(箇条3)、`VITE_API_URL` と CORS の許す送り元(箇条4)、手元の利用者(所有者のもの)、確認のあとに元の画面に戻すこと(箇条7) | 「手元での画面の確認で Claude がすること」(757〜766行目)。元の画面に戻す手順は、`react` が worktree の別のプロジェクトで作られていたときに成り立たない(D13-2-1) |
+
+### 申告
+
+差分で新しく決めたことのうち、申告に当たるものは無い。往復1の申告1と2のままである。
+
+### 指摘
+
+| ID | レベル | 該当箇所 | 内容 | 直し方の案 |
+|---|---|---|---|---|
+| D13-2-1 | 中 | design.md「手元での画面の確認で Claude がすること」の箇条3(761行目)と箇条7(765行目) | 箇条3は、`react` のコンテナが worktree で作られていても止められるように、名前で止めるとする。箇条1は、worktree で作られたコンテナは `keirekipro` と違うプロジェクト名のコンテナだとする。この前提のとき、箇条7の `bash start-dev.sh` は `react` を起動し直せない。start-dev.sh 43〜58行の `ensure_containers` は、本体のフォルダのプロジェクト `keirekipro` の中だけで `docker compose ps --status running -q frontend` を探す。別のプロジェクトの `react` は見つからないので、`docker compose up -d frontend` を打つ。compose はプロジェクト `keirekipro` に `frontend` のコンテナが無いので、名前 `react`(compose.yaml 98行)のコンテナを新しく作ろうとし、止まっている別のプロジェクトの `react` と名前が重なって失敗する。start-dev.sh は 55〜56行で `exit 1` し、Java 版に繋いだ画面の開発サーバは起動しない。箇条1が `backend-go` で避けた名前の重なりと同じことが、`react` で起きる。同じ理由で、メモリ recreate-dev-containers-from-main のとおり worktree の `start-dev.sh` が残した `spring` と `api-docs` が別のプロジェクトで動いていると、start-dev.sh 40行の `REQUIRED_SERVICES` に入っているので、`up -d` が名前の重なりで失敗する。手元の開発環境が確認の前の形に戻らず、所有者が次に手元の画面を開いたときに必ず発覚する | 箇条3を、`docker rm -f react` でコンテナを消す、に変える。node_modules は名前付きのボリューム `named-node_modules`(compose.yaml 115〜117行、198〜199行)にあるので、コンテナを消しても残る。箇条7の start-dev.sh が、本体のフォルダから `react` を作り直し、開発サーバを起動する。あわせて、箇条7で start-dev.sh を動かす前に、`docker inspect` のラベル `com.docker.compose.project` で `spring` と `api-docs` のプロジェクト名を読み、`keirekipro` でなければ `docker rm -f` で消す、と書く |
+| D13-2-2 | 低 | design.md「手元での画面の確認で Claude がすること」の箇条1(759行目) | `docker compose -p keirekipro up -d --no-deps backend-go` は `--build` を付けていないので、イメージ `keirekipro-backend-go` がすでにあれば、そのイメージでコンテナを作る。`docker/backend-go/Dockerfile` が main で変わったあと(Dependabot の基のイメージの更新など)でも、古いイメージのまま動く。コードは差し込みで main の最新になるので、Go 版の動きへの影響は小さい。往復1の D13-1-1 の直し方の案には `--build` があった | 箇条1のコマンドに `--build` を足す |
+| D13-2-3 | 低 | design.md「手元での画面の確認で Claude がすること」の箇条2と箇条5(760行目、763行目) | 箇条1で作り直した `backend-go` は、起動のたびに `go run` で組み立てるので、受け付けを始めるまで時間がかかる(start-dev.sh 28〜31行は、キャッシュが空のときの実測を12秒としている)。また、db などにつながらないと起動に失敗して止まる(start-dev.sh 115〜117行)。箇条2は差し込みの元だけを確かめ、受け付けを始めたかを確かめずに、箇条5で URL を示す。所有者が早く開くとログインに失敗し、箇条8のとおり Claude が原因を調べる手間が増える | 箇条2のあとに、start-dev.sh 66〜71行と同じく、`backend-go` のコンテナの中で `/healthz` が 200 を返すまで待ち、コンテナが止まったらログを読んで所有者に URL を示さない、と書く |
+
+### 前の段階への指摘
+
+なし
+
+- 往復: 2回目 / 高0 中1 低2
+
+## サイクル13 往復3(2026-11-26)
+
+### 審査の範囲
+
+範囲: 差分
+
+- design.md「runbook.md」の操作2を所有者に頼む理由の段(755行目): 差分の本体。要件7の受入基準1の6つに当たらないことと、受入基準2のとおりに「要る理由」と「Claude が自分でできない理由」を添えて頼むことを書き直した。requirements.md 要件7(194〜208行目)の受入基準1と2の文と突き合わせた
+- design.md「手元での画面の確認で Claude がすること」(757〜767行目): 差分の本体。8つの箇条を9つにし、箇条1(本体のフォルダと違うプロジェクトのコンテナを消す)、箇条2(`backend-go` を消す)、箇条3(`start-dev.sh` で作り直す)を足し、`react` を止める箇条から「動いていれば」を外し、元に戻す箇条から条件を外した。9つの箇条をすべて読み、往復2の D13-2-1 の場面(`react` と `spring` と `api-docs` が worktree の別のプロジェクトにある)と、tasks.md 826行目の「作業フォルダでは `COMPOSE_PROJECT_NAME=keirekipro bash start-dev.sh` で起動する」場面(コンテナはプロジェクト `keirekipro` にあり、worktree のフォルダを差し込む)の2つで、箇条を順にたどった
+- design.md「runbook.md」の操作2の行(749行目)と「使う部品」(769行目): 差分の箇条6(URL を示す)と箇条9(違いがあったときにやり直す)が操作2の見分け方を使い、「使う部品」は差分の直後の段なので読んだ。どちらも変わっていない
+- design.md のほかの節と tasks.md: 差分の語(`手元での画面の確認` `9つ` `docker stop react` `start-dev.sh`)で Grep した。design.md の 236行目、865行目、1084行目、1114行目は `start-dev.sh` を変えるPRの話で、手元の確認の箇条の番号や数を参照していない。tasks.md 446行目は「操作2で Claude がすること」を runbook.md に書くとし、箇条の数を書いていないので食い違わない。影響を受ける箇所はほかに無い
+- 前の段階の requirements-review.md と requirements-response.md: 往復1と往復2で「手元」「runbook」「手順書」「7.2」で検索し、design で書くと記録された食い違いが無かった。差分は要件7の受入基準2の言い回しに合わせただけで、新しい語は無いので、検索し直していない
+
+### 実ファイルで確かめた文
+
+- 箇条1「compose.yaml には `name:` が無いので、プロジェクト名は `docker compose` を打ったフォルダの名前で決まり、本体のフォルダでは `keirekipro` になる」: compose.yaml 1〜215行(最上位に `name:` が無い)、リポジトリと本体のフォルダに `COMPOSE_PROJECT_NAME` を書いたファイルと最上位の `.env` が無い(Grep と Glob)、本体のフォルダの名前が `KeirekiPro` / 合っていた
+- 箇条1「compose.yaml がコンテナの名前を固定している」: compose.yaml 6、15、41、77、98、122、135、159、170行(`dind` `spring` `backend-go` `api-docs` `react` `terraform` `postgresql` `redis` `localstack`) / 合っていた
+- 箇条1「`start-dev.sh` と `docker compose -p keirekipro` が、プロジェクト `keirekipro` のコンテナしか探さない」: start-dev.sh 46行(`-p` を付けない `docker compose ps`。本体のフォルダで打てばプロジェクト `keirekipro`)、.claude/scripts/parallel/ui.sh 144行 / 合っていた
+- 箇条1「コンテナを消しても、データベースと部品のデータは、名前を付けたボリュームに残る」: compose.yaml 148〜151行と 196〜207行(`named-db-data` `named-node_modules` `named-localstack` `named-backend-gradle-cache` `named-backend-go-cache`)。名前を付けたボリュームはプロジェクトによらず同じものを指す / 合っていた。`redis` にはボリュームが無いが、本文は Redis のデータが残るとは書いていない
+- 箇条1で消すコンテナに、ほかのセッションの画面の確認のコンテナが入らないこと: ui.sh 37行、144〜152行、211行、222行、249行(画面の確認は、プロジェクト `keirekipro` の共有のサービスと、`kp-ui-<枠>-*` の名前の1回きりのコンテナを使い、compose.yaml の `container_name` の名前のコンテナを作らない) / 合っていた
+- 箇条2「`backend-go` のコンテナは、作ったときに差し込んだフォルダのコードを読み続け、`docker compose restart` では作り直されない」: compose.yaml 48〜51行(`command: go run ./cmd/keirekipro`、`./backend` を `/app` に差し込む) / 合っていた
+- 箇条3「`start-dev.sh` は、無いコンテナを本体のフォルダから作り直して起動し、`backend-go` が `/healthz` に 200 を返すまで待つ」: start-dev.sh 40行(`REQUIRED_SERVICES` に `backend-go` と `frontend` がある)、43〜58行(動いていないサービスを `docker compose up -d` で起動する)、66〜71行と 118〜136行(`/healthz` が 200 を返すまで待ち、コンテナが止まったらログを出して `exit 1`) / 合っていた。D13-2-3 の場面は無くなった
+- 箇条5「`react` のコンテナは、動いている間ホストの 5173 を使い、`start-dev.sh` が起動した Java 版に繋いだ画面の開発サーバが動いている」: compose.yaml 97〜104行、start-dev.sh 138〜190行(箇条3の `start-dev.sh` が、5173 が開いていなければ開発サーバを起動する)、frontend/.env.development 3行 / 合っていた。箇条3のあとなので、`react` はプロジェクト `keirekipro` にあり、動いている
+- 箇条8「1回きりのコンテナを止め、本体のフォルダで `bash start-dev.sh` を動かして、`react` のコンテナと Java 版に繋いだ画面の開発サーバを起動し直す」: start-dev.sh 43〜58行(止まった `frontend` を `docker compose up -d frontend` で起動する。箇条1のあとなので `react` はプロジェクト `keirekipro` にあり、名前は重ならない)、138〜190行(5173 が開いていなければ依存を入れて開発サーバを起動する)。箇条6の1回きりのコンテナは `--rm` なので、止めると消え、5173 も空く / 合っていた。D13-2-1 の場面は無くなった
+- tasks.md 826行目の場面(worktree で `COMPOSE_PROJECT_NAME=keirekipro bash start-dev.sh` を打ち、プロジェクト `keirekipro` のコンテナが worktree のフォルダを差し込んでいる): 箇条1は消さないが、箇条2が `backend-go` を名前で消し、箇条3が本体のフォルダから作り直し、箇条4が差し込みの元を確かめる。画面は箇条6の本体のフォルダの1回きりのコンテナが出すので、所有者が確かめるのは main の最新の画面と Go 版である / 合っていた
+
+### 受入基準ごとの確かめ方
+
+| 受入基準 | 確かめる道具 | 動かす場所 | 動かすのに要るもの | design の箇所 |
+|---|---|---|---|---|
+| 5.3 | runbook.md を読み、操作2に、開く場所と見分け方があるかを見る | 文書の確認(PR 4-2) | 操作2の開く URL `http://localhost:5173` | 「手元での画面の確認で Claude がすること」の箇条6(764行目)。操作2の行(749行目)には無いまま(D13-1-4 は記録のみ) |
+| 7.1 | runbook.md の操作が、6つの操作か、7.2 で頼む操作のどちらかに当たるかを読む | 文書の確認(PR 4-2) | 要らない | 「runbook.md」の 755行目 |
+| 7.2 | 操作2を頼む返事に、要る理由と Claude ができない理由があるかを見る。手元の Go 版の画面を、所有者がブラウザで開く | 本体のフォルダの開発環境(プロジェクト `keirekipro` の `backend-go` と、1回きりの `frontend` のコンテナ) | 違うプロジェクトのコンテナを消すこと(箇条1)、`backend-go` を本体のフォルダから作り直し受け付けを待つこと(箇条2、3)、差し込みの元の確かめ(箇条4)、ホストの 5173 を空けること(箇条5)、`VITE_API_URL` と CORS の許す送り元(箇条6)、手元の利用者(所有者のもの)、確認のあとに元の画面に戻すこと(箇条8) | 「runbook.md」の 755行目と「手元での画面の確認で Claude がすること」(757〜767行目) |
+
+### 申告
+
+差分で新しく決めたことのうち、申告に当たるものは無い。往復1の申告1と2のままである。箇条1で、本体のフォルダと違うプロジェクトのコンテナを、Redis のデータごと消すことは、手元の開発環境のことで、所有者は操作2でログインし直すので、外れたときの手戻りは小さい。
+
+### 指摘
+
+なし
+
+### 前の段階への指摘
+
+なし
+
+- 往復: 3回で収束 / 未解決: 0件
