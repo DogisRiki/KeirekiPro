@@ -468,7 +468,7 @@
   - 受入基準とテストの対応: 要件9の受入基準1(画面が使うすべての操作を同じにする)は `TestCoverage_Operations` で、要件13の受入基準6(切り替えの前に版をまたぐ確認がある)と要件9の受入基準7(決めた操作の時間を比べる)の筋書きがそろっていることは、判定の関数の単体テストに足す `TestCoverageJudge_CrossOperationsMissing` と `TestCoverageJudge_PerfOperationsMissing` で確かめる
   - _要件: 9.1, 9.7, 13.6_
 
-- [ ] 8.2 応答の時間を測り、幅を超えた操作を直す
+- [x] 8.2 応答の時間を測り、幅を超えた操作を直す
 
   Claude は、`run-check.sh backend-go make compat-perf` を動かし、11の操作の95パーセンタイルと、PDF の同時2件のメモリの最大と、起動の時間を `progress.md` に書く。幅を超えた操作があれば、Claude は、要件9の受入基準7のとおりに Go 版を直して測り直し、直せなければ操作と測った値を所有者に報告する。メモリが 1792MB を超えたら、PDF の同時の数を1に下げて測り直し、それでも超えたら所有者に報告する。
   - 完了の確かめ方: `make compat-perf` が成功し、progress.md に測った値の表がある
