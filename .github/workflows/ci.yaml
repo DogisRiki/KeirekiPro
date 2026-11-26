@@ -213,9 +213,14 @@ jobs:
 
           echo "audit-weekly の直近の完了: ${latest}(10日未満のため通過)"
 
+  # main への push では、frontend/ を変えていなくても毎回動かし、デプロイ用の frontend-dist を残す
+  # (ci.yaml の push は main だけで起動する)。release.yaml は、欄を空で起動すると、main への push で
+  # 成功した直近100件の実行の中から frontend-dist のある CI の実行を探す。その100件には別のワークフローの
+  # 実行も入るため、frontend/ を変えた push のときだけ残すと、2日ほどで探す範囲の外に出て出荷が止まる(#952)。
+  # 名前で直接探す形にしても、frontend-dist は90日で消えるので、frontend/ を長く変えない時期にはまた止まる。
   frontend-test:
     needs: detect-changes
-    if: needs.detect-changes.outputs.frontend_changed == 'true'
+    if: github.event_name == 'push' || needs.detect-changes.outputs.frontend_changed == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
