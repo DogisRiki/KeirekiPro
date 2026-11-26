@@ -53,6 +53,12 @@ RUN chown -R spring:spring /app
 # 非rootユーザーに切り替え
 USER spring
 
+# VERSION は、ログの service.version に書く版である。出荷のワークフローがコミットの SHA を渡す。
+# application.yaml は環境変数 APP_VERSION を読むので、受け取った版を APP_VERSION に入れる。
+# 渡されないときは、application.yaml の既定と同じ unknown になる
+ARG VERSION=unknown
+ENV APP_VERSION=${VERSION}
+
 # アプリケーションポートを公開
 EXPOSE 8080
 
