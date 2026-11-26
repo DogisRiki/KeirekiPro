@@ -461,7 +461,7 @@
   - _要件: 7.3_
 
 - [ ] 8. 50の操作の確認を必須にし、応答の時間を測る(PR 4-3)
-- [ ] 8.1 50の操作がすべて筋書きに出てくることを必須にする
+- [x] 8.1 50の操作がすべて筋書きに出てくることを必須にする
 
   Claude は、タスク3.10で作った定数 `requireAllOperations` を `true` にする。Claude は、`TestCoverage_Operations` に、design.md の「cross」の10の操作がそれぞれ `modes` に `cross` を持つ筋書きに出てくることと、design.md の「perf」の11の操作がそれぞれ `modes` に `perf` を持つ筋書きに出てくることの確認を足す。足りない筋書きがあれば、Claude は、その筋書きを足す。
   - 完了の確かめ方: `run-check.sh backend-go go test -tags compat -run TestCoverage ./compat/...` が成功する
