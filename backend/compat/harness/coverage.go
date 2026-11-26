@@ -138,3 +138,191 @@ func MissingOperations(ops Operations, scenarios []Scenario, completed []int, re
 	}
 	return missing
 }
+
+// UseStep は、design.md が筋書きに求める操作の、1つの段の条件である。
+type UseStep struct {
+	// Operations は、段の操作の ID の候補である。段の操作が、どれか1つに当たればよい。
+	Operations []string
+	// Query は、空でなければ、段のパスの ? よりあとに含まれなければならない文字である。
+	Query string
+	// Accept は、空でなければ、段の Accept の行に含まれなければならない文字である。出力の形を見分ける。
+	Accept string
+	// Version は、空でなければ、送り先の組で、この段を送る版である。版をまたぐ確認にだけ書く。
+	Version string
+}
+
+// RequiredUse は、design.md が、1つの動かし方の筋書きに求める操作の1つである。
+type RequiredUse struct {
+	// Name は、design.md の一覧の言葉である。
+	Name string
+	// Sequences の段の並びは、それぞれ、1つの筋書きの段に、この順で出てこなければならない。間に別の段があってよい。
+	Sequences [][]UseStep
+}
+
+// saveOperations は、画面が経歴書と利用者の情報を保存する操作である。
+var saveOperations = []string{
+	"updateUserInfo", "createResume", "updateResumeBasic",
+	"createCareer", "updateCareer", "createProject", "updateProject",
+	"createCertification", "updateCertification", "createPortfolio", "updatePortfolio",
+	"createSnsPlatform", "updateSnsPlatform", "createSelfPromotion", "updateSelfPromotion",
+}
+
+// exportOperations は、経歴書を出力する2つの操作である。どちらも、Accept の行で出力の形を選ぶ。
+var exportOperations = []string{"exportResume", "exportResumeWithSettings"}
+
+func requiredUse(name string, sequences ...[]UseStep) RequiredUse {
+	return RequiredUse{Name: name, Sequences: sequences}
+}
+
+func opStep(ids ...string) UseStep { return UseStep{Operations: ids} }
+
+// CrossUses は、design.md の「cross」が、版をまたぐ動かし方の筋書きに求める10の操作である。
+var CrossUses = []RequiredUse{
+	requiredUse("ログインしたままの利用者の保存", []UseStep{opStep("login"), opStep(saveOperations...)}),
+	requiredUse("PDF の出力", []UseStep{{Operations: exportOperations, Accept: "application/pdf"}}),
+	requiredUse("ログアウト", []UseStep{opStep("logout")}),
+	requiredUse("トークンの更新", []UseStep{opStep("refreshToken")}),
+	requiredUse("2段階認証", []UseStep{opStep("login"), opStep("verifyTwoFactorAuth")}),
+	requiredUse("パスワードの再設定", []UseStep{opStep("requestPasswordReset"), opStep("verifyPasswordResetToken"), opStep("resetPassword")}),
+	requiredUse("新規の登録のメールアドレスの確認", []UseStep{opStep("registerUser"), opStep("verifyEmail")}),
+	requiredUse("Google と GitHub でのログイン",
+		[]UseStep{{Operations: []string{"startOidcAuthorization"}, Query: "provider=google"}, opStep("handleOidcCallback")},
+		[]UseStep{{Operations: []string{"startOidcAuthorization"}, Query: "provider=github"}, opStep("handleOidcCallback")}),
+	requiredUse("Go 版で書き出したバックアップを Java 版で戻すこと",
+		[]UseStep{{Operations: []string{"backupResume"}, Version: VersionGo}, {Operations: []string{"restoreResume"}, Version: VersionJava}}),
+	requiredUse("Java 版で書き出したバックアップを Go 版で戻すこと",
+		[]UseStep{{Operations: []string{"backupResume"}, Version: VersionJava}, {Operations: []string{"restoreResume"}, Version: VersionGo}}),
+}
+
+// PerfUses は、design.md の「perf」が、応答の時間の比べ方の筋書きの最後の段で測ることを求める11の操作である。
+var PerfUses = []RequiredUse{
+	requiredUse("ログイン", []UseStep{opStep("login")}),
+	requiredUse("トークンの更新", []UseStep{opStep("refreshToken")}),
+	requiredUse("利用者の情報の取得", []UseStep{opStep("getUserInfo")}),
+	requiredUse("経歴書の一覧", []UseStep{opStep("listResumes")}),
+	requiredUse("経歴書の取得", []UseStep{opStep("getResume")}),
+	requiredUse("基本情報の保存", []UseStep{opStep("updateResumeBasic")}),
+	requiredUse("職歴の追加", []UseStep{opStep("createCareer")}),
+	requiredUse("PDF の出力", []UseStep{{Operations: exportOperations, Accept: "application/pdf"}}),
+	requiredUse("Markdown の出力", []UseStep{{Operations: exportOperations, Accept: "text/markdown"}}),
+	requiredUse("バックアップの書き出し", []UseStep{opStep("backupResume")}),
+	requiredUse("バックアップの戻し", []UseStep{opStep("restoreResume")}),
+}
+
+// MissingCrossUses は、CrossUses のうち、版をまたぐ動かし方の筋書きに出てこない操作の名前を、CrossUses の順に返す。
+// 段の Version は、CrossDirections のどれか1つの送り先の組で、CrossRoute がその段を送る版と比べる。
+func MissingCrossUses(ops Operations, scenarios []Scenario) ([]string, error) {
+	type routed struct {
+		scenario Scenario
+		route    []string
+	}
+	var candidates []routed
+	for _, s := range scenarios {
+		if !s.HasMode(ModeCross) {
+			continue
+		}
+		for _, direction := range CrossDirections {
+			route, err := CrossRoute(s, direction)
+			if err != nil {
+				return nil, err
+			}
+			candidates = append(candidates, routed{s, route})
+		}
+	}
+	var missing []string
+	for _, u := range CrossUses {
+		found := func(seq []UseStep) bool {
+			return slices.ContainsFunc(candidates, func(c routed) bool {
+				return containsSequence(ops, c.scenario.Steps, c.route, seq)
+			})
+		}
+		if !allSequences(u, found) {
+			missing = append(missing, u.Name)
+		}
+	}
+	return missing, nil
+}
+
+// MissingPerfUses は、PerfUses のうち、応答の時間の比べ方の筋書きの最後の段で測っていない操作の名前を、PerfUses の順に返す。
+// 測るのは最後の段だけなので、段の並びの最後は筋書きの最後の段に当たり、それより前は準備の段に出てこなければならない。
+func MissingPerfUses(ops Operations, scenarios []Scenario) []string {
+	var missing []string
+	for _, u := range PerfUses {
+		found := func(seq []UseStep) bool {
+			return slices.ContainsFunc(scenarios, func(s Scenario) bool {
+				if !s.HasMode(ModePerf) || len(s.Steps) == 0 {
+					return false
+				}
+				last := len(s.Steps) - 1
+				return matchStep(ops, s.Steps[last], "", seq[len(seq)-1]) &&
+					containsSequence(ops, s.Steps[:last], nil, seq[:len(seq)-1])
+			})
+		}
+		if !allSequences(u, found) {
+			missing = append(missing, u.Name)
+		}
+	}
+	return missing
+}
+
+// allSequences は、u の段の並びが、すべて found に当たるかを返す。段の並びの無い操作は、当たらないとする。
+func allSequences(u RequiredUse, found func([]UseStep) bool) bool {
+	if len(u.Sequences) == 0 {
+		return false
+	}
+	for _, seq := range u.Sequences {
+		if !found(seq) {
+			return false
+		}
+	}
+	return true
+}
+
+// containsSequence は、段 steps に、seq の条件に当たる段がこの順で出てくるかを返す。route は段ごとに送る版で、nil なら版を見ない。
+// 前から順に、最初に当たる段を選ぶ。どの条件も段1つで決まるので、早く当たる段を選んでも、あとの条件に当たる段は減らない。
+func containsSequence(ops Operations, steps []Step, route []string, seq []UseStep) bool {
+	next := 0
+	for i, step := range steps {
+		if next == len(seq) {
+			break
+		}
+		version := ""
+		if route != nil {
+			version = route[i]
+		}
+		if matchStep(ops, step, version, seq[next]) {
+			next++
+		}
+	}
+	return next == len(seq)
+}
+
+// matchStep は、段 step が条件 want に当たるかを返す。version は、送り先の組がその段を送る版である。
+func matchStep(ops Operations, step Step, version string, want UseStep) bool {
+	if step.Kind() != StepVersion {
+		return false
+	}
+	if !slices.Contains(want.Operations, ops.Lookup(step.Request.Method, step.Request.Path)) {
+		return false
+	}
+	if want.Query != "" {
+		_, query, _ := strings.Cut(step.Request.Path, "?")
+		if !strings.Contains(query, want.Query) {
+			return false
+		}
+	}
+	if want.Accept != "" && !strings.Contains(headerValue(step.Request.Headers, "Accept"), want.Accept) {
+		return false
+	}
+	return want.Version == "" || want.Version == version
+}
+
+// headerValue は、ヘッダの名前の大文字と小文字を区別せずに、headers から name の値を返す。
+func headerValue(headers map[string]string, name string) string {
+	for k, v := range headers {
+		if strings.EqualFold(k, name) {
+			return v
+		}
+	}
+	return ""
+}

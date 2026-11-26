@@ -27,8 +27,8 @@ import (
 
 // requireAllOperations は、TestCoverage_Operations が、仕様書のすべての操作を筋書きに求めるかである。
 // false の間は、progress.md で完了と記したまとまりの操作だけを、そのまとまりの筋書きに求める。
-// 段階4の切り替えの準備で true にする。
-const requireAllOperations = false
+// 段階4の切り替えの準備で true にした。
+const requireAllOperations = true
 
 // TestCompare_Scenarios は、backend/compat/scenarios/ の、比べる動かし方の筋書きを、Java 版と Go 版で動かして比べる。
 // 筋書きは、まとまりの spec で足す。筋書きが1つも無いうちは、イメージを組み立てずに、その旨を記録して終える。
@@ -83,6 +83,25 @@ func TestCoverage_Operations(t *testing.T) {
 	}
 	for _, op := range harness.MissingOperations(ops, scenarios, completed, requireAllOperations) {
 		t.Errorf("操作 %s(%s %s、まとまり %d)が、比べる動かし方の筋書きに出てきません", op.ID, op.Method, op.Path, op.Group)
+	}
+	// 版をまたぐ確認と応答の時間の比べ方の筋書きに、design.md の「cross」の10と「perf」の11の操作がそろっていることを確かめる
+	cross, err := harness.LoadScenarios(harness.ScenariosDir(), harness.ModeCross)
+	if err != nil {
+		t.Fatal(err)
+	}
+	crossMissing, err := harness.MissingCrossUses(ops, cross)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range crossMissing {
+		t.Errorf("操作「%s」が、版をまたぐ動かし方の筋書きに出てきません", name)
+	}
+	perf, err := harness.LoadScenarios(harness.ScenariosDir(), harness.ModePerf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range harness.MissingPerfUses(ops, perf) {
+		t.Errorf("操作「%s」を、応答の時間の比べ方の筋書きの最後の段で測っていません", name)
 	}
 	t.Logf("仕様書の操作 %d 個、完了と記したまとまり %v、比べる動かし方の筋書き %d 個、すべての操作を求める = %v",
 		len(ops), completed, len(scenarios), requireAllOperations)

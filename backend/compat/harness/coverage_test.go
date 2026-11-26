@@ -251,3 +251,238 @@ func TestComparer_DropRepeatedRedisIgnoresTTL(t *testing.T) {
 		t.Errorf("違い = %+v, want 1段目と3段目の2件", got)
 	}
 }
+
+// useStep は、筋書きの版に送る段である。to が ToOther なら、送り先の組でもう一方の版へ移る。
+func useStep(name, method, path, accept, to string) Step {
+	s := Step{Name: name, To: to, Request: Request{Method: method, Path: path}}
+	if accept != "" {
+		s.Request.Headers = map[string]string{"Accept": accept}
+	}
+	return s
+}
+
+// crossScenarios は、design.md の「cross」の10の操作をそろえた、版をまたぐ動かし方の筋書きである。
+func crossScenarios() []Scenario {
+	cross := func(name string, steps ...Step) Scenario {
+		// 最後の段は、送り先の組がその前の版と違う版に送る、保存した内容を読む段である
+		steps = append(steps, useStep("read", "GET", "/api/users/me", "", ""))
+		return Scenario{Name: name, Group: GroupAuth, Modes: []string{ModeCompare, ModeCross}, Steps: steps}
+	}
+	return []Scenario{
+		cross("save", useStep("login", "POST", "/api/auth/login", "", ""),
+			useStep("update-basic", "PUT", "/api/resumes/{resumeID}/basic", "", "")),
+		cross("export", useStep("login", "POST", "/api/auth/login", "", ""),
+			useStep("pdf", "POST", "/api/resumes/{resumeID}/export", "application/pdf, application/json", "")),
+		cross("refresh-logout", useStep("login", "POST", "/api/auth/login", "", ""),
+			useStep("refresh", "POST", "/api/auth/token/refresh", "", ""), useStep("logout", "POST", "/api/auth/logout", "", "")),
+		cross("two-factor", useStep("login", "POST", "/api/auth/login", "", ""), useStep("verify", "POST", "/api/auth/2fa/verify", "", "")),
+		cross("password-reset", useStep("request", "POST", "/api/auth/password/reset/request", "", ""),
+			useStep("verify", "POST", "/api/auth/password/reset/verify", "", ""), useStep("reset", "POST", "/api/auth/password/reset", "", "")),
+		cross("register", useStep("register", "POST", "/api/auth/register", "", ""),
+			useStep("verify", "POST", "/api/auth/email-verification/verify", "", "")),
+		cross("google", useStep("start", "GET", "/api/auth/oidc/authorize?provider=google", "", ""),
+			useStep("callback", "GET", "/api/auth/oidc/callback?code={code}&state={state}", "", "")),
+		cross("github", useStep("start", "GET", "/api/auth/oidc/authorize?provider=github", "", ""),
+			useStep("callback", "GET", "/api/auth/oidc/callback?code={code}&state={state}", "", "")),
+		cross("backup", useStep("login", "POST", "/api/auth/login", "", ""),
+			useStep("backup", "GET", "/api/resumes/{resumeID}/backup", "application/json", ""),
+			useStep("delete", "DELETE", "/api/resumes/{resumeID}", "", ""),
+			useStep("restore", "POST", "/api/resumes/restore", "", ToOther)),
+	}
+}
+
+// replaceScenario は、scenarios の写しで、名前が name の筋書きを s に替える。
+func replaceScenario(scenarios []Scenario, name string, s Scenario) []Scenario {
+	out := slices.Clone(scenarios)
+	for i := range out {
+		if out[i].Name == name {
+			out[i] = s
+		}
+	}
+	return out
+}
+
+func useNames(uses []RequiredUse) []string {
+	var out []string
+	for _, u := range uses {
+		out = append(out, u.Name)
+	}
+	return out
+}
+
+// usesHaveRealOperations は、決めた操作の ID が、すべて仕様書にあることを確かめる。書き誤りで確かめる操作が減らないようにするためである。
+func usesHaveRealOperations(t *testing.T, ops Operations, uses []RequiredUse) {
+	t.Helper()
+	known := map[string]bool{}
+	for _, op := range ops {
+		known[op.ID] = true
+	}
+	for _, u := range uses {
+		if len(u.Sequences) == 0 {
+			t.Errorf("%s: 段の並びがありません", u.Name)
+		}
+		for _, seq := range u.Sequences {
+			for _, step := range seq {
+				for _, id := range step.Operations {
+					if !known[id] {
+						t.Errorf("%s: 操作 %s は仕様書にありません", u.Name, id)
+					}
+				}
+			}
+		}
+	}
+}
+
+// 要件13の受入基準6: 版をまたぐ動かし方の筋書きに、design.md の「cross」の10の操作がそろっていなければ、足りない操作を返す。
+func TestCoverageJudge_CrossOperationsMissing(t *testing.T) {
+	ops := realOperations(t)
+	if got := len(CrossUses); got != 10 {
+		t.Errorf("版をまたぐ確認に求める操作 = %d, want 10", got)
+	}
+	usesHaveRealOperations(t, ops, CrossUses)
+	all := crossScenarios()
+	missing := func(scenarios []Scenario) []string {
+		t.Helper()
+		got, err := MissingCrossUses(ops, scenarios)
+		if err != nil {
+			t.Fatalf("MissingCrossUses: %v", err)
+		}
+		return got
+	}
+	if got := missing(all); len(got) != 0 {
+		t.Fatalf("10がそろっているのに、足りない操作 = %v", got)
+	}
+	if got := missing(nil); !slices.Equal(got, useNames(CrossUses)) {
+		t.Errorf("筋書きが無いとき、足りない操作 = %v, want 10のすべて", got)
+	}
+	drop := func(name string) []Scenario {
+		return slices.DeleteFunc(slices.Clone(all), func(s Scenario) bool { return s.Name == name })
+	}
+	withSteps := func(name string, steps ...Step) []Scenario {
+		for _, s := range all {
+			if s.Name == name {
+				s.Steps = steps
+				return replaceScenario(all, name, s)
+			}
+		}
+		t.Fatalf("筋書き %s がありません", name)
+		return nil
+	}
+	login := useStep("login", "POST", "/api/auth/login", "", "")
+	read := useStep("read", "GET", "/api/users/me", "", "")
+	for name, tc := range map[string]struct {
+		scenarios []Scenario
+		want      []string
+	}{
+		"ログインせずに保存する": {
+			withSteps("save", useStep("update-basic", "PUT", "/api/resumes/{resumeID}/basic", "", ""), read),
+			[]string{"ログインしたままの利用者の保存"},
+		},
+		"Markdown だけを出力する": {
+			withSteps("export", login,
+				useStep("markdown", "GET", "/api/resumes/{resumeID}/export", "text/markdown, application/json", ""), read),
+			[]string{"PDF の出力"},
+		},
+		"ログアウトとトークンの更新が無い": {drop("refresh-logout"), []string{"ログアウト", "トークンの更新"}},
+		"ログインせずに2段階認証のコードを送る": {
+			withSteps("two-factor", useStep("verify", "POST", "/api/auth/2fa/verify", "", ""), read),
+			[]string{"2段階認証"},
+		},
+		"再設定のトークンを確かめない": {
+			withSteps("password-reset", useStep("request", "POST", "/api/auth/password/reset/request", "", ""),
+				useStep("reset", "POST", "/api/auth/password/reset", "", ""), read),
+			[]string{"パスワードの再設定"},
+		},
+		"確認を登録より前に送る": {
+			withSteps("register", useStep("verify", "POST", "/api/auth/email-verification/verify", "", ""),
+				useStep("register", "POST", "/api/auth/register", "", ""), read),
+			[]string{"新規の登録のメールアドレスの確認"},
+		},
+		"GitHub でのログインが無い": {drop("github"), []string{"Google と GitHub でのログイン"}},
+		// to: other が無いと、交互の組だけが版をまたぐ。交互の組は、1つ目の段を Java 版に送るので、2つ目の段の書き出しを Go 版に、
+		// 3つ目の段の戻しを Java 版に送る
+		"戻す段が交互の組でだけ版をまたぐ": {
+			withSteps("backup", login,
+				useStep("backup", "GET", "/api/resumes/{resumeID}/backup", "application/json", ""),
+				useStep("restore", "POST", "/api/resumes/restore", "", ""), read),
+			[]string{"Java 版で書き出したバックアップを Go 版で戻すこと"},
+		},
+		"戻す段が書き出した版と同じ版に届く": {
+			withSteps("backup", login,
+				useStep("backup", "GET", "/api/resumes/{resumeID}/backup", "application/json", ""),
+				useStep("delete", "DELETE", "/api/resumes/{resumeID}", "", ""),
+				useStep("restore", "POST", "/api/resumes/restore", "", ""),
+				useStep("read-resume", "GET", "/api/resumes/{resumeID}", "", ToOther)),
+			[]string{"Go 版で書き出したバックアップを Java 版で戻すこと", "Java 版で書き出したバックアップを Go 版で戻すこと"},
+		},
+	} {
+		if got := missing(tc.scenarios); !slices.Equal(got, tc.want) {
+			t.Errorf("%s: 足りない操作 = %v, want %v", name, got, tc.want)
+		}
+	}
+	// 比べる動かし方だけの筋書きは、版をまたぐ確認に数えない
+	compareOnly := slices.Clone(all)
+	for i := range compareOnly {
+		compareOnly[i].Modes = []string{ModeCompare}
+	}
+	if got := missing(compareOnly); !slices.Equal(got, useNames(CrossUses)) {
+		t.Errorf("比べる動かし方だけの筋書きのとき、足りない操作 = %v, want 10のすべて", got)
+	}
+}
+
+// perfScenarios は、design.md の「perf」の11の操作を、それぞれ最後の段で測る筋書きである。
+func perfScenarios() []Scenario {
+	perf := func(name string, last Step) Scenario {
+		return Scenario{
+			Name: name, Group: GroupResumes, Modes: []string{ModePerf},
+			Steps: []Step{useStep("login", "POST", "/api/auth/login", "", ""), last},
+		}
+	}
+	return []Scenario{
+		{Name: "login", Group: GroupAuth, Modes: []string{ModePerf}, Steps: []Step{useStep("login", "POST", "/api/auth/login", "", "")}},
+		perf("refresh", useStep("refresh", "POST", "/api/auth/token/refresh", "", "")),
+		perf("user-info", useStep("me", "GET", "/api/users/me", "", "")),
+		perf("list", useStep("list", "GET", "/api/resumes", "", "")),
+		perf("get", useStep("get", "GET", "/api/resumes/{resumeID}", "", "")),
+		perf("basic", useStep("basic", "PUT", "/api/resumes/{resumeID}/basic", "", "")),
+		perf("career", useStep("career", "POST", "/api/resumes/{resumeID}/careers", "", "")),
+		perf("pdf", useStep("pdf", "POST", "/api/resumes/{resumeID}/export", "application/pdf, application/json", "")),
+		perf("markdown", useStep("markdown", "GET", "/api/resumes/{resumeID}/export", "text/markdown, application/json", "")),
+		perf("backup", useStep("backup", "GET", "/api/resumes/{resumeID}/backup", "application/json", "")),
+		perf("restore", useStep("restore", "POST", "/api/resumes/restore", "", "")),
+	}
+}
+
+// 要件9の受入基準7: 応答の時間の比べ方の筋書きが、design.md の「perf」の11の操作を最後の段で測っていなければ、足りない操作を返す。
+func TestCoverageJudge_PerfOperationsMissing(t *testing.T) {
+	ops := realOperations(t)
+	if got := len(PerfUses); got != 11 {
+		t.Errorf("応答の時間を比べる操作 = %d, want 11", got)
+	}
+	usesHaveRealOperations(t, ops, PerfUses)
+	all := perfScenarios()
+	if got := MissingPerfUses(ops, all); len(got) != 0 {
+		t.Fatalf("11がそろっているのに、足りない操作 = %v", got)
+	}
+	if got := MissingPerfUses(ops, nil); !slices.Equal(got, useNames(PerfUses)) {
+		t.Errorf("筋書きが無いとき、足りない操作 = %v, want 11のすべて", got)
+	}
+	// 職歴の追加の段が、測る最後の段でなく、準備の段にある
+	notLast := all[6]
+	notLast.Steps = []Step{notLast.Steps[1], notLast.Steps[0]}
+	if got := MissingPerfUses(ops, replaceScenario(all, "career", notLast)); !slices.Equal(got, []string{"職歴の追加"}) {
+		t.Errorf("職歴の追加を準備の段で送るとき、足りない操作 = %v, want [職歴の追加]", got)
+	}
+	// 出力の形は、Accept の行で見分ける
+	markdownOnly := all[7]
+	markdownOnly.Steps = []Step{all[7].Steps[0], useStep("markdown", "POST", "/api/resumes/{resumeID}/export", "text/markdown, application/json", "")}
+	if got := MissingPerfUses(ops, replaceScenario(all, "pdf", markdownOnly)); !slices.Equal(got, []string{"PDF の出力"}) {
+		t.Errorf("PDF を測る筋書きが Markdown を求めるとき、足りない操作 = %v, want [PDF の出力]", got)
+	}
+	// 版をまたぐ動かし方の筋書きは、応答の時間の比べ方に数えない
+	crossOnly := all[10]
+	crossOnly.Modes = []string{ModeCross}
+	if got := MissingPerfUses(ops, replaceScenario(all, "restore", crossOnly)); !slices.Equal(got, []string{"バックアップの戻し"}) {
+		t.Errorf("戻しが版をまたぐ動かし方の筋書きにだけあるとき、足りない操作 = %v, want [バックアップの戻し]", got)
+	}
+}

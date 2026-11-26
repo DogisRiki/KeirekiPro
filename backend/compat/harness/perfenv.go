@@ -26,6 +26,9 @@ type PerfEnv struct {
 	*Stack
 	// URL は、テストの処理から届く backend の URL である。
 	URL string
+	// Startup は、backend の起動から /healthz が 200 を返すまでの時間である。Go 版のイメージを置いたときだけ測り、
+	// 測らないときは 0 である。
+	Startup time.Duration
 
 	backend *Container
 	client  *http.Client
@@ -38,7 +41,7 @@ func StartPerfEnv(ctx context.Context, env *Env, images Images, version string, 
 	if err != nil {
 		return nil, err
 	}
-	ctr, url, _, err := startBackend(ctx, env, version, be, stack.backing)
+	ctr, url, startup, err := startBackend(ctx, env, version, be, stack.backing)
 	if err == nil {
 		err = stack.registerRedirects(ctx)
 	}
@@ -46,7 +49,7 @@ func StartPerfEnv(ctx context.Context, env *Env, images Images, version string, 
 		_ = stack.Close()
 		return nil, err
 	}
-	return &PerfEnv{Stack: stack, URL: url, backend: ctr, client: NewHTTPClient()}, nil
+	return &PerfEnv{Stack: stack, URL: url, Startup: startup, backend: ctr, client: NewHTTPClient()}, nil
 }
 
 // MemoryPeak は、backend のコンテナの、起動してからのメモリの最大(バイト)を返す。

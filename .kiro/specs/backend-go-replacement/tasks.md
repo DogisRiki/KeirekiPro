@@ -460,30 +460,27 @@
   - 受入基準とテストの対応: 要件7の受入基準3(承認が要る理由と、main に入れたときに本番で起きることを示す)は、`gh pr view` で読んだ PR の本文で確かめる
   - _要件: 7.3_
 
-- [ ] 8. 50の操作の確認を必須にし、応答の時間を測る(PR 4-3)
-- [ ] 8.1 50の操作がすべて筋書きに出てくることを必須にする
+- [x] 8. 50の操作の確認を必須にし、応答の時間を測る(PR 4-3)
+- [x] 8.1 50の操作がすべて筋書きに出てくることを必須にする
 
   Claude は、タスク3.10で作った定数 `requireAllOperations` を `true` にする。Claude は、`TestCoverage_Operations` に、design.md の「cross」の10の操作がそれぞれ `modes` に `cross` を持つ筋書きに出てくることと、design.md の「perf」の11の操作がそれぞれ `modes` に `perf` を持つ筋書きに出てくることの確認を足す。足りない筋書きがあれば、Claude は、その筋書きを足す。
   - 完了の確かめ方: `run-check.sh backend-go go test -tags compat -run TestCoverage ./compat/...` が成功する
   - 受入基準とテストの対応: 要件9の受入基準1(画面が使うすべての操作を同じにする)は `TestCoverage_Operations` で、要件13の受入基準6(切り替えの前に版をまたぐ確認がある)と要件9の受入基準7(決めた操作の時間を比べる)の筋書きがそろっていることは、判定の関数の単体テストに足す `TestCoverageJudge_CrossOperationsMissing` と `TestCoverageJudge_PerfOperationsMissing` で確かめる
   - _要件: 9.1, 9.7, 13.6_
-  - _保留: PR 4-2 が main に入ったあと、所有者が `/kiro-impl backend-go-replacement` を打った会話で、Claude が大タスク8を行う_
 
-- [ ] 8.2 応答の時間を測り、幅を超えた操作を直す
+- [x] 8.2 応答の時間を測り、幅を超えた操作を直す
 
   Claude は、`run-check.sh backend-go make compat-perf` を動かし、11の操作の95パーセンタイルと、PDF の同時2件のメモリの最大と、起動の時間を `progress.md` に書く。幅を超えた操作があれば、Claude は、要件9の受入基準7のとおりに Go 版を直して測り直し、直せなければ操作と測った値を所有者に報告する。メモリが 1792MB を超えたら、PDF の同時の数を1に下げて測り直し、それでも超えたら所有者に報告する。
   - 完了の確かめ方: `make compat-perf` が成功し、progress.md に測った値の表がある
   - 受入基準とテストの対応: 要件9の受入基準7(主な操作の応答の時間を Java 版と比べ、決めた幅に収める)は、`perf_test.go` の `TestPerf_AllOperationsWithinTolerance`、`TestPerf_PDFMemoryWithin1792MB` で確かめる
   - _要件: 9.7_
-  - _保留: 8.1 と同じ_
 
-- [ ] 8.3 品質チェックと Java 版と Go 版を比べる検査を通し、変えた動きの一覧と手順書を所有者に示して PR を出す
+- [x] 8.3 品質チェックと Java 版と Go 版を比べる検査を通し、変えた動きの一覧と手順書を所有者に示して PR を出す
 
   Claude は、`/verify-backend` と `run-check.sh backend-go make check` と `make compat` と `make compat-cross` を通して PR を出す。Claude は、PR を出したときの返事で、`changed-behaviors.yaml` の全体と runbook.md を所有者に示す。
   - 完了の確かめ方: `make check` と `make compat` と `make compat-cross` が成功し、PR の CI の `backend-test` が成功する
   - 受入基準とテストの対応: 要件9の受入基準6(切り替えの前に一覧を見られる)は、テストでなく、所有者への返事に一覧の全体を載せたことで確かめる
   - _要件: 9.6_
-  - _保留: 8.1 と同じ_
 
 - [ ] 9. 本番の切り替えを確かめて記録する(段階5)
 - [ ] 9.1 切り替えの前に、手元で Go 版に繋いだ画面を所有者に確かめてもらう

@@ -3,6 +3,7 @@
 package compat
 
 import (
+	"sync"
 	"testing"
 
 	"github.com/DogisRiki/KeirekiPro/backend/compat/harness"
@@ -40,6 +41,12 @@ func TestPerf_SelfPairRuns(t *testing.T) {
 	if envs[harness.VersionJava].DBConn == envs[harness.VersionGo].DBConn {
 		t.Fatalf("2つの版が同じデータベースにつながっています: %s", envs[harness.VersionGo].DBConn)
 	}
+	// 両方の位置に置いた Go 版の本番のイメージは、起動の時間を測られている
+	for _, version := range []string{harness.VersionJava, harness.VersionGo} {
+		if d := envs[version].Startup; d <= 0 || d > harness.GoStartupLimit {
+			t.Errorf("版 %s の位置の Go 版の起動の時間 = %s, want 0 より長く %s 以内", version, d, harness.GoStartupLimit)
+		}
+	}
 
 	opts := harness.PerfOptions{Warmup: 2, Samples: 10, Concurrency: harness.PerfConcurrency}
 	report, err := harness.RunPerf(t.Context(), envs, []harness.Scenario{writeScenario(t, selfPerf)}, opts)
@@ -65,30 +72,82 @@ func TestPerf_SelfPairRuns(t *testing.T) {
 	}
 }
 
-// TestPerf_Scenarios は、backend/compat/scenarios/ の、応答の時間の比べ方の筋書きを、Java 版と Go 版で測って比べる。
-// 筋書きは、まとまりの spec で足す。筋書きが1つも無いうちは、イメージを組み立てずに、その旨を記録して終える。
-func TestPerf_Scenarios(t *testing.T) {
+// scenariosPerf は、backend/compat/scenarios/ の、応答の時間の比べ方の筋書きを、Java 版と Go 版で測った結果である。
+// TestPerf_AllOperationsWithinTolerance と TestPerf_PDFMemoryWithin1792MB は、同じ測った結果を確かめる。
+// 測るのに時間がかかるので、先に動いたテストが1回だけ測り、あとのテストは測った結果を使う。
+var scenariosPerf struct {
+	once     sync.Once
+	report   harness.PerfReport
+	measured bool
+}
+
+// measureScenarios は、応答の時間の比べ方の筋書きを測った結果を返す。まだ測っていなければ、ここで測る。
+// 測るのに失敗したときは、測ったテストがその理由で失敗し、あとのテストも失敗にする。
+func measureScenarios(t *testing.T) harness.PerfReport {
+	t.Helper()
+	scenariosPerf.once.Do(func() {
+		scenariosPerf.report = runScenariosPerf(t)
+		scenariosPerf.measured = true
+	})
+	if !scenariosPerf.measured {
+		t.Fatal("応答の時間の比べ方の筋書きを測れませんでした。先に測ったテストの記録に理由があります")
+	}
+	return scenariosPerf.report
+}
+
+// runScenariosPerf は、応答の時間の比べ方の筋書きを、Java 版と Go 版で測り、報告を ReportDir に書く。
+// 筋書きが1つも無いときは、50の操作を求める TestCoverage_Operations が失敗するので、ここでも失敗にする。
+func runScenariosPerf(t *testing.T) harness.PerfReport {
+	t.Helper()
 	scenarios, err := harness.LoadScenarios(harness.ScenariosDir(), harness.ModePerf)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(scenarios) == 0 {
-		t.Logf("%s に、応答の時間の比べ方の筋書きがまだありません", harness.ScenariosDir())
-		return
+		t.Fatalf("%s に、応答の時間の比べ方の筋書きがありません", harness.ScenariosDir())
 	}
 	images := buildImages(t, harness.ImageJava, harness.ImageGo, harness.ImagePostgres, harness.ImageRedis, harness.ImageFakeAWS, harness.ImageFakeOIDC)
 	envs := startPerfEnvs(t, images, map[string]harness.Backend{
 		harness.VersionJava: harness.JavaBackend(images[harness.ImageJava]),
 		harness.VersionGo:   harness.GoBackend(images[harness.ImageGo]),
 	})
+	t.Logf("Go 版の起動から /healthz が 200 を返すまでの時間: %s", envs[harness.VersionGo].Startup)
 	report, err := harness.RunPerf(t.Context(), envs, scenarios, harness.DefaultPerfOptions)
 	if err != nil {
 		t.Fatal(err)
 	}
 	writePerfReport(t, report)
 	t.Logf("応答の時間の比べ方の結果:\n%s", report)
-	if report.Failed() {
-		t.Errorf("上限を超えた操作があります:\n%s", report)
+	return report
+}
+
+// 要件9の受入基準7: 筋書きで測ったすべての操作で、Go 版の95パーセンタイルが、Java 版の95パーセンタイルの1.2倍に20ミリ秒を
+// 足した時間を超えない。
+func TestPerf_AllOperationsWithinTolerance(t *testing.T) {
+	report := measureScenarios(t)
+	if len(report.Latencies) == 0 {
+		t.Fatal("応答の時間を測った操作がありません")
+	}
+	for _, l := range report.Latencies {
+		if !l.Within() {
+			t.Errorf("操作 %s: Go 版の95パーセンタイル %s が、上限 %s を超えました。Java 版の95パーセンタイルは %s",
+				l.Operation, l.Go, l.Limit(), l.Java)
+		}
+	}
+}
+
+// 要件9の受入基準7: PDF の出力を同時に2件送ったときの Go 版のコンテナのメモリの最大が、タスク定義の
+// memoryReservation 1792MB を超えない。
+func TestPerf_PDFMemoryWithin1792MB(t *testing.T) {
+	report := measureScenarios(t)
+	if len(report.Memories) == 0 {
+		t.Fatal("メモリの最大を測った操作がありません。PDF の出力の筋書きに measure_memory: true を書きます")
+	}
+	for _, m := range report.Memories {
+		if !m.Within() {
+			t.Errorf("操作 %s: 同時に %d 件送ったときの Go 版のコンテナのメモリの最大 %d バイトが、上限 %d バイトを超えました",
+				m.Operation, harness.PerfConcurrency, m.PeakBytes, harness.MemoryLimitBytes)
+		}
 	}
 }
 

@@ -1,0 +1,45 @@
+# 職歴を追加する応答の時間を測る筋書き。6つの欄のすべてに項目を持つ経歴書に、職歴を1件足す段を繰り返して測る。
+# 同じ経歴書に職歴を足し続けると、期間の重なりと職歴の数の上限で断られるので、prepare_each を真にし、回ごとに前の段を送り直す。
+# user1 がログインし、経歴書の一覧の最初の経歴書の ID を取り出して消してから、経歴書 401 のバックアップのファイル
+# fixtures/backups/java-401.json を戻し、戻した経歴書の ID を取り出す。fixtures が users/basic.sql と resumes/fonts.sql
+# なので、user1 の経歴書は、最初は経歴書 401 の1件で、2回目からは前の回に戻した経歴書の1件である。
+# 足す職歴の期間は、経歴書 401 の2つの職歴(2012年4月から2018年3月と、2018年4月から今)と重ならないようにする。
+name: resumes-perf-create-career
+group: 3
+fixtures: [users/basic.sql, resumes/fonts.sql]
+modes: [perf]
+prepare_each: true
+steps:
+  - name: login-user1
+    request:
+      method: POST
+      path: /api/auth/login
+      json: {email: user1@example.com, password: Passw0rd!}
+    expect: {status: 200}
+  - name: list-resumes
+    request:
+      method: GET
+      path: /api/resumes
+    capture: {resumeID: '$.resumes[0].id'}
+    expect: {status: 200}
+  - name: delete-first
+    request:
+      method: DELETE
+      path: /api/resumes/{resumeID}
+      csrf: true
+    expect: {status: 204}
+  - name: restore-401
+    request:
+      method: POST
+      path: /api/resumes/restore
+      csrf: true
+      json_file: backups/java-401.json
+    capture: {restoredID: $.id}
+    expect: {status: 201}
+  - name: create-career
+    request:
+      method: POST
+      path: /api/resumes/{restoredID}/careers
+      csrf: true
+      json: {companyName: 株式会社はかる, startDate: '2008-04', endDate: '2012-03', isActive: false}
+    expect: {status: 201}
