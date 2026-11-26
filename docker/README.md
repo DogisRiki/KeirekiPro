@@ -11,9 +11,12 @@ Google および GitHub で OAuth アプリケーションを登録し、それ�
 
 - リダイレクトURIの設定には以下を使用する：
   - 開発用: `http://localhost:8080/api/auth/oidc/callback`
+  - Go 版の backend の開発サーバ用: `http://localhost:8081/api/auth/oidc/callback`
   - Claude が画面確認で起動する開発サーバ用: `http://localhost:<18080+枠の番号>/api/auth/oidc/callback`
     - 枠の番号は1から、同時に走らせる数の設定 `git config keirekipro.parallelSlots`(初期値1)までである。設定が1なら `http://localhost:18081/api/auth/oidc/callback` だけを足す。設定の数を増やしたときは、増えた番号の分も足す
-    - Google は、登録した戻り先とポートまで同じでないとログインを断る(`エラー 400: redirect_uri_mismatch`)ので、Google Cloud Console の「承認済みのリダイレクト URI」に、枠ごとに足す
+- Google と GitHub は、どちらも、登録した戻り先とポートまで同じでないとログインを断る。そのため、上のリダイレクトURIを、すべて1つずつ登録する
+  - Google: Google Cloud Console の OAuth クライアントの「承認済みのリダイレクト URI」に、「URI を追加」を押して1つずつ足す。足していない戻り先では、Google が `エラー 400: redirect_uri_mismatch` の画面を出す
+  - GitHub: OAuth App の設定の「Redirect URIs」の節で、「Add redirect URI」を押して増えた「Redirect URI」の欄に1つずつ足し、「Update application」を押す。OAuth App は戻り先を10個まで登録できる([GitHub の説明](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/creating-an-oauth-app))。足していない戻り先では、GitHub がログインを断って `error=redirect_uri_mismatch` を付けて戻す
 
 ---
 
