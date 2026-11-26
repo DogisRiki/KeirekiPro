@@ -23,6 +23,18 @@ on:
         required: false
         type: boolean
         default: true
+      # 出荷する backend の版。current は今の本番と同じ版をもう一度出荷する。
+      # java と go は、その版に切り替えるか、その版に戻す。
+      # 版の決め方は .github/scripts/backend-deploy-impl.sh にある。
+      backend_impl:
+        description: 'バックエンドの版(current は今の本番と同じ版、java は Java 版、go は Go 版)'
+        required: false
+        type: choice
+        options:
+          - current
+          - java
+          - go
+        default: current
       deploy_frontend:
         description: 'フロントエンドをデプロイする'
         required: false
@@ -150,6 +162,8 @@ jobs:
       id-token: write
       contents: read
     uses: ./.github/workflows/backend-deploy.yaml
+    with:
+      backend_impl: ${{ inputs.backend_impl }}
     secrets: inherit
 
   frontend-release:

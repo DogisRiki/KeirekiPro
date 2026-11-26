@@ -101,6 +101,12 @@ jobs:
       - name: Test backend-test verdict
         run: bash .github/scripts/tests/test-backend-test-verdict.sh
 
+      # 本番の出荷(backend-deploy.yaml)が、出荷する backend の版と、Dockerfile と、
+      # イメージのタグを決めるスクリプトのテスト。決め方を誤ると、所有者が選んだのと
+      # 違う版が本番に出るので、PR の時点で流す。外部の道具もネットワークも使わない
+      - name: Test backend deploy implementation
+        run: bash .github/scripts/tests/test-backend-deploy-impl.sh
+
       # ラベルの一覧のファイル(.github/labels.json)の検証と、その合わせ込みのスクリプトのテスト。
       # 誤ったファイルを main に入れないために、PRの時点で流す。.github/ を変えるPRでも
       # 承認を待たずに動くよう、承認待ちで失敗するステップより前に置く。

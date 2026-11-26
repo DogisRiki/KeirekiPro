@@ -15,6 +15,12 @@ on:
         description: 'ECS service name'
         required: false
         type: string
+      # 出荷する版(current、java、go のどれか)。release.yaml の入力 backend_impl を受け取る。
+      backend_impl:
+        description: 'Backend implementation to deploy (current, java, or go)'
+        required: false
+        type: string
+        default: current
 
 permissions:
   id-token: write
@@ -70,17 +76,55 @@ jobs:
             } >> "$GITHUB_OUTPUT"
           fi
 
+      # サービスが今動かしているタスク定義を読み、出荷する版と、Dockerfile と、
+      # 組み立ての文脈と、イメージのタグを決める。current のときは、今のイメージのタグが
+      # go- で始まれば Go 版、そうでなければ Java 版になる。決めた版はワークフローの要約に書く。
+      # ファミリーの最新のリビジョンは読まない。terraform はタスク定義を変えるたびに
+      # イメージを :placeholder にしたリビジョンを登録し、サービスは前のリビジョンのまま動くため、
+      # 最新のリビジョンのタグでは、Go 版で動いている本番を Java 版と取り違える。
+      # 版を決められないときは、イメージを組み立てる前にここで止まり、本番は今の版のまま動く。
+      - name: Decide backend implementation
+        id: impl
+        env:
+          BACKEND_IMPL: ${{ inputs.backend_impl }}
+          GIT_SHA: ${{ github.sha }}
+          ECS_CLUSTER_NAME: ${{ steps.vars.outputs.ecs_cluster_name }}
+          ECS_SERVICE_NAME: ${{ steps.vars.outputs.ecs_service_name }}
+        run: |
+          TASK_DEF_ARN=$(aws ecs describe-services \
+            --cluster "$ECS_CLUSTER_NAME" \
+            --services "$ECS_SERVICE_NAME" \
+            --query 'services[0].taskDefinition' \
+            --output text)
+          aws ecs describe-task-definition \
+            --task-definition "$TASK_DEF_ARN" \
+            --query 'taskDefinition' \
+            --output json > current-task-definition.json
+          CURRENT_IMAGE=$(jq -r --arg CONTAINER "$CONTAINER_NAME" \
+            '.containerDefinitions[] | select(.name == $CONTAINER) | .image' \
+            current-task-definition.json)
+          export CURRENT_IMAGE
+          bash .github/scripts/backend-deploy-impl.sh
+          {
+            echo "### Backend の出荷の版"
+            echo ""
+            echo "- 入力 backend_impl: \`${BACKEND_IMPL}\`"
+            echo "- サービスが動かしているタスク定義: \`${TASK_DEF_ARN}\`"
+            echo "- そのイメージ: \`${CURRENT_IMAGE}\`"
+            echo "- 出荷する版: \`$(sed -n 's/^impl=//p' "$GITHUB_OUTPUT" | tail -n 1)\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
       # GitHub のキャッシュは読みも書きもしない(#749)。書き出しに1分半ほどかかるうえ、
       # キャッシュが当たると Dockerfile.prod の apt-get upgrade が飛ばされ、
       # ビルドのたびに OS の部品の修正版を取り込む意図(#453)が崩れるため。
       - name: Build and push Docker image
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
-          context: ./backend
-          file: ./docker/backend/Dockerfile.prod
+          context: ${{ steps.impl.outputs.context }}
+          file: ${{ steps.impl.outputs.dockerfile }}
           push: true
           tags: |
-            ${{ steps.vars.outputs.ecr_repository_url }}:${{ github.sha }}
+            ${{ steps.vars.outputs.ecr_repository_url }}:${{ steps.impl.outputs.image_tag }}
           platforms: linux/arm64
           provenance: false
 
@@ -97,7 +141,7 @@ jobs:
 
       - name: Update task definition with new image
         run: |
-          NEW_IMAGE="${{ steps.vars.outputs.ecr_repository_url }}:${{ github.sha }}"
+          NEW_IMAGE="${{ steps.vars.outputs.ecr_repository_url }}:${{ steps.impl.outputs.image_tag }}"
 
           jq --arg IMAGE "$NEW_IMAGE" --arg CONTAINER "${{ env.CONTAINER_NAME }}" \
             '.containerDefinitions = [.containerDefinitions[] | if .name == $CONTAINER then .image = $IMAGE else . end]' \
