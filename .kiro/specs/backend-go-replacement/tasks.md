@@ -439,7 +439,7 @@
   - 受入基準とテストの対応: 要件5の受入基準2(1回の出荷で切り替えと戻しができる)と要件1の受入基準4(どの PR のあとでも出荷が成功する)は、actionlint が通る2つのワークフローで入力が渡ることと、タスク7.1の `test-backend-deploy-impl.sh` で確かめる
   - _要件: 1.3, 1.4, 5.2_
 
-- [ ] 7.3 切り替えの手順書を書く (並行可)
+- [x] 7.3 切り替えの手順書を書く (並行可)
 
   Claude は、`.kiro/specs/backend-go-replacement/runbook.md` に、次の6つを書く。
   1. Claude は、切り替え、Java 版に戻す、もう一度切り替える、の3つの場面ごとに、design.md の「runbook.md」の6つの操作を、押す場所か打つコマンドと、うまくいったかの見分け方と一緒に書く
@@ -853,6 +853,8 @@
 - Go 版の文の割合の数え方(タスク5.5で go-test-coverage v2.22.0 のソースを読んで確かめた): 週次の集計は、`make coverage` が下限と比べる値と同じ範囲で数える。数えるのは go.mod の module の名前に /internal/ を続けたパスの下だけで、`.testcoverage.yml` の exclude: の paths: の正規表現にモジュールの名前を除いたパスが当たるファイルは数えない。同じ箇所は1つとして数え、小数第1位に四捨五入する。go-test-coverage と違うのは、ソースのコメントで外す指定(coverage-ignore)を読まないことと、パッケージの最上位の関数リテラルの中の箇所も数えることの2つで、今のコードはどちらも使っていない
 - Claude は、ci.yaml の backend-go の仕事に、成果物 backend-go-coverage(coverage.out)を残すステップを足した(タスク5.5)。週次の集計が Go 版の値を読む元が、ほかに無いためである。design の「PR 2-5 で変えるファイル」の一覧は collect-coverage.sh だけで、ci.yaml はその外にある。Claude は、このことを、タスク5.6で所有者にファイルを置いてもらうときと PR の本文に書く
 - 出荷の版を決めるスクリプトのテスト(タスク7.1で分かったこと): `test-backend-deploy-impl.sh` を CI で流すステップが、タスク7.1から7.4に無かった。テストが CI で流れないと、版の決め方を壊す変更が PR で止まらないため、Claude は、タスク7.2で `guardrails.yaml` の「Test backend-test verdict」の次にステップを足し、タスク7.4で所有者にファイルを置いてもらうときと PR の本文にこのことを書く
+- 出荷の版を決めるときに読むタスク定義(タスク7.2の確認役の指摘で分かったこと): terraform はタスク定義を変えるたびにイメージを `:placeholder` にしたリビジョンを登録し、サービスは前のリビジョンのまま動く(`terraform/modules/ecs/main.tf` の `ignore_changes`)。そのため、`backend-deploy.yaml` はファミリーの最新のリビジョンでなく、`aws ecs describe-services` で得たサービスが動かしているタスク定義を読む。tasks.md のタスク7.2の本文の「最初のステップで `aws ecs describe-task-definition` を動かして今のタスク定義を読み」とは、ステップの位置(「Set variables」のあと)と読むタスク定義が違うので、タスク7.4で PR の本文にこの食い違いと理由を書く
+- README.md は改行が CRLF で入っている。`sed -i` で書き換えると全部の行の改行が LF に変わり、README の全部の行が差分に出る(タスク7.2で起きた)。README は Edit で書き換える
 
 ## 完了条件(全タスク共通)
 
