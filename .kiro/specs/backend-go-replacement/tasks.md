@@ -460,7 +460,7 @@
   - 受入基準とテストの対応: 要件7の受入基準3(承認が要る理由と、main に入れたときに本番で起きることを示す)は、`gh pr view` で読んだ PR の本文で確かめる
   - _要件: 7.3_
 
-- [ ] 8. 50の操作の確認を必須にし、応答の時間を測る(PR 4-3)
+- [x] 8. 50の操作の確認を必須にし、応答の時間を測る(PR 4-3)
 - [x] 8.1 50の操作がすべて筋書きに出てくることを必須にする
 
   Claude は、タスク3.10で作った定数 `requireAllOperations` を `true` にする。Claude は、`TestCoverage_Operations` に、design.md の「cross」の10の操作がそれぞれ `modes` に `cross` を持つ筋書きに出てくることと、design.md の「perf」の11の操作がそれぞれ `modes` に `perf` を持つ筋書きに出てくることの確認を足す。足りない筋書きがあれば、Claude は、その筋書きを足す。
@@ -475,7 +475,7 @@
   - 受入基準とテストの対応: 要件9の受入基準7(主な操作の応答の時間を Java 版と比べ、決めた幅に収める)は、`perf_test.go` の `TestPerf_AllOperationsWithinTolerance`、`TestPerf_PDFMemoryWithin1792MB` で確かめる
   - _要件: 9.7_
 
-- [ ] 8.3 品質チェックと Java 版と Go 版を比べる検査を通し、変えた動きの一覧と手順書を所有者に示して PR を出す
+- [x] 8.3 品質チェックと Java 版と Go 版を比べる検査を通し、変えた動きの一覧と手順書を所有者に示して PR を出す
 
   Claude は、`/verify-backend` と `run-check.sh backend-go make check` と `make compat` と `make compat-cross` を通して PR を出す。Claude は、PR を出したときの返事で、`changed-behaviors.yaml` の全体と runbook.md を所有者に示す。
   - 完了の確かめ方: `make check` と `make compat` と `make compat-cross` が成功し、PR の CI の `backend-test` が成功する

@@ -374,33 +374,47 @@ func TestCoverageJudge_CrossOperationsMissing(t *testing.T) {
 		scenarios []Scenario
 		want      []string
 	}{
-		"ログインせずに保存する": {withSteps("save", useStep("update-basic", "PUT", "/api/resumes/{resumeID}/basic", "", ""), read),
-			[]string{"ログインしたままの利用者の保存"}},
-		"Markdown だけを出力する": {withSteps("export", login,
-			useStep("markdown", "GET", "/api/resumes/{resumeID}/export", "text/markdown, application/json", ""), read),
-			[]string{"PDF の出力"}},
+		"ログインせずに保存する": {
+			withSteps("save", useStep("update-basic", "PUT", "/api/resumes/{resumeID}/basic", "", ""), read),
+			[]string{"ログインしたままの利用者の保存"},
+		},
+		"Markdown だけを出力する": {
+			withSteps("export", login,
+				useStep("markdown", "GET", "/api/resumes/{resumeID}/export", "text/markdown, application/json", ""), read),
+			[]string{"PDF の出力"},
+		},
 		"ログアウトとトークンの更新が無い": {drop("refresh-logout"), []string{"ログアウト", "トークンの更新"}},
-		"ログインせずに2段階認証のコードを送る": {withSteps("two-factor", useStep("verify", "POST", "/api/auth/2fa/verify", "", ""), read),
-			[]string{"2段階認証"}},
-		"再設定のトークンを確かめない": {withSteps("password-reset", useStep("request", "POST", "/api/auth/password/reset/request", "", ""),
-			useStep("reset", "POST", "/api/auth/password/reset", "", ""), read),
-			[]string{"パスワードの再設定"}},
-		"確認を登録より前に送る": {withSteps("register", useStep("verify", "POST", "/api/auth/email-verification/verify", "", ""),
-			useStep("register", "POST", "/api/auth/register", "", ""), read),
-			[]string{"新規の登録のメールアドレスの確認"}},
+		"ログインせずに2段階認証のコードを送る": {
+			withSteps("two-factor", useStep("verify", "POST", "/api/auth/2fa/verify", "", ""), read),
+			[]string{"2段階認証"},
+		},
+		"再設定のトークンを確かめない": {
+			withSteps("password-reset", useStep("request", "POST", "/api/auth/password/reset/request", "", ""),
+				useStep("reset", "POST", "/api/auth/password/reset", "", ""), read),
+			[]string{"パスワードの再設定"},
+		},
+		"確認を登録より前に送る": {
+			withSteps("register", useStep("verify", "POST", "/api/auth/email-verification/verify", "", ""),
+				useStep("register", "POST", "/api/auth/register", "", ""), read),
+			[]string{"新規の登録のメールアドレスの確認"},
+		},
 		"GitHub でのログインが無い": {drop("github"), []string{"Google と GitHub でのログイン"}},
 		// to: other が無いと、交互の組だけが版をまたぐ。交互の組は、1つ目の段を Java 版に送るので、2つ目の段の書き出しを Go 版に、
 		// 3つ目の段の戻しを Java 版に送る
-		"戻す段が交互の組でだけ版をまたぐ": {withSteps("backup", login,
-			useStep("backup", "GET", "/api/resumes/{resumeID}/backup", "application/json", ""),
-			useStep("restore", "POST", "/api/resumes/restore", "", ""), read),
-			[]string{"Java 版で書き出したバックアップを Go 版で戻すこと"}},
-		"戻す段が書き出した版と同じ版に届く": {withSteps("backup", login,
-			useStep("backup", "GET", "/api/resumes/{resumeID}/backup", "application/json", ""),
-			useStep("delete", "DELETE", "/api/resumes/{resumeID}", "", ""),
-			useStep("restore", "POST", "/api/resumes/restore", "", ""),
-			useStep("read-resume", "GET", "/api/resumes/{resumeID}", "", ToOther)),
-			[]string{"Go 版で書き出したバックアップを Java 版で戻すこと", "Java 版で書き出したバックアップを Go 版で戻すこと"}},
+		"戻す段が交互の組でだけ版をまたぐ": {
+			withSteps("backup", login,
+				useStep("backup", "GET", "/api/resumes/{resumeID}/backup", "application/json", ""),
+				useStep("restore", "POST", "/api/resumes/restore", "", ""), read),
+			[]string{"Java 版で書き出したバックアップを Go 版で戻すこと"},
+		},
+		"戻す段が書き出した版と同じ版に届く": {
+			withSteps("backup", login,
+				useStep("backup", "GET", "/api/resumes/{resumeID}/backup", "application/json", ""),
+				useStep("delete", "DELETE", "/api/resumes/{resumeID}", "", ""),
+				useStep("restore", "POST", "/api/resumes/restore", "", ""),
+				useStep("read-resume", "GET", "/api/resumes/{resumeID}", "", ToOther)),
+			[]string{"Go 版で書き出したバックアップを Java 版で戻すこと", "Java 版で書き出したバックアップを Go 版で戻すこと"},
+		},
 	} {
 		if got := missing(tc.scenarios); !slices.Equal(got, tc.want) {
 			t.Errorf("%s: 足りない操作 = %v, want %v", name, got, tc.want)
@@ -419,8 +433,10 @@ func TestCoverageJudge_CrossOperationsMissing(t *testing.T) {
 // perfScenarios は、design.md の「perf」の11の操作を、それぞれ最後の段で測る筋書きである。
 func perfScenarios() []Scenario {
 	perf := func(name string, last Step) Scenario {
-		return Scenario{Name: name, Group: GroupResumes, Modes: []string{ModePerf},
-			Steps: []Step{useStep("login", "POST", "/api/auth/login", "", ""), last}}
+		return Scenario{
+			Name: name, Group: GroupResumes, Modes: []string{ModePerf},
+			Steps: []Step{useStep("login", "POST", "/api/auth/login", "", ""), last},
+		}
 	}
 	return []Scenario{
 		{Name: "login", Group: GroupAuth, Modes: []string{ModePerf}, Steps: []Step{useStep("login", "POST", "/api/auth/login", "", "")}},
