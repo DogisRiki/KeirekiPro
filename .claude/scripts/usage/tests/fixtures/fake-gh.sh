@@ -28,6 +28,7 @@
 # - calls.log: 呼ばれた引数を、1回の呼び出しにつき1行、空白でつないで書く
 #
 # 偽の gh は、答えられない呼び出し(知らないオプション、--jq など)を、2 で終わらせる。
+# ただし gh pr list の --jq は、集計が本文を絞る式(PR_BODY_JQ)だけを受け、本物の gh と同じ形で答える。
 # テストが偽の gh の答えない呼び出しに気づかないまま通ることを防ぐためである。
 # --paginate は、ページごとの JSON を区切らずに続けて出す(本物の gh の --slurp 無しの形)。
 # =====================================================================
@@ -41,6 +42,8 @@ use Fcntl qw(:flock);
 use POSIX qw(strftime);
 
 my $JSON = JSON::PP->new->utf8->canonical;
+# 集計が gh pr list の本文を絞る --jq の式。usage.sh と report.pl の PR_BODY_JQ と同じ文字列にする
+use constant PR_BODY_JQ => 'map(.body = ([(.body // "") | scan("(?m)^(?:Closes|Refs:) #[0-9]+")] | join("\n")))';
 
 sub unsupported {
     print STDERR "fake-gh: unsupported: $_[0]\n";
@@ -331,9 +334,12 @@ sub cmd_pr {
     if ($sub eq 'list') {
         my ($o) = parse(\@rest, { '--json' => 'json', '--state' => 'state', '-s' => 'state', '--base' => 'base', '-B' => 'base',
             '--head' => 'head', '-H' => 'head', '--search' => 'search', '-S' => 'search', '--limit' => 'limit', '-L' => 'limit',
-            '-R' => 'repo', '--repo' => 'repo' }, {});
+            '-R' => 'repo', '--repo' => 'repo', '--jq' => 'jq' }, {});
         my $state = one($o, 'state') // 'open';
         unsupported("--state $state") unless $state =~ /\A(open|merged|all)\z/;
+        # --jq は、集計が本文を絞るのに使う式(usage.sh と report.pl の PR_BODY_JQ)だけを受ける
+        my $jq = one($o, 'jq');
+        unsupported("--jq $jq") if defined $jq && $jq ne PR_BODY_JQ;
         my ($base, $head) = (one($o, 'base'), one($o, 'head'));
         my $since;
         if (defined(my $s = one($o, 'search'))) {
@@ -347,7 +353,12 @@ sub cmd_pr {
         } sort { $b->{number} <=> $a->{number} } @{ $db->{prs} };
         splice @r, limit_of($o) if @r > limit_of($o);
         my $f = json_fields($o);
-        out([ map { pr_cli($_, $f) } @r ]);
+        my @l = map { pr_cli($_, $f) } @r;
+        # 本物の gh と同じく、本文を、行の頭の Closes #<N> と Refs: #<N> の行だけを改行でつないだものにする
+        if (defined $jq) {
+            $_->{body} = join "\n", ($_->{body} // '') =~ /^(?:Closes|Refs:) #[0-9]+/mg for @l;
+        }
+        out(\@l);
     } elsif ($sub eq 'view') {
         my ($o, $pos) = parse(\@rest, { '--json' => 'json', '-R' => 'repo', '--repo' => 'repo' }, {});
         my $p = find_pr($pos->[0] // 0) or fail_with('no pull requests found for ' . ($pos->[0] // ''));

@@ -3,8 +3,10 @@
 # extract.pl: Claude Code の会話の記録(JSONL)から、集計に要る数と名前だけを抜き出す部品
 #
 # 呼び出し方:
-#   perl extract.pl --state <記録の置き場所> --all --skip-locked|--wait --repo <本体の作業フォルダ>
-#     このリポジトリの全部の会話の記録の続きを読み、<記録の置き場所>/extract/ に書く
+#   perl extract.pl --state <記録の置き場所> --all --skip-locked|--wait [--jobs <数>] --repo <本体の作業フォルダ>
+#     このリポジトリの全部の会話の記録の続きを読み、<記録の置き場所>/extract/ に書く。
+#     --jobs に2以上を渡すと、先に --skip-locked の子をその数(上限 MAX_JOBS)だけ同時に動かして記録の鍵を読み分けさせ、
+#     子がすべて終わってから、子が読み残した記録の鍵を、渡した --skip-locked か --wait のとおりに読む
 #   perl extract.pl hook
 #     フックの入力を標準入力で受け、hook_event_name ごとの仕事をする(run_hook)。失敗しても 0 で終わり、
 #     理由を <記録の置き場所>/extract/errors.log に残す
@@ -62,6 +64,9 @@ my %READ_CMDS = map { $_ => 1 } qw(cat head tail sed nl less more);
 # データのファイルの wait_categories(待ちの分類)と stage_marks(段階の印の名前)。run_all が読む
 my ($WAIT_CATS, $STAGE_MARKS, $REVIEW_AGENTS);
 
+# --jobs で同時に動かす子の数の上限。20個の論理コアの PC で全部の記録を読み直したとき、12本で1本のときの3分の1ほどの時間になった
+use constant MAX_JOBS => 12;
+
 # 錠を待つ上限、錠を古いとみなす時間、読んでいる間に錠の時刻を直す間隔(秒)。テストだけが環境変数で短くする
 my $LOCK_WAIT  = test_secs(q(KP_USAGE_TEST_LOCK_WAIT),  600);
 my $LOCK_STALE = test_secs(q(KP_USAGE_TEST_LOCK_STALE), 60);
@@ -86,11 +91,13 @@ sub main {
         'all'         => \$o{all},
         'skip-locked' => \$o{skip_locked},
         'wait'        => \$o{wait},
+        'jobs=i'      => \$o{jobs},
         'repo=s'      => \$o{repo},
     );
     if (!$ok || @args || !$o{all} || !defined $o{state} || !defined $o{repo}
-        || ($o{skip_locked} ? 1 : 0) + ($o{wait} ? 1 : 0) != 1) {
-        print STDERR "usage: perl extract.pl --state <記録の置き場所> --all --skip-locked|--wait --repo <本体の作業フォルダ>\n";
+        || ($o{skip_locked} ? 1 : 0) + ($o{wait} ? 1 : 0) != 1
+        || (defined $o{jobs} && $o{jobs} < 1)) {
+        print STDERR "usage: perl extract.pl --state <記録の置き場所> --all --skip-locked|--wait [--jobs <数>] --repo <本体の作業フォルダ>\n";
         return 64;
     }
     return run_all(\%o);
@@ -185,7 +192,8 @@ sub hook_session_start {
         open(STDIN, '<', File::Spec->devnull);
         open(STDOUT, '>', File::Spec->devnull);
         POSIX::setsid();
-        { exec($^X, $SELF, '--state', $state, '--all', '--skip-locked', '--repo', $repo) };
+        # 抜き出し方の版が変わったあとの会話の始めでは全部の記録を読み直すので、論理コアの数だけ同時に読み分けさせる
+        { exec($^X, $SELF, '--state', $state, '--all', '--skip-locked', '--jobs', cpu_count(), '--repo', $repo) };
         print STDERR "extract.pl: 裏の --all の呼び出しを起動できない: $!\n";
         POSIX::_exit(1);
     }
@@ -271,7 +279,8 @@ sub run_all {
         }
     }
     my @bases = repo_bases($o->{repo});
-    my (%seen, %repo_keys);
+    # 読む記録の [会話の記録の場所, 記録の鍵] を、読む順に集める
+    my (%seen, %repo_keys, @items);
     for my $projects (project_dirs()) {
         opendir(my $pd, $projects) or next;
         my @dirs = sort grep { !/^\./ && -d "$projects/$_" } readdir $pd;
@@ -287,10 +296,7 @@ sub run_all {
                 # .pos がある記録の鍵は、前にこのリポジトリの会話と見分けたもの
                 next unless -e "$exdir/$key.pos" || is_repo_record($path, \@bases);
                 $repo_keys{$key} = 1;
-                my $rc = with_lock($o, $key, sub {
-                    read_record($path, $key, $exdir) || rewrite_unknown("$exdir/$key.jsonl");
-                });
-                return $rc if $rc;
+                push @items, [$path, $key];
                 # 補助役の記録は、本体の会話の記録と同じフォルダの <sessionId>/subagents/ の下にある
                 my $sub = "$projects/$dir/$key/subagents";
                 opendir(my $sd, $sub) or next;
@@ -299,13 +305,18 @@ sub run_all {
                 for my $af (@agents) {
                     (my $akey = "$key.$af") =~ s/\.jsonl\z//;
                     next if $seen{$akey}++;
-                    $rc = with_lock($o, $akey, sub {
-                        read_record("$sub/$af", $akey, $exdir) || rewrite_unknown("$exdir/$akey.jsonl");
-                    });
-                    return $rc if $rc;
+                    push @items, ["$sub/$af", $akey];
                 }
             }
         }
+    }
+    run_children($o, \@items, $exdir) if ($o->{jobs} // 1) > 1;
+    for my $it (@items) {
+        my ($path, $key) = @$it;
+        my $rc = with_lock($o, $key, sub {
+            read_record($path, $key, $exdir) || rewrite_unknown("$exdir/$key.jsonl");
+        });
+        return $rc if $rc;
     }
     # 会話の記録のファイルが消えた記録の鍵(.pos だけが残る鍵)も、unknown の行を書き直す
     if (opendir(my $ed, $exdir)) {
@@ -317,6 +328,51 @@ sub run_all {
         }
     }
     return write_desktop($exdir, \%repo_keys);
+}
+
+# PC の論理コアの数。分からなければ 1
+sub cpu_count {
+    my $n = `getconf _NPROCESSORS_ONLN 2>/dev/null`;
+    $n = $ENV{NUMBER_OF_PROCESSORS} unless defined $n && $n =~ /\A\s*[1-9][0-9]*\s*\z/;
+    return defined $n && $n =~ /\A\s*([1-9][0-9]*)\s*\z/ ? $1 : 1;
+}
+
+# 読む行が残る記録の鍵が2つ以上あれば、--skip-locked の子を同時に動かし、すべて終わるまで待つ。
+# 子は、読む行が残る記録の鍵だけを、残りの大きい順にたどり、錠を取れた鍵だけを読むので、別々の鍵を読み分ける。
+# 子の終了コードは見ない。子が読めなかった記録の鍵は、このあとの呼び出し元の読み直しが読むか、失敗として返すため
+sub run_children {
+    my ($o, $items, $exdir) = @_;
+    my @todo;
+    for my $it (@$items) {
+        my $size = -s $it->[0] // 0;
+        my $pos = read_pos("$exdir/$it->[1].pos");
+        my $done = ($pos && defined $pos->{version} && $pos->{version} eq EXTRACT_VERSION
+            && -e "$exdir/$it->[1].jsonl" && $size >= $pos->{size}) ? $pos->{offset} : 0;
+        push @todo, [@$it, $size - $done] if $size > $done;
+    }
+    return if @todo < 2;
+    @todo = sort { $b->[2] <=> $a->[2] || $a->[1] cmp $b->[1] } @todo;
+    my $n = $o->{jobs} > MAX_JOBS ? MAX_JOBS : $o->{jobs};
+    $n = @todo if $n > @todo;
+    my $child = { %$o, skip_locked => 1, wait => 0 };
+    my @pids;
+    for (1 .. $n) {
+        my $pid = fork;
+        if (!defined $pid) {
+            print STDERR "extract.pl: 同時に読む子を起動できない: $!\n";
+            last;
+        }
+        if ($pid == 0) {
+            for my $it (@todo) {
+                my ($path, $key) = @$it;
+                eval { with_lock($child, $key, sub { read_record($path, $key, $exdir) }) };
+            }
+            POSIX::_exit(0);
+        }
+        push @pids, $pid;
+    }
+    waitpid($_, 0) for @pids;
+    return;
 }
 
 # 記録の鍵の錠 locks/extract-<記録の鍵> を mkdir で取ってから $work を動かし、終わったら錠を外す
@@ -557,6 +613,8 @@ sub read_record {
         || !defined $pos->{version} || $pos->{version} ne EXTRACT_VERSION) {
         $pos = { offset => 0, size => 0, skipped => 0 };
     }
+    # 前に読んだところから大きさが変わっていなければ、読む行が無いので、開かずに終える
+    return 0 if $pos->{offset} && $size == $pos->{offset} && -e $exf;
     open(my $in, '<:raw', $path) or do {
         print STDERR "extract.pl: 会話の記録を開けない: $path\n";
         return 0;

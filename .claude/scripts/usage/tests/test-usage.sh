@@ -14,6 +14,8 @@ set -u
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
 USAGE="$(cd "$HERE/.." && pwd)/usage.sh"
+# usage.sh が gh pr list の本文を絞る --jq の式(usage.sh の PR_BODY_JQ と同じ)
+JQ='map(.body = ([(.body // "") | scan("(?m)^(?:Closes|Refs:) #[0-9]+")] | join("\n")))'
 TMP_ROOT=$(mktemp -d)
 trap 'rm -rf "$TMP_ROOT"' EXIT
 
@@ -193,6 +195,8 @@ runin() {
 run() { runin "$REPO" "$@"; }
 # 偽の gh が呼ばれた引数を | でつなぐ
 calls() { if [ -f "$FAKE_GH_DIR/calls.log" ]; then tr '\n' '|' <"$FAKE_GH_DIR/calls.log"; fi; }
+# 偽の gh の呼び出しを1行ずつ出す。--jq の式は | を含むので、calls の出力を | で分けずにこれを使う
+calllines() { if [ -f "$FAKE_GH_DIR/calls.log" ]; then cat "$FAKE_GH_DIR/calls.log"; fi; }
 # 標準エラーの行の数
 nlines() { if [ -n "$1" ]; then printf '%s\n' "$1" | wc -l | tr -d ' '; else printf 0; fi; }
 # 標準エラーが usage.sh の日本語の1行かどうか
@@ -278,7 +282,7 @@ issuejson 110 '{"list_pending":true,"report_url":"https://github.com/owner/repo/
 issuejson 111 '{"closed_at":"2026-10-25T05:00:00Z","list_pending":true,"report_url":"https://github.com/owner/repo/issues/111#issuecomment-5","reported_at":"2026-10-26T00:00:00Z","skip":"system-pr"}'
 run pending --session S1
 check "pending が、仕組みが入ったあとに閉じた Issue のうち出していないものを出し、gh issue list と、マージされた PR を読む gh pr list を1回ずつ呼ぶ" \
-    "$RC/$OUT/$(calls)" '0/{"issues":[101,102,107,108,112]}/issue list --state closed --search closed:>=2026-10-23 --limit 200 --json number,closedAt|pr list --state merged --base main --search merged:>=2026-10-23 --limit 1000 --json body|'
+    "$RC/$OUT/$(calls)" '0/{"issues":[101,102,107,108,112]}/issue list --state closed --search closed:>=2026-10-23 --limit 200 --json number,closedAt|pr list --state merged --base main --search merged:>=2026-10-23 --limit 1000 --json body --jq '"$JQ"'|'
 check "閉じる PR がマージされていない Issue を、pending が出さず、集計しない印 no-merged-pr を書く" \
     "$(statejson issues/113.json)/$(statejson issues/114.json)" \
     '{"closed_at":"2026-10-25T09:00:00Z","skip":"no-merged-pr"}/{"closed_at":"2026-10-25T10:00:00Z","skip":"no-merged-pr"}'
@@ -377,7 +381,7 @@ for n in 201 206 207; do recv "$n"; done
 run draft 202 --session S1
 check "閉じる PR がデータのファイルを足したコミットより前にマージされた Issue に、draft が before-system の印を書いて 2 で終わり、集計のコメントを探してから、PR と Issue を report.pl と同じ gh のコマンドで読む" \
     "$RC/$(statejson issues/202.json)/$(calls)" \
-    '2/{"closed_at":"2026-10-25T02:00:00Z","skip":"before-system"}/api --paginate repos/{owner}/{repo}/issues/202/comments|pr list --state all --base main --limit 1000 --json number,state,body,headRefName,mergedAt,mergeCommit|issue view 202 --json state,closedAt|'
+    '2/{"closed_at":"2026-10-25T02:00:00Z","skip":"before-system"}/api --paginate repos/{owner}/{repo}/issues/202/comments|pr list --state all --base main --limit 1000 --json number,state,body,headRefName,mergedAt,mergeCommit --jq '"$JQ"'|issue view 202 --json state,closedAt|'
 run draft 203
 check "閉じる PR がデータのファイルを足したコミットより後にマージされた Issue には、draft が集計しない印を書かない" \
     "$RC/$(statejson issues/203.json)" "0/none"
@@ -770,7 +774,7 @@ check "出してから7日の間の Issue の行が一覧に無いと、list_pen
     "$(statejson issues/120.json | grep -c '"list_pending":true')/$(statejson issues/121.json | grep -c list_pending)/$(statejson issues/122.json | grep -c list_pending)/$(statejson issues/123.json | grep -c list_pending)" "1/0/0/0"
 # gh の呼び出しが、閉じた Issue の一覧とマージされた PR の一覧を読む呼び出しと、本文や欄を付けない gh api の読み取りだけか
 check "session-context が gh で GitHub に書かない" \
-    "$([ -n "$(calls)" ] && printf called)/$(calls | tr '|' '\n' | grep -v '^$' | grep -vcE '^(issue list |pr list --state merged |api )')/$(calls | tr '|' '\n' | grep -cE '^api .*(^| )(-X|--method|-f|-F|--field|--raw-field|--input)( |=|$)')" "called/0/0"
+    "$([ -n "$(calls)" ] && printf called)/$(calllines | grep -v '^$' | grep -vcE '^(issue list |pr list --state merged |api )')/$(calllines | grep -cE '^api .*(^| )(-X|--method|-f|-F|--field|--raw-field|--input)( |=|$)')" "called/0/0"
 check "知らせる文が、usage-report のスキルの手順を指し、所有者に打たせるコマンドを含まない" \
     "$(nlines "$OUT")/$(printf '%s\n' "$OUT" | grep -v "usage-report のスキルの『" | grep -vc '^\[usage\] 会話の相手: 所有者$')/$(printf '%s\n' "$OUT" | grep -cE 'usage\.sh|`|/[a-z]|gh |打')" "3/0/0"
 run session-context

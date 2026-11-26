@@ -816,6 +816,36 @@ check "元の会話の記録のファイルが無い記録の鍵でも、unknown
     "$(kfield "$LSTATE/extract/lk3.jsonl" turn 2 from)/$(kfield "$LSTATE/extract/lk3.jsonl" turn 2 raw)" "owner/undef"
 check "書き直した行と同じ行がファイルの後ろにあるときは、同じ行を2つ残さない" "$(kcount "$LSTATE/extract/lk3.jsonl" turn)" "2"
 
+printf '== --jobs で同時に読むとき\n'
+JHOME="$WORK/jhome"
+JP="$JHOME/.claude/projects/p"
+for i in 1 2 3 4 5 6 7 8; do
+    mkrec "$JP/jb$i.jsonl" "$REPO" "$i"
+done
+mkrec "$JP/jb1/subagents/agent-ja1.jsonl" "$REPO" 0
+mkrec "$JP/other.jsonl" "$WORK/elsewhere" 0
+jrun() { HOME="$JHOME" USERPROFILE="$JHOME" LOCALAPPDATA="$WORK/nolocal" perl "$EXTRACT" --state "$1" --all --wait "${@:2}" --repo "$REPO"; }
+jrun "$WORK/jstate1"
+r1=$?
+jrun "$WORK/jstate4" --jobs 4
+r4=$?
+same=yes
+for f in "$WORK/jstate1/extract/"*.jsonl "$WORK/jstate1/extract/"*.pos; do
+    cmp -s "$f" "$WORK/jstate4/extract/$(basename "$f")" || same=no
+done
+n1=$(ls "$WORK/jstate1/extract" | wc -l | tr -d ' ')
+n4=$(ls "$WORK/jstate4/extract" | wc -l | tr -d ' ')
+check "--jobs 4 で読んだ記録は、1本で読んだ記録と同じファイルと中身になる" "$r1/$r4/$same/$n4" "0/0/yes/$n1"
+check "--jobs で読んだあとに、錠が残らない" "$(ls "$WORK/jstate4/locks" | wc -l | tr -d ' ')" "0"
+jrun "$WORK/jstate0" --jobs 0 2>/dev/null
+check "--jobs に1より小さい数を渡すと 64 で終わる" "$?" "64"
+mkdir -p "$WORK/jstate5/locks/extract-jb3"
+( sleep 2; rmdir "$WORK/jstate5/locks/extract-jb3" ) &
+KP_USAGE_TEST_LOCK_WAIT=30 jrun "$WORK/jstate5" --jobs 3
+check "--jobs と --wait では、子が飛ばした錠のある記録の鍵を、錠が外れてから読む" \
+    "$?/$(jfile "$WORK/jstate5/extract/jb3.pos" offset)" "0/$(fsize "$JP/jb3.jsonl")"
+wait
+
 printf '== フックから呼ばれたとき\n'
 HHOME="$WORK/hhome"
 HP="$HHOME/.claude/projects/p"

@@ -29,6 +29,9 @@ use Encode ();
 
 # 仕組みが main に入ったコミットを見分けるデータのファイルの、リポジトリの最上位からの場所
 use constant CONFIG_PATH => '.claude/scripts/usage/usage-config.json';
+# PR の一覧の本文を、行の頭の Closes #<N> と Refs: #<N> の行だけに絞る gh の --jq の式(usage.sh の PR_BODY_JQ と同じ)。
+# 本文の全部を受けると約2.7MB になり、JSON::PP で読むのに2分を超えるためである。集計が本文から読むのはこの2つの行だけである
+use constant PR_BODY_JQ => 'map(.body = ([(.body // "") | scan("(?m)^(?:Closes|Refs:) #[0-9]+")] | join("\n")))';
 # spec のフォルダの、リポジトリの最上位からの場所
 use constant SPECS_DIR => '.kiro/specs';
 # 開始と終了の時刻が無いときの、果ての時刻
@@ -209,7 +212,7 @@ sub collect_prs {
     my ($ctx) = @_;
     my $n = $ctx->{n};
     my $out = gh('pr', 'list', '--state', 'all', '--base', 'main', '--limit', '1000',
-        '--json', 'number,state,body,headRefName,mergedAt,mergeCommit');
+        '--json', 'number,state,body,headRefName,mergedAt,mergeCommit', '--jq', PR_BODY_JQ);
     my $list = eval { $JSON->decode($out) };
     die "gh pr list の出力を JSON として読めなかった\n" unless ref $list eq 'ARRAY';
     # ほかの Issue のブランチと終了の時刻を決めるために、PR の一覧の全部を残す

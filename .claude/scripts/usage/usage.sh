@@ -37,6 +37,9 @@ set -u
 HERE="$(cd "$(dirname "$0")" && pwd)"
 GITHUB="$HERE/github.pl"
 CONFIG_PATH=.claude/scripts/usage/usage-config.json
+# PR の一覧の本文を、行の頭の Closes #<N> と Refs: #<N> の行だけに絞る gh の --jq の式(report.pl の PR_BODY_JQ と同じ)。
+# 本文の全部を受けると約2.7MB になり、JSON::PP で読むのに2分を超えるためである。集計が本文から読むのはこの2つの行だけである
+PR_BODY_JQ='map(.body = ([(.body // "") | scan("(?m)^(?:Closes|Refs:) #[0-9]+")] | join("\n")))'
 
 fail() {
     printf 'usage.sh: %s\n' "$1" >&2
@@ -298,7 +301,7 @@ pending_select() {
     # PR を通らずに閉じた Issue を、閉じる PR がマージされたと知らせないためである
     printf '[]\n' >"$STATE/.prs.$$"
     if ! grep -q '"check":{}' "$STATE/.sel.$$"; then
-        gh pr list --state merged --base main --search "merged:>=$since" --limit 1000 --json body >"$STATE/.prs.$$" 2>"$STATE/.gh-err.$$" || {
+        gh pr list --state merged --base main --search "merged:>=$since" --limit 1000 --json body --jq "$PR_BODY_JQ" >"$STATE/.prs.$$" 2>"$STATE/.gh-err.$$" || {
             local why
             why=$(tail -n 1 "$STATE/.gh-err.$$" 2>/dev/null)
             rm -f "$STATE/.gh-err.$$" "$STATE/.sel.$$" "$STATE/.prs.$$"
@@ -370,7 +373,7 @@ cmd_draft() {
     [ $# -eq 1 ] || fail "draft には Issue の番号を1つ渡す。"
     printf '%s' "$1" | grep -Eq '^[1-9][0-9]{0,9}$' && [ "$(printf '%s' "$1" | wc -l | tr -d ' ')" = 0 ] ||
         fail "draft の Issue の番号を、0で始まらない10桁までの数にする。"
-    local n=$1 sysc decision kind mc at rc why
+    local n=$1 sysc decision kind mc at rc why jobs
     ensure_state
     lock_issue "$n"
 
@@ -394,7 +397,7 @@ cmd_draft() {
 
     # 2〜3. PR と Issue を、report.pl の collect_prs と同じ gh のコマンドで読む
     checked "gh で PR の一覧を読めなかった" \
-        gh pr list --state all --base main --limit 1000 --json number,state,body,headRefName,mergedAt,mergeCommit >"$prs"
+        gh pr list --state all --base main --limit 1000 --json number,state,body,headRefName,mergedAt,mergeCommit --jq "$PR_BODY_JQ" >"$prs"
     checked "gh で Issue $n を読めなかった" gh issue view "$n" --json state,closedAt >"$issue"
     # report.pl の collect_prs と同じ決まりで Issue の PR を選び、判定を「種類 タブ 閉じる PR の mergeCommit タブ closedAt」の1行で出す。
     # 空の欄は - にする(read がタブの続きを1つにまとめるため)
@@ -474,9 +477,12 @@ EOF
 
     # 5. この PC の会話の記録の続きを抜き出す。ほかの呼び出しが読んでいる記録は、読み終わるのを待ってから続きを読む。
     # 消した worktree の会話も読むように、--repo には worktree でなく本体の作業フォルダ(共通ディレクトリの親)を渡す。
-    # 途中までしか抜き出していない記録で集計を作らないように、抜き出しに失敗したら集計を作らない
+    # 途中までしか抜き出していない記録で集計を作らないように、抜き出しに失敗したら集計を作らない。
+    # 抜き出し方の版が変わると全部の記録を読み直すので、PC の論理コアの数だけ同時に読み分けさせる
+    jobs=$(getconf _NPROCESSORS_ONLN 2>/dev/null)
+    case "$jobs" in '' | *[!0-9]* | 0) jobs=1 ;; esac
     checked "会話の記録を抜き出せなかった" \
-        perl "$HERE/extract.pl" --state "$STATE" --all --wait --repo "$(dirname "$COMMON")"
+        perl "$HERE/extract.pl" --state "$STATE" --all --wait --jobs "$jobs" --repo "$(dirname "$COMMON")"
 
     # 6. 一覧の過去の行を読み、集計を作って drafts/<N>/ に書く。report.pl は、記録が無ければ 2 で終わる
     checked "gh で一覧の行を読めなかった" github list-read >"$list"
@@ -689,6 +695,10 @@ context_body() {
     ensure_state
     # 上限を超えて止められた本体が残した一時ファイルを、ほかの会話の本体が使い終えたころに消す
     find "$STATE" -maxdepth 1 -name '.ctx-*' -mmin +10 -exec rm -f {} + 2>/dev/null
+    # 止められた本体の pending_select と、止められた draft と publish が残した一時ファイルも消す。
+    # draft は会話の記録を抜き出す間も一時ファイルを持つので、使い終えたとみなすまでを長めの60分にする
+    find "$STATE" -maxdepth 1 \( -name '.sel.*' -o -name '.prs.*' -o -name '.perl-err.*' -o -name '.gh-err.*' \
+        -o -name '.err.*' -o -name '.draft-*' \) -mmin +60 -exec rm -f {} + 2>/dev/null
     trap 'rm -f "$STATE/.ctx-sel.$$" "$STATE/.ctx-rows.$$" "$STATE/.ctx-props.$$"' EXIT
     pending_select "$sys" context >"$STATE/.ctx-sel.$$" || exit 1
     printf '[]\n' >"$STATE/.ctx-rows.$$"
