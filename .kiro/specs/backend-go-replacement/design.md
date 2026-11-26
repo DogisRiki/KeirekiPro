@@ -741,17 +741,32 @@ Claude は、どのデータを使うかを、出力のまとまりの spec で�
 
 #### runbook.md(切り替えの手順書)
 
-対応する要件: 5.3, 5.4, 5.5, 7.1
+対応する要件: 5.3, 5.4, 5.5, 7.1, 7.2
 
-**役割**: `.kiro/specs/backend-go-replacement/runbook.md` は、所有者がする操作を、切り替え、Java 版に戻す、もう一度切り替える、の3つの場面ごとに、順番に書く。Claude は、手順書に、所有者が切り替えの出荷を平日の 08:00 から 20:00 の間に起動し、20:00 に本番が止まる30分前までに出荷を終えることも書く。Claude は、手順書に次の操作を含める。
+**役割**: `.kiro/specs/backend-go-replacement/runbook.md` は、所有者がする操作を、切り替え、Java 版に戻す、もう一度切り替える、の3つの場面ごとに、順番に書く。Claude は、手順書に、所有者が切り替えの出荷を平日の 08:00 から 20:00 の間に起動し、20:00 に本番が止まる30分前までに出荷を終えることも書く。Claude は、手順書に次の6つの操作を含める。切り替えともう一度切り替える場面では、所有者は、操作2の切り替えの前の手元での画面の確認を、操作3の切り替えの出荷より前に行う。
 
 1. 段階4の本番の設定の変更の反映: 所有者は、「移行」の節の「段階ごとの PR」に書いた、terraform のファイルだけを変える PR を本番に反映する2回の手順のとおりに、`terraform-apply.yaml` を動かす。手順書には、この2回の手順を順番に書く。見分け方は、`aws secretsmanager get-secret-value` で読んだ `keirekipro/redis` にキー `redis-username` があること
-2. 切り替えの出荷: Actions の `release` を、`backend_impl` に `go` を選んで起動し、承認する。見分け方は、ワークフローの要約の版が `go` で、`backend` と `frontend` の仕事が成功したこと
-3. Claude への報告の依頼: 所有者は、出荷が終わったら会話で「切り替えた」と書く。見分け方は、Claude が出荷の結果とログを確かめた返事を書くこと
-4. 画面での確認: ログインしたままの画面で経歴書を開き、1つの項目を保存し、PDF を出力する。見分け方は、ログインの画面に戻らず、保存した値が画面を開き直しても残り、PDF が開けること
-5. Java 版に戻す出荷: Actions の `release` を、`backend_impl` に `java` を選んで起動し、承認する。見分け方は、ワークフローの要約の版が `java` で、`backend` の仕事が成功したこと
+2. 切り替えの前の手元での画面の確認: 所有者は、Claude が手元の開発環境で起動した、Go 版に繋いだ画面を、作業PCのブラウザで開く。所有者は、手元の開発環境の利用者でログインし、経歴書を開き、1つの項目を保存し、PDF を出力する。終わったら、所有者は会話で「確かめた」と書く。見分け方は、ログインの画面に戻らず、保存した値が画面を開き直しても残り、PDF が開けること。どれかが違えば、所有者は、違った操作と画面に出た文を会話に書き、切り替えの出荷をしない
+3. 切り替えの出荷: Actions の `release` を、`backend_impl` に `go` を選んで起動し、承認する。見分け方は、ワークフローの要約の版が `go` で、`backend` と `frontend` の仕事が成功したこと
+4. Claude への報告の依頼: 所有者は、出荷が終わったら会話で「切り替えた」と書く。見分け方は、Claude が出荷の結果とログを確かめた返事を書くこと
+5. 画面での確認: ログインしたままの画面で経歴書を開き、1つの項目を保存し、PDF を出力する。見分け方は、ログインの画面に戻らず、保存した値が画面を開き直しても残り、PDF が開けること
+6. Java 版に戻す出荷: Actions の `release` を、`backend_impl` に `java` を選んで起動し、承認する。見分け方は、ワークフローの要約の版が `java` で、`backend` の仕事が成功したこと
 
-**使う部品**: Claude は、所有者の「切り替えた」を受けて、`gh run view` で出荷の結果を読み、`aws ecs describe-services` と `describe-task-definition` で動いているタスクのイメージのタグが `go-` で始まることを確かめ、CloudWatch Logs の `/ecs/keirekipro-backend` で、出荷のあとの Go 版のログに 5xx の行が無いかを読む。Claude は、確かめた結果と、所有者が画面で確かめる操作を、1つの返事で示す。AWS を読む権限が Claude の環境に無いときは、所有者に、打つコマンドを1つずつ示し、結果を貼ってもらう。
+操作2の切り替えの前の手元での画面の確認は、要件7の受入基準1が、所有者がこの置き換えで原則としてする操作として挙げた6つのどれにも当たらない。そこで、Claude は、要件7の受入基準2のとおりに、操作2が要る理由と、Claude が自分でできない理由を添えて、操作2を所有者に頼む。操作2を所有者がする理由は、所有者が Issue #935 の会話で、本番を切り替える前に Go 版の画面を自分の目で確かめると決めたためである。Claude が操作2を所有者の代わりにできない理由は、手元の開発環境の利用者のパスワードは所有者のものであり、Claude はそのパスワードを入れられないためである。
+
+**手元での画面の確認で Claude がすること**: Claude は、操作2の切り替えの前の手元での画面の確認の前と後に、次の9つをする。
+
+1. Claude は、本体のフォルダを main の最新にする。続けて、Claude は、`docker ps -a` で、compose.yaml の `container_name` に書いた名前のコンテナのラベル `com.docker.compose.project` を読み、値が `keirekipro` でないコンテナを、`docker rm -f <コンテナの名前>` で消す。ラベル `com.docker.compose.project` には、compose のプロジェクト名が入る。compose のプロジェクト名とは、`docker compose` が、作ったコンテナを1つの組として扱うために付ける名前である。compose.yaml には `name:` が無いので、プロジェクト名は `docker compose` を打ったフォルダの名前で決まり、本体のフォルダでは `keirekipro`、worktree では worktree のフォルダの名前になる。Claude が `keirekipro` でないコンテナを消す理由は、`start-dev.sh` と `docker compose -p keirekipro` が、プロジェクト `keirekipro` のコンテナしか探さないためである。compose.yaml がコンテナの名前を固定しているので、worktree で作られた同じ名前のコンテナが残っていると、本体のフォルダの `docker compose up` は、名前が重なって失敗する。コンテナを消しても、データベースと部品のデータは、名前を付けたボリュームに残る
+2. Claude は、`docker rm -f backend-go` で、`backend-go` のコンテナを消す。Claude がこのコンテナを消す理由は、このコンテナが、コンテナを作ったときに差し込んだフォルダのコードを読み続け、`docker compose restart` では作り直されないためである。worktree で開発環境を起動したことがあると、`backend-go` のコンテナは worktree のフォルダを差し込んだまま残っている
+3. Claude は、本体のフォルダで `bash start-dev.sh` を動かす。`start-dev.sh` は、無いコンテナを本体のフォルダから作り直して起動し、`backend-go` が `/healthz` に 200 を返すまで待つ
+4. Claude は、`docker inspect backend-go` で、差し込みの元が本体のフォルダの `backend` であることを確かめる
+5. Claude は、`docker stop react` で、`react` のコンテナを止める。Claude がこのコンテナを止めるのは、このコンテナが、動いている間ホストの 5173 を使うためである。このコンテナでは、`start-dev.sh` が起動した、Java 版に繋いだ画面の開発サーバが動いている
+6. Claude は、本体のフォルダで、繋ぎ先を Go 版にした画面の開発サーバを、1回きりのコンテナでホストの 5173 に起動する。コマンドは `docker compose -p keirekipro run -d --rm --name <名前> -p 5173:5173 -e VITE_API_URL=http://localhost:8081/api/ frontend pnpm dev` である。Vite は、起動したときにすでにある環境変数を、`.env.development` の値より先に使う。そのため、画面は、Java 版の 8080 ではなく Go 版の 8081 を呼ぶ。Vite のこの動きは、https://vite.dev/guide/env-and-mode に書かれている。ポートを 5173 にする理由は、Go 版の dev の設定が、CORS の許す送り元を `http://localhost:5173` と API の説明画面に限るためである。続けて、Claude は、所有者が開く URL `http://localhost:5173` を、所有者に示す
+7. Claude は、所有者の「確かめた」を受けて、`docker compose -p keirekipro logs backend-go` で、確認の間の Go 版のログに 5xx の行が無いかを読み、結果を所有者に示す
+8. Claude は、1回きりのコンテナを止め、本体のフォルダで `bash start-dev.sh` を動かして、`react` のコンテナと、Java 版に繋いだ画面の開発サーバを起動し直す。`docker compose start frontend` を使わない理由は、Java 版に繋いだ画面の開発サーバが、コンテナを起動したときに動くプロセスではなく、`start-dev.sh` がコンテナの中で起動したプロセスであり、コンテナを動かし直すだけでは起動しないためである
+9. 所有者が、操作2の見分け方と違った操作と画面に出た文を会話に書いたときは、Claude は、切り替えを進めず、違いの原因を調べて、その原因を直す PR を出す。直した PR が main に入ったら、Claude は操作2をやり直す
+
+**使う部品**: Claude は、所有者の「切り替えた」を受けて、`gh run view` で出荷の結果を読み、`aws ecs describe-services` と `describe-task-definition` で動いているタスクのイメージのタグが `go-` で始まることを確かめ、CloudWatch Logs の `/ecs/keirekipro-backend` で、出荷のあとの Go 版のログに 5xx の行が無いかを読む。Claude は、確かめた結果と、所有者が画面で確かめる操作(操作5)を、1つの返事で示す。AWS を読む権限が Claude の環境に無いときは、所有者に、打つコマンドを1つずつ示し、結果を貼ってもらう。
 
 ### 進め方の記録
 
@@ -1035,11 +1050,14 @@ flowchart TB
     S4a --> Apply1[所有者の terraform apply]
     Apply1 --> S4b[段階4 出荷の版の選び方と手順書と 50の操作の確認と 応答の時間]
     S4b --> Show[変えた動きの一覧を所有者に示す]
-    Show --> S5[段階5 所有者の切り替えの出荷]
+    Show --> Local{段階5 所有者の手元での Go 版の画面の確認}
+    Local -->|違いがある| LocalFix[Go 版を直す PR]
+    LocalFix --> Local
+    Local -->|問題なし| S5[段階5 所有者の切り替えの出荷]
     S5 --> Check{Claude の確認と 所有者の画面での確認}
     Check -->|不具合| Back[所有者の Java 版に戻す出荷]
     Back --> Fix[Go 版を直して比べる検査に通す]
-    Fix --> S5
+    Fix --> Local
     Check -->|問題なし 7日以上| Ask[Claude が消してよいかを尋ねる]
     Ask -->|消してよい| S6[段階6 削除と書き換え]
     Ask -->|まだ| Wait[待つ]

@@ -2,10 +2,10 @@
   "feature_name": "backend-go-replacement",
   "issue": 445,
   "created_at": "2026-11-07T11:52:44Z",
-  "updated_at": "2026-11-16T23:14:51Z",
+  "updated_at": "2026-11-26T00:48:31Z",
   "language": "ja",
   "review_model": "opus",
-  "phase": "tasks-approved",
+  "phase": "tasks-generated",
   "approvals": {
     "requirements": {
       "generated": true,
@@ -17,13 +17,13 @@
       "generated": true,
       "approved": true,
       "approved_by": "DogisRiki",
-      "approved_at": "2026-11-16T21:59:58Z"
+      "approved_at": "2026-11-26T00:48:31Z"
     },
     "tasks": {
       "generated": true,
       "approved": true,
       "approved_by": "DogisRiki",
-      "approved_at": "2026-11-16T23:14:51Z"
+      "approved_at": "2026-11-26T00:48:31Z"
     }
   },
   "approval_history": [
@@ -114,6 +114,22 @@
       "issues": [445],
       "revoked_at": "2026-11-16T12:36:14Z",
       "revoked_for": "設計の見直しで見つかった食い違いによる requirements の直し: 要件10の受入基準1に、PDF の文字の大きさの違いを 0.5pt 以内、表の色の違いを赤と緑と青のそれぞれで 2 以内まで許すことを書き足す"
+    },
+    {
+      "stage": "design",
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-11-16T21:59:58Z",
+      "issues": [445],
+      "revoked_at": "2026-11-25T23:50:00Z",
+      "revoked_for": "Issue #935 の所有者の指示による直し: 本番を Go 版に切り替える前に、所有者が手元の開発環境で Go 版に繋いだ画面を確かめる操作を、切り替えの手順書に足す"
+    },
+    {
+      "stage": "tasks",
+      "approved_by": "DogisRiki",
+      "approved_at": "2026-11-16T23:14:51Z",
+      "issues": [445],
+      "revoked_at": "2026-11-25T23:50:00Z",
+      "revoked_for": "Issue #935 の所有者の指示による直し: 本番を Go 版に切り替える前に、所有者が手元の開発環境で Go 版に繋いだ画面を確かめる操作を、切り替えの手順書に足す"
     }
   ]
 }
