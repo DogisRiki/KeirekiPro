@@ -7,6 +7,10 @@
 #   - poppler-utils: Java 版と Go 版の PDF を比べる検査(pdftotext pdffonts pdftoppm)
 #   - Docker の CLI: 比べる検査と結合テストが dind の Docker を使う
 #   - chromium と fonts-noto-cjk: PDF を作る部品の単体テストと、開発サーバの PDF の出力
+#   - Java 版が使う Noto の4つのフォントのファイル: 経歴書の PDF のテンプレートは、フォントを
+#     Noto Sans JP と Noto Serif JP の名前で指定する。fonts-noto-cjk のフォントは Noto Sans CJK JP と
+#     Noto Serif CJK JP の名前なので、4つのファイルが無いと、開発サーバの PDF が明朝系を選んでも明朝系にならない。
+#     本番のイメージ(Dockerfile.prod)と同じファイルを置く
 # Go のモジュールとビルドのキャッシュは /cache に置き、compose のボリューム backend-go-cache を差し込む。
 FROM docker:29-cli@sha256:34507eb5069d8be82c95dd3b6987d4250fd5fee49b82e2509b7d7a7030740d6d AS docker-cli
 
@@ -18,6 +22,13 @@ RUN apt-get update \
         fonts-noto-cjk \
         poppler-utils \
     && rm -rf /var/lib/apt/lists/*
+
+COPY backend/src/main/resources/fonts/NotoSansJP-Regular.ttf \
+     backend/src/main/resources/fonts/NotoSansJP-Bold.ttf \
+     backend/src/main/resources/fonts/NotoSerifJP-Regular.ttf \
+     backend/src/main/resources/fonts/NotoSerifJP-Bold.ttf \
+     /usr/share/fonts/keirekipro/
+RUN fc-cache -f
 
 COPY --from=docker-cli /usr/local/bin/docker /usr/local/bin/docker
 
