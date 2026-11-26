@@ -424,24 +424,22 @@
   - 受入基準とテストの対応: 要件5の受入基準1(Java 版のままでも動く形で先に入れる)は、`git diff origin/main -- terraform/` の差分と、`plan_only` で動かした `terraform-apply.yaml` の plan の差分に、Java 版が読む値の変更と削除が無いことで確かめる
   - _要件: 5.1_
 
-- [ ] 7. 出荷の版の選び方と切り替えの手順書を入れる(PR 4-2)
-- [ ] 7.1 出荷する版を決めるスクリプトを作る
+- [x] 7. 出荷の版の選び方と切り替えの手順書を入れる(PR 4-2)
+- [x] 7.1 出荷する版を決めるスクリプトを作る
 
   Claude は、`.github/scripts/backend-deploy-impl.sh` とそのテストを、置き場に作る。このスクリプトは、入力 `current` `java` `go` と、今のタスク定義のイメージのタグを受け取り、版と、Dockerfile と、組み立ての文脈 `./backend` と、イメージのタグを返す。返すイメージのタグは、Java 版ではコミットの SHA、Go 版では `go-<SHA>` である。このスクリプトは、入力が `current` のときは、今のタスク定義のイメージのタグが `go-` で始まれば Go 版を、そうでなければ Java 版を選ぶ。
   - 完了の確かめ方: 検査用の写しで、`test-backend-deploy-impl.sh` が成功する
   - 受入基準とテストの対応: 要件5の受入基準2(1回の出荷で切り替えと戻し)は、`test-backend-deploy-impl.sh` の「go を選ぶと Go 版の Dockerfile と go- のタグ」「java を選ぶと Java 版の Dockerfile と SHA のタグ」の場合で、要件1の受入基準3と4(切り替えるまでは Java 版のまま出荷が成功する)と要件5の受入基準7(失敗したら Java 版のまま)は「current で今のタグが SHA なら Java 版」「current で今のタグが go- なら Go 版」の場合で確かめる
   - _要件: 1.3, 1.4, 5.2, 5.7_
-  - _保留: Claude は、大タスク7を、所有者が PR 4-1 を本番に反映したあとに、所有者が `/kiro-impl backend-go-replacement` を打った会話で行う_
 
-- [ ] 7.2 出荷のワークフローに入力 backend_impl を足す
+- [x] 7.2 出荷のワークフローに入力 backend_impl を足す
 
   Claude は、`.github/workflows/release.yaml` と `backend-deploy.yaml` の完成版を、置き場に作る。`release.yaml` は、入力 `backend_impl` を受け取り、`backend-deploy.yaml` に渡す。`backend_impl` の既定の値は `current` である。`backend-deploy.yaml` は、最初のステップで `aws ecs describe-task-definition` を動かして今のタスク定義を読み、タスク7.1の `backend-deploy-impl.sh` で版を決め、決めた版をワークフローの要約に書く。Claude は、`backend-deploy.yaml` のそのあとの4つのステップを変えない。
   - 完了の確かめ方: 検査用の写しで、actionlint と `check-action-pinning.sh` と `node .github/scripts/tests/test-release-gate.mjs` が成功する
   - 受入基準とテストの対応: 要件5の受入基準2(1回の出荷で切り替えと戻しができる)と要件1の受入基準4(どの PR のあとでも出荷が成功する)は、actionlint が通る2つのワークフローで入力が渡ることと、タスク7.1の `test-backend-deploy-impl.sh` で確かめる
   - _要件: 1.3, 1.4, 5.2_
-  - _保留: 7.1 と同じ_
 
-- [ ] 7.3 切り替えの手順書を書く (並行可)
+- [x] 7.3 切り替えの手順書を書く (並行可)
 
   Claude は、`.kiro/specs/backend-go-replacement/runbook.md` に、次の6つを書く。
   1. Claude は、切り替え、Java 版に戻す、もう一度切り替える、の3つの場面ごとに、design.md の「runbook.md」の6つの操作を、押す場所か打つコマンドと、うまくいったかの見分け方と一緒に書く
@@ -454,15 +452,13 @@
   - 受入基準とテストの対応: 要件5の受入基準3と4(切り替えの手順書を作り、出荷の時刻を所有者が選ぶ)と要件7の受入基準1(所有者がする6つの操作)と受入基準2(6つのほかの操作を、理由を添えて所有者に頼む)は、テストでなく、runbook.md の本文で確かめる。手順書は文書なので、テストは無い
   - _要件: 5.3, 5.4, 7.1, 7.2_
   - _対象の部品: runbook.md_
-  - _保留: 7.1 と同じ_
 
-- [ ] 7.4 所有者に置いてもらい、テストを流して PR を出す
+- [x] 7.4 所有者に置いてもらい、テストを流して PR を出す
 
   Claude は、実装のメモの「所有者に置いてもらう」のとおりに、置き場のファイルを所有者に本来の場所へ置いてもらったあと、`.github/scripts/tests/` のテストを Linux のコンテナで流し、shellcheck と actionlint を流して PR を出す。
   - 完了の確かめ方: すべてのテストと shellcheck と actionlint が成功し、PR の本文に「承認が要る理由」と「main に入れたときに本番で起きること」(入力の既定が `current` なので、出荷しても今の版のまま)の欄がある
   - 受入基準とテストの対応: 要件7の受入基準3(承認が要る理由と、main に入れたときに本番で起きることを示す)は、`gh pr view` で読んだ PR の本文で確かめる
   - _要件: 7.3_
-  - _保留: 7.1 と同じ_
 
 - [ ] 8. 50の操作の確認を必須にし、応答の時間を測る(PR 4-3)
 - [ ] 8.1 50の操作がすべて筋書きに出てくることを必須にする
@@ -856,6 +852,9 @@
 - 変異テストの台帳の表(タスク5.4): 既存の5列の表「記録(測定方式つき)」に6列の行を足すと、GitHub の表示が表の頭より多い欄を捨てて「実行」の欄が消える。そこで、見出し「記録(Go 版つき)」の6列の表を別に作って追記し、前回の全件の行は5列と6列の両方の表から探す。段階6で Java 版の欄を消すときは、この6列の表から PIT の列を消す形になる
 - Go 版の文の割合の数え方(タスク5.5で go-test-coverage v2.22.0 のソースを読んで確かめた): 週次の集計は、`make coverage` が下限と比べる値と同じ範囲で数える。数えるのは go.mod の module の名前に /internal/ を続けたパスの下だけで、`.testcoverage.yml` の exclude: の paths: の正規表現にモジュールの名前を除いたパスが当たるファイルは数えない。同じ箇所は1つとして数え、小数第1位に四捨五入する。go-test-coverage と違うのは、ソースのコメントで外す指定(coverage-ignore)を読まないことと、パッケージの最上位の関数リテラルの中の箇所も数えることの2つで、今のコードはどちらも使っていない
 - Claude は、ci.yaml の backend-go の仕事に、成果物 backend-go-coverage(coverage.out)を残すステップを足した(タスク5.5)。週次の集計が Go 版の値を読む元が、ほかに無いためである。design の「PR 2-5 で変えるファイル」の一覧は collect-coverage.sh だけで、ci.yaml はその外にある。Claude は、このことを、タスク5.6で所有者にファイルを置いてもらうときと PR の本文に書く
+- 出荷の版を決めるスクリプトのテスト(タスク7.1で分かったこと): `test-backend-deploy-impl.sh` を CI で流すステップが、タスク7.1から7.4に無かった。テストが CI で流れないと、版の決め方を壊す変更が PR で止まらないため、Claude は、タスク7.2で `guardrails.yaml` の「Test backend-test verdict」の次にステップを足し、タスク7.4で所有者にファイルを置いてもらうときと PR の本文にこのことを書く
+- 出荷の版を決めるときに読むタスク定義(タスク7.2の確認役の指摘で分かったこと): terraform はタスク定義を変えるたびにイメージを `:placeholder` にしたリビジョンを登録し、サービスは前のリビジョンのまま動く(`terraform/modules/ecs/main.tf` の `ignore_changes`)。そのため、`backend-deploy.yaml` はファミリーの最新のリビジョンでなく、`aws ecs describe-services` で得たサービスが動かしているタスク定義を読む。tasks.md のタスク7.2の本文の「最初のステップで `aws ecs describe-task-definition` を動かして今のタスク定義を読み」とは、ステップの位置(「Set variables」のあと)と読むタスク定義が違うので、タスク7.4で PR の本文にこの食い違いと理由を書く
+- README.md は改行が CRLF で入っている。`sed -i` で書き換えると全部の行の改行が LF に変わり、README の全部の行が差分に出る(タスク7.2で起きた)。README は Edit で書き換える
 
 ## 完了条件(全タスク共通)
 
