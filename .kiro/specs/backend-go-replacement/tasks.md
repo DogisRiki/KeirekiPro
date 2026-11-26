@@ -467,7 +467,6 @@
   - 完了の確かめ方: `run-check.sh backend-go go test -tags compat -run TestCoverage ./compat/...` が成功する
   - 受入基準とテストの対応: 要件9の受入基準1(画面が使うすべての操作を同じにする)は `TestCoverage_Operations` で、要件13の受入基準6(切り替えの前に版をまたぐ確認がある)と要件9の受入基準7(決めた操作の時間を比べる)の筋書きがそろっていることは、判定の関数の単体テストに足す `TestCoverageJudge_CrossOperationsMissing` と `TestCoverageJudge_PerfOperationsMissing` で確かめる
   - _要件: 9.1, 9.7, 13.6_
-  - _保留: PR 4-2 が main に入ったあと、所有者が `/kiro-impl backend-go-replacement` を打った会話で、Claude が大タスク8を行う_
 
 - [ ] 8.2 応答の時間を測り、幅を超えた操作を直す
 
@@ -475,7 +474,6 @@
   - 完了の確かめ方: `make compat-perf` が成功し、progress.md に測った値の表がある
   - 受入基準とテストの対応: 要件9の受入基準7(主な操作の応答の時間を Java 版と比べ、決めた幅に収める)は、`perf_test.go` の `TestPerf_AllOperationsWithinTolerance`、`TestPerf_PDFMemoryWithin1792MB` で確かめる
   - _要件: 9.7_
-  - _保留: 8.1 と同じ_
 
 - [ ] 8.3 品質チェックと Java 版と Go 版を比べる検査を通し、変えた動きの一覧と手順書を所有者に示して PR を出す
 
@@ -483,7 +481,6 @@
   - 完了の確かめ方: `make check` と `make compat` と `make compat-cross` が成功し、PR の CI の `backend-test` が成功する
   - 受入基準とテストの対応: 要件9の受入基準6(切り替えの前に一覧を見られる)は、テストでなく、所有者への返事に一覧の全体を載せたことで確かめる
   - _要件: 9.6_
-  - _保留: 8.1 と同じ_
 
 - [ ] 9. 本番の切り替えを確かめて記録する(段階5)
 - [ ] 9.1 切り替えの前に、手元で Go 版に繋いだ画面を所有者に確かめてもらう
