@@ -251,3 +251,37 @@
 レビュー役は、往復1と同じく、`design-review.md` が大きいために、サイクル12 往復2 の節を自分で書き足せなかった。レビュー役は、節の全文を最終応答に書いて返した。実装セッションは、レビュー役の会話の記録からその節をスクリプトで取り出し、1文字も変えずに `design-review.md` の末尾に写した。
 
 指摘は0件で、収束した。
+
+## サイクル13 往復1 への対応(2026-11-26)
+
+- レビュー役のモデル: Opus 5.5(所有者が選んだ)
+- レビュー役が使った量: 120471 トークン
+- 審査の範囲: 前回からの差分
+
+| ID | 処置 | 内容 |
+|---|---|---|
+| D13-1-1 | 修正 | design.md「手元での画面の確認で Claude がすること」を直した。`docker rm -f backend-go` で今のコンテナを消してから、本体のフォルダで `docker compose -p keirekipro up -d --no-deps backend-go` を打って作り直し、`docker inspect backend-go` で差し込みの元が本体のフォルダの `backend` であることを確かめる、と書いた。`react` のコンテナは `docker stop react` で止める、と書いた。restart を使わない理由と、名前で消して止める理由を書いた。compose.yaml の `container_name` と、いま動いている `backend-go` のコンテナの計画の作業フォルダのラベルで確かめた |
+| D13-1-2 | 修正 | design.md「手元での画面の確認で Claude がすること」を直した。1回きりのコンテナを止めたあと、`react` のコンテナを止めていたときは、本体のフォルダで `bash start-dev.sh` を動かして、コンテナと Java 版に繋いだ画面の開発サーバを起動し直す、と書いた。start-dev.sh 171〜173行の `docker compose exec -d` と、compose.yaml の `frontend` に `command` が無いことで確かめた |
+| D13-1-3 | 記録のみ | 操作2を Claude が代われない理由の書き方の指摘。要件7の受入基準2の判定も作るものも変わらない |
+| D13-1-4 | 記録のみ | 操作2の行に開く URL を書く提案。URL は同じ節の「手元での画面の確認で Claude がすること」にあり、Claude が所有者に示すことも書いてある。tasks で書く: タスク9.1 で、Claude が所有者に URL `http://localhost:5173` を示す |
+| D13-1-5 | 記録のみ | 「使う既存の仕組み」に `frontend` のサービスと `start-dev.sh` を足す提案。作るものは変わらない |
+
+## サイクル13 往復2 への対応(2026-11-26)
+
+- レビュー役のモデル: Opus 5.5(所有者が選んだ)
+- レビュー役が使った量: 91445 トークン
+- 審査の範囲: 前回からの差分
+
+| ID | 処置 | 内容 |
+|---|---|---|
+| D13-2-1 | 修正 | design.md「手元での画面の確認で Claude がすること」を9つの箇条に直した。最初に、compose.yaml の `container_name` の名前のコンテナのうち、ラベル `com.docker.compose.project` が `keirekipro` でないものを `docker rm -f` で消し、`backend-go` も消してから、本体のフォルダで `bash start-dev.sh` を動かしてコンテナを作り直す、と書いた。`react` は `docker stop react` で止め、確認のあとは `bash start-dev.sh` で起動し直す。compose.yaml に `name:` と COMPOSE_PROJECT_NAME の設定が無いことと、start-dev.sh 43〜58行の `ensure_containers` がプロジェクトを指定せずに `docker compose ps` で探すことで確かめた。データベースのデータは名前を付けたボリューム `named-db-data` に残る(compose.yaml 195〜206行) |
+| D13-2-2 | 記録のみ | `--build` が無く、Dockerfile が変わると古いイメージのまま動く指摘。コードは差し込みで最新になり、作るものは変わらない |
+| D13-2-3 | 記録のみ | 作り直した `backend-go` が受け付けを始めたかを確かめずに URL を示す指摘。D13-2-1 の直しで、`start-dev.sh` が `/healthz` の 200 を待つ(start-dev.sh 118〜125行)ので、この指摘の場面は無くなった |
+
+## サイクル13 往復3 への対応(2026-11-26)
+
+- レビュー役のモデル: Opus 5.5(所有者が選んだ)
+- レビュー役が使った量: 102537 トークン
+- 審査の範囲: 前回からの差分
+
+指摘は無かった。往復2の D13-2-1 は直ったことを、D13-2-3 は指摘の場面が無くなったことを、レビュー役が確かめた。D13-2-2 は記録のみのまま残した。
