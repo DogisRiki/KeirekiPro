@@ -833,10 +833,10 @@ same=yes
 for f in "$WORK/jstate1/extract/"*.jsonl "$WORK/jstate1/extract/"*.pos; do
     cmp -s "$f" "$WORK/jstate4/extract/$(basename "$f")" || same=no
 done
-n1=$(ls "$WORK/jstate1/extract" | wc -l | tr -d ' ')
-n4=$(ls "$WORK/jstate4/extract" | wc -l | tr -d ' ')
+n1=$(find "$WORK/jstate1/extract" -mindepth 1 -maxdepth 1 | wc -l | tr -d ' ')
+n4=$(find "$WORK/jstate4/extract" -mindepth 1 -maxdepth 1 | wc -l | tr -d ' ')
 check "--jobs 4 で読んだ記録は、1本で読んだ記録と同じファイルと中身になる" "$r1/$r4/$same/$n4" "0/0/yes/$n1"
-check "--jobs で読んだあとに、錠が残らない" "$(ls "$WORK/jstate4/locks" | wc -l | tr -d ' ')" "0"
+check "--jobs で読んだあとに、錠が残らない" "$(find "$WORK/jstate4/locks" -mindepth 1 -maxdepth 1 | wc -l | tr -d ' ')" "0"
 jrun "$WORK/jstate0" --jobs 0 2>/dev/null
 check "--jobs に1より小さい数を渡すと 64 で終わる" "$?" "64"
 mkdir -p "$WORK/jstate5/locks/extract-jb3"
