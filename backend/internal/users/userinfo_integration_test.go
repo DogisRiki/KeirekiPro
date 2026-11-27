@@ -19,14 +19,17 @@ import (
 const testProfileImage = "/profile/image/a.png"
 
 // userInfoService は、テストの Postgres と偽の AWS につなぎ、今の時刻を testNow にした Service を作る。
+// 利用者の行をトランザクションで書くため、テストの Postgres につないだ auth の Service も渡す。
 func userInfoService(t *testing.T) *Service {
 	t.Helper()
+	now := func() time.Time { return testNow }
 	return New(Deps{
 		Pool:        testPool,
+		Auth:        auth.New(auth.Deps{Pool: testPool, Now: now}),
 		S3:          newTestS3(t),
 		Bucket:      testBucket,
 		AWSEndpoint: testAWSEndpoint,
-		Now:         func() time.Time { return testNow },
+		Now:         now,
 	})
 }
 

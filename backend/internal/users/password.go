@@ -19,38 +19,40 @@ type SetEmailAndPasswordInput struct {
 	CurrentPassword *string
 }
 
-// ChangePassword は、Java 版の ChangePasswordUseCase と同じ順で、利用者 userID のパスワードを newPassword に変える。
-// Java 版と同じく、トランザクションを使わない。
+// ChangePassword は、利用者 userID のパスワードを newPassword に変える。利用者の読み書きは1つのトランザクションで行う。
+// 途中で失敗したときに、役割と連携の行が消えたまま残らないためである(Issue #968)。
 //   - 利用者が居なければ、Cookie を消させる 401 の誤りを返す
 //   - 今のパスワードが nowPassword と合わなければ項目 nowPassword に、newPassword と合えば項目 newPassword に文言を集め、
 //     1つでもあれば 400 の入力の誤りを返す。パスワードを持たない利用者では、どちらの照合も合わない
 //   - 新しいパスワードを強さ10でハッシュにして利用者の行を書き、すべての端末のログインの状態を使えなくする
 func (s *Service) ChangePassword(ctx context.Context, userID uuid.UUID, nowPassword, newPassword string) error {
-	q := sqlcgen.New(s.deps.Pool)
-	u, err := auth.LoadUser(ctx, q, userID, auth.ErrCredentialsNotFound(MessageInvalidAccess))
-	if err != nil {
-		return err
-	}
+	err := s.deps.Auth.InTransaction(ctx, func(q *sqlcgen.Queries) error {
+		u, err := auth.LoadUser(ctx, q, userID, auth.ErrCredentialsNotFound(MessageInvalidAccess))
+		if err != nil {
+			return err
+		}
 
-	nowMatches, err := auth.PasswordMatches(nowPassword, u.Row.Password)
-	if err != nil {
-		return err
-	}
-	sameAsNow, err := auth.PasswordMatches(newPassword, u.Row.Password)
-	if err != nil {
-		return err
-	}
-	f := auth.FieldErrors{}
-	f.Check("nowPassword", nowMatches, MessageNowPhraseWrong)
-	f.Check("newPassword", !sameAsNow, MessageNewPhraseSameAsNow)
-	if e := f.Result(); e != nil {
-		return e
-	}
+		nowMatches, err := auth.PasswordMatches(nowPassword, u.Row.Password)
+		if err != nil {
+			return err
+		}
+		sameAsNow, err := auth.PasswordMatches(newPassword, u.Row.Password)
+		if err != nil {
+			return err
+		}
+		f := auth.FieldErrors{}
+		f.Check("nowPassword", nowMatches, MessageNowPhraseWrong)
+		f.Check("newPassword", !sameAsNow, MessageNewPhraseSameAsNow)
+		if e := f.Result(); e != nil {
+			return e
+		}
 
-	if err := s.setPhrase(&u, newPassword); err != nil {
-		return err
-	}
-	if err := auth.SaveUser(ctx, q, u); err != nil {
+		if err := s.setPhrase(&u, newPassword); err != nil {
+			return err
+		}
+		return auth.SaveUser(ctx, q, u)
+	})
+	if err != nil {
 		return err
 	}
 	return s.deps.Auth.InvalidateSessions(ctx, userID)

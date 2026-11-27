@@ -104,8 +104,7 @@ func fullResume() resume.Resume {
 	}
 }
 
-// fullResumeJSON は、fullResume を Java 版の ResumeInfoResponse の項目の順で書いた本文である。プロジェクトの工程は、
-// Java 版と同じく、maintenance に SystemTest の値を、systemTest に Maintenance の値を入れる。技術スタックの中の
+// fullResumeJSON は、fullResume を Java 版の ResumeInfoResponse の項目の順で書いた本文である。技術スタックの中の
 // 並びは、nil を null、空を [] のまま書く。
 const fullResumeJSON = `{"id":"00000000-0000-4000-8000-000000000301","resumeName":"職務経歴書<&>","date":"2026-11-14",` +
 	`"lastName":"山田","firstName":"太郎","createdAt":"2026-11-14T10:23:45.34123748","updatedAt":"2026-11-14T10:23:46.5",` +
@@ -115,7 +114,7 @@ const fullResumeJSON = `{"id":"00000000-0000-4000-8000-000000000301","resumeName
 	`"projects":[{"id":"00000000-0000-4000-8000-000000000501","companyName":"A社","startDate":"2020-01",` +
 	`"endDate":"2021-01","active":false,"name":"案件","overview":"概要","teamComp":"5人","role":"開発","achievement":"成果",` +
 	`"process":{"requirements":true,"basicDesign":false,"detailedDesign":true,"implementation":false,` +
-	`"integrationTest":true,"maintenance":true,"systemTest":false},` +
+	`"integrationTest":true,"maintenance":false,"systemTest":true},` +
 	`"techStack":{"frontend":{"languages":["TypeScript",null],"frameworks":[],"libraries":null,"buildTools":null,` +
 	`"packageManagers":null,"linters":null,"formatters":null,"testingTools":null},` +
 	`"backend":{"languages":null,"frameworks":null,"libraries":null,"buildTools":null,"packageManagers":null,` +
@@ -730,10 +729,9 @@ func TestResumeHandlers_OmitEmpty(t *testing.T) {
 			`"createdAt":"2026-01-02T03:04:05","updatedAt":"2026-01-02T03:04:06"}`))
 }
 
-// TestResumeHandlers_ProcessSwap は、プロジェクトの工程の答えで、Java 版の ResumeInfoResponse と同じく、systemTest の鍵に
-// Maintenance の値を、maintenance の鍵に SystemTest の値を入れることを確かめる(要件1の受入基準1)。ほかの5つの工程は
-// 入れ替えない。
-func TestResumeHandlers_ProcessSwap(t *testing.T) {
+// TestResumeHandlers_Process は、プロジェクトの工程の答えで、どの工程も、保存した値を同じ名前の鍵に入れて答えることを
+// 確かめる(Issue #968)。
+func TestResumeHandlers_Process(t *testing.T) {
 	cases := []struct {
 		process resume.Process
 		want    string
@@ -741,12 +739,12 @@ func TestResumeHandlers_ProcessSwap(t *testing.T) {
 		{
 			process: resume.Process{SystemTest: true},
 			want: `{"requirements":false,"basicDesign":false,"detailedDesign":false,"implementation":false,` +
-				`"integrationTest":false,"maintenance":true,"systemTest":false}`,
+				`"integrationTest":false,"maintenance":false,"systemTest":true}`,
 		},
 		{
 			process: resume.Process{Maintenance: true},
 			want: `{"requirements":false,"basicDesign":false,"detailedDesign":false,"implementation":false,` +
-				`"integrationTest":false,"maintenance":false,"systemTest":true}`,
+				`"integrationTest":false,"maintenance":true,"systemTest":false}`,
 		},
 		{
 			process: resume.Process{Requirements: true, BasicDesign: true, DetailedDesign: true, Implementation: true, IntegrationTest: true},

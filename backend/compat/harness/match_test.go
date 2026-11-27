@@ -325,14 +325,14 @@ func TestLoadChangedBehaviors_CB005HasNoMatch(t *testing.T) {
 			t.Errorf("%s が一覧にありません", id)
 		}
 	}
-	if len(got) != 75 {
-		t.Errorf("一覧の項目は75のはずですが、%d です", len(got))
+	if len(got) != 78 {
+		t.Errorf("一覧の項目は78のはずですが、%d です", len(got))
 	}
 	// CB-022 は、利用者の操作の筋書きの管理者で違いが出るので match を持つ(TestChangedBehaviors_RefreshTokenRoles で確かめる)
 	for _, id := range []string{
 		"CB-005", "CB-007", "CB-008", "CB-009", "CB-010",
 		"CB-013", "CB-014", "CB-015", "CB-016", "CB-017", "CB-018", "CB-019", "CB-020", "CB-021", "CB-023", "CB-025", "CB-026",
-		"CB-027", "CB-075",
+		"CB-027", "CB-075", "CB-077", "CB-078",
 	} {
 		if m := byID[id].Matches; len(m) != 0 {
 			t.Errorf("%s は記録だけの項目のはずですが、match があります: %+v", id, m)
@@ -667,4 +667,33 @@ func TestChangedBehaviors_BackupItems(t *testing.T) {
 			}
 		}
 	})
+}
+
+// TestChangedBehaviors_ProcessSwap は、CB-076 が、経歴書の答えの工程の systemTest と maintenance の値の違いだけを許し、
+// ほかの工程の鍵と、バックアップの JSON の工程の違いを許さないことを確かめる(Issue #968)。
+func TestChangedBehaviors_ProcessSwap(t *testing.T) {
+	got, err := LoadChangedBehaviors(filepath.Join("..", "changed-behaviors.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	step := StepRef{Operation: "getResume", JavaStatus: 200, GoStatus: 200}
+	backup := StepRef{Operation: "backupResume", JavaStatus: 200, GoStatus: 200}
+	tests := []struct {
+		name string
+		diff Diff
+		want string
+	}{
+		{"systemTest の違いを許す", Diff{Step: step, Target: TargetBody, Path: "$.projects[0].process.systemTest"}, "CB-076"},
+		{"maintenance の違いを許す", Diff{Step: step, Target: TargetBody, Path: "$.projects[2].process.maintenance"}, "CB-076"},
+		{"ほかの工程の違いは許さない", Diff{Step: step, Target: TargetBody, Path: "$.projects[0].process.integrationTest"}, ""},
+		{"バックアップの工程の違いは許さない", Diff{Step: backup, Target: TargetBody, Path: "$.resume.projects[0].process.systemTest"}, ""},
+		{"データベースの違いは許さない", Diff{Step: step, Target: TargetDB, Path: "projects"}, ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if id := allowedBy(got, tt.diff); id != tt.want {
+				t.Errorf("allowedBy(%+v) = %q, want %q", tt.diff, id, tt.want)
+			}
+		})
+	}
 }

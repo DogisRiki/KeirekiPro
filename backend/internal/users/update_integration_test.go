@@ -207,22 +207,51 @@ func TestUpdateUserInfo_ReplaceImage(t *testing.T) {
 	})
 }
 
-func TestUpdateUserInfo_ImageKeptOnUsernameError(t *testing.T) {
+// TestUpdateUserInfo_ImageNotPlacedOnInputError は、名前か2段階認証の設定の誤りで断る要求では、新しい画像を置かず、
+// 同じ名前の今の画像を上書きしないことを確かめる(Issue #968)。
+func TestUpdateUserInfo_ImageNotPlacedOnInputError(t *testing.T) {
 	s := userInfoService(t)
-	id := insertUser(t, userRow{})
-	before := loadUser(t, id)
-	image := validPNG(t)
-
-	// 名前の誤りは、2段階認証の設定を確かめる前に処理を止める。2段階認証を使う設定にできない利用者でも、名前の文言だけを返す。
-	err := s.UpdateUserInfo(t.Context(), UpdateInput{UserID: id, Username: strPtr(" 　"), ProfileImage: &image, TwoFactorAuthEnabled: boolPtr(true)})
-	wantInputErrors(t, err, map[string][]string{"username": {MessageUsernameRequired}})
-
-	// Java 版と同じく、置いた画像を消さない。利用者の行は変わらない。
-	key := imageKeyOf(id, "png")
-	if content, _, ok := storedObject(t, key); !ok || !bytes.Equal(content, image.Content) {
-		t.Errorf("画像 %s が残っていない(ある = %v)", key, ok)
+	tests := []struct {
+		name string
+		in   func(id uuid.UUID, image *ImageInput) UpdateInput
+		want map[string][]string
+	}{
+		{
+			// 名前の誤りは、2段階認証の設定を確かめる前に処理を止める。2段階認証を使う設定にできない利用者でも、名前の文言だけを返す。
+			name: "名前の誤り",
+			in: func(id uuid.UUID, image *ImageInput) UpdateInput {
+				return UpdateInput{UserID: id, Username: strPtr(" 　"), ProfileImage: image, TwoFactorAuthEnabled: boolPtr(true)}
+			},
+			want: map[string][]string{"username": {MessageUsernameRequired}},
+		},
+		{
+			name: "2段階認証の設定の誤り",
+			in: func(id uuid.UUID, image *ImageInput) UpdateInput {
+				return UpdateInput{UserID: id, ProfileImage: image, TwoFactorAuthEnabled: boolPtr(true)}
+			},
+			want: map[string][]string{"twoFactorAuthEnabled": {MessageTwoFactorPrerequisiteMissing}},
+		},
 	}
-	wantUnchanged(t, id, before)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			id := insertUser(t, userRow{})
+			current := ImageInput{FileName: "a.png", ContentType: "image/png", Content: pngBytes(t, 2, 2)}
+			if err := s.UpdateUserInfo(t.Context(), UpdateInput{UserID: id, ProfileImage: &current}); err != nil {
+				t.Fatalf("UpdateUserInfo: %v", err)
+			}
+			before := loadUser(t, id)
+
+			image := validPNG(t)
+			err := s.UpdateUserInfo(t.Context(), tt.in(id, &image))
+			wantInputErrors(t, err, tt.want)
+
+			key := imageKeyOf(id, "png")
+			if content, _, ok := storedObject(t, key); !ok || !bytes.Equal(content, current.Content) {
+				t.Errorf("画像 %s が今の画像のまま残っていない(ある = %v)", key, ok)
+			}
+			wantUnchanged(t, id, before)
+		})
+	}
 }
 
 func TestUpdateUserInfo_Username(t *testing.T) {
@@ -324,7 +353,8 @@ func TestUpdateUserInfo_UserGone(t *testing.T) {
 
 func TestUpdateUserInfo_PutFails(t *testing.T) {
 	putErr := errors.New("置き場所に書けない")
-	s := New(Deps{Pool: testPool, S3: &fakeS3{err: putErr}, Bucket: testBucket, Now: func() time.Time { return testNow }})
+	now := func() time.Time { return testNow }
+	s := New(Deps{Pool: testPool, Auth: auth.New(auth.Deps{Pool: testPool, Now: now}), S3: &fakeS3{err: putErr}, Bucket: testBucket, Now: now})
 	id := insertUser(t, userRow{})
 	before := loadUser(t, id)
 	image := validPNG(t)
