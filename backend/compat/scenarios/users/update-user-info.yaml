@@ -121,7 +121,7 @@ steps:
         - {name: username, value: 空白 四郎}
     expect: {status: 200}
   # 画像と空の名前を一度に送ると、名前の誤りで断られる。画像の名前は拡張子を jpeg にし、前の段で置いた .jpg と違う名前で置かせる。
-  # 送った画像は、まだ無かった .jpeg の名前で画像の置き場所に残るが、利用者の情報の画像は PNG のままになる
+  # Java 版だけが、送った画像を、まだ無かった .jpeg の名前で画像の置き場所に残す(CB-076)。どちらの版も、利用者の情報の画像は PNG のままになる
   - name: update-image-with-invalid-username
     request:
       method: PUT
