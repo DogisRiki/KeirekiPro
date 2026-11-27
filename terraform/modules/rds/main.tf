@@ -71,8 +71,9 @@ resource "aws_db_instance" "main" {
   parameter_group_name = aws_db_parameter_group.main.name
 
   # Backup
+  # Must fall while the scheduler keeps the instance running (the instance starts at 07:50 JST) and must not touch the maintenance window. 07:55-08:25 JST
   backup_retention_period   = 7
-  backup_window             = "18:00-19:00"
+  backup_window             = "22:55-23:25"
   copy_tags_to_snapshot     = true
   skip_final_snapshot       = false
   final_snapshot_identifier = "${var.project_name}-db-final-snapshot"
