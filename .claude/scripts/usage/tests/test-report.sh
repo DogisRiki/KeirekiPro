@@ -13,6 +13,8 @@ set -u
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
 REPORT="$(cd "$HERE/.." && pwd)/report.pl"
+# report.pl が gh pr list の本文を絞る --jq の式(report.pl の PR_BODY_JQ と同じ)
+JQ='map(.body = ([(.body // "") | scan("(?m)^(?:Closes|Refs:) #[0-9]+")] | join("\n")))'
 CONFIG="$(cd "$HERE/.." && pwd)/usage-config.json"
 TMP_ROOT=$(mktemp -d)
 trap 'rm -rf "$TMP_ROOT"' EXIT
@@ -193,7 +195,7 @@ rec s0 '{"k":"recv","ts":1790812800,"how":"claim","issue":501,"branch":"feat/b"}
 run 501
 check "PR が2つの Issue で、終了日が Closes の PR のマージの日になる" "$RC/$(rj 'J([R("issue"), R("prs"), R("end_date")])')" '0/[501,[10,11,12],"2026-11-02"]'
 check "Issue の PR を、gh pr list の1回の呼び出しで集める" "$(grep -c '^pr list' "$FAKE_GH_DIR/calls.log")/$(grep '^pr list' "$FAKE_GH_DIR/calls.log")" \
-    "1/pr list --state all --base main --limit 1000 --json number,state,body,headRefName,mergedAt,mergeCommit"
+    "1/pr list --state all --base main --limit 1000 --json number,state,body,headRefName,mergedAt,mergeCommit --jq $JQ"
 mkdb 'prs => [
     pr(11, "MERGED", "Closes #501\n", "feat/b", "2026-10-20T03:00:00Z", "'"$SHA10"'"),
     pr(12, "CLOSED", "Closes #501\n", "feat/c", undef, undef) ]'

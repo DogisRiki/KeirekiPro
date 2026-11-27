@@ -21,11 +21,11 @@ allowed-tools: Read, Write, Bash, Grep
 
 ### マージを見届けたとき
 
-`/ship-it` の CI の見届けで、PR の `state` が `MERGED` だと分かり、PR の本文の行頭に `Closes #<N>` があるときである。Claude は、同じ会話の中で、その Issue について、下の「集計を出す手順」を行う。
+`/ship-it` の CI の見届けで、PR の `state` が `MERGED` だと分かり、PR の本文の行頭に `Closes #<N>` があるときである。Claude は、同じ会話の中で、その Issue について、下の「集計を出す手順」を始める。Claude は、手順の1の `usage.sh draft` を裏で動かしている間に、マージされたことを会話の相手に書いて、`/ship-it` の見届けを終える。返答を終えるときに、Stop のフック(`check-ship-watch-before-stop.sh`)が「集計がまだ GitHub に出ていません」の文で返答の終わりを1回止めたときは、Claude は、`usage.sh draft` を裏で動かしていることを1文で書いて、返答を終える。このフックは、同じ会話と同じ PR の組では1回しか止めないためである。Claude は、止められたことを理由に、`usage.sh draft` の終わりを待たない。
 
 ### 次の会話で出すとき
 
-会話の始めのフックが、`[usage] Issue #<N> を閉じる PR がマージされ、集計がまだ GitHub に出ていない。` の文か、`[usage] Issue #<N> の集計は GitHub に出したが、一覧か案の索引への書き込みが残っている。` の文で、Issue を知らせたときである。Claude は、会話の相手の最初の依頼に答える前に、知らされた Issue ごとに、下の「集計を出す手順」を行う。書き込みが残っている Issue では、手順の1の `usage.sh draft` が、残った一覧の行と案の索引を書き足して、2 で終わる。Claude は、知らされたすべての Issue の手順を終えてから、会話の相手の最初の依頼に答える。
+会話の始めのフックが、`[usage] Issue #<N> を閉じる PR がマージされ、集計がまだ GitHub に出ていない。` の文か、`[usage] Issue #<N> の集計は GitHub に出したが、一覧か案の索引への書き込みが残っている。` の文で、Issue を知らせたときである。Claude は、会話の相手の最初の依頼に答える前に、知らされた Issue のうち番号の最も小さい Issue について、下の「集計を出す手順」を始める。Claude は、手順の1の `usage.sh draft` を裏で動かしている間に、会話の相手の最初の依頼に答える。知らされた Issue が2つ以上あるときは、Claude は、1つの Issue の手順を終えてから、次の Issue の手順を始める。`usage.sh draft` は同じ会話の記録を読むので、2つを同時に動かすと、あとの `usage.sh draft` が先の読み終わりを待つだけになるためである。書き込みが残っている Issue では、手順の1の `usage.sh draft` が、残った一覧の行と案の索引を書き足して、2 で終わる。
 
 ### 案を尋ねるとき
 
@@ -42,7 +42,7 @@ Claude は、会話の相手に、このリポジトリの所有者かどうか�
 
 ## 集計を出す手順
 
-1. Claude は、`usage.sh draft <N> --session <ID>` を呼ぶ。
+1. Claude は、`usage.sh draft <N> --session <ID>` を、Bash の `run_in_background` で動かす。Claude は、`usage.sh draft` の終わりを待たずに、会話の相手の依頼に答える。`usage.sh draft` が終わると、Claude は呼び戻される。Claude は、呼び戻されたら、会話の相手の依頼の作業の区切りで、出力のファイルと終了コードを読み、次のとおりに進む。下書きを作ってから60分を過ぎると `usage.sh publish` が集計を出さないので、Claude は、呼び戻されてから60分の中に、下の3まで進める。
    - 2 で終わったときは、Claude は、Issue #<N> の集計を作らなかったことを、会話の相手に1文で書いて、この手順を終える。集計を出し済みの Issue でも、`usage.sh draft` は 2 で終わる。そのときは、`usage.sh draft` が一覧の行と案の索引も確かめて書き足しているので、Claude はほかに何もしない。
    - 1 で終わったときは、Claude は、下の5に進む。
    - 0 で終わったときは、`usage.sh draft` が、`{"draft":<下書きの場所>,"compare":{...},"unknown":{...}}` の1行を出す。Claude は、2に進む。
