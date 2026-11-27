@@ -138,9 +138,9 @@ type projectBody struct {
 	TechStack   resume.TechStack `json:"techStack"`
 }
 
-// processBody は、プロジェクトの工程の答えである。Java 版の ResumeInfoResponse は、maintenance の鍵に SystemTest の値を、
-// systemTest の鍵に Maintenance の値を入れて答え、画面はこの答えを読んで表示する。答えに見える値の形なので、Go 版も
-// 同じに入れ替えて答え、鍵の順も Java 版の項目の順(maintenance、systemTest)にする。
+// processBody は、プロジェクトの工程の答えである。鍵の順は、Java 版の ResumeInfoResponse の項目の順(maintenance、systemTest)にする。
+// Java 版は、maintenance の鍵に SystemTest の値を、systemTest の鍵に Maintenance の値を入れて答えるので、画面が総合テストと
+// 運用・保守のチェックを入れ替えて出す。Go 版は、鍵ごとにその工程の値を入れて答える(変えた動きの一覧の CB-078)。
 type processBody struct {
 	Requirements    bool `json:"requirements"`
 	BasicDesign     bool `json:"basicDesign"`
@@ -205,8 +205,8 @@ func newResumeBody(r resume.Resume) resumeBody {
 				DetailedDesign:  p.Process.DetailedDesign,
 				Implementation:  p.Process.Implementation,
 				IntegrationTest: p.Process.IntegrationTest,
-				Maintenance:     p.Process.SystemTest,
-				SystemTest:      p.Process.Maintenance,
+				Maintenance:     p.Process.Maintenance,
+				SystemTest:      p.Process.SystemTest,
 			},
 			TechStack: p.TechStack,
 		})

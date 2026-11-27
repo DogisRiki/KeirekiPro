@@ -5,8 +5,9 @@
 # 続けてもう一方の版で、基本の情報と6つの欄の項目を直し、2つ目の資格を消す。もう一方の版で読み直して更新の日時を取り出し、
 # 最初の版(to: other)で読み、直した値と、資格が1つだけ残ったことと、作成と更新の日時が同じことを確かめる。
 # 最後にもう一方の版(to: other)で経歴書を消し、最初の版(to: other)で読むと 404 になることを確かめる。
-# プロジェクトの作業の工程の systemTest と maintenance は、どちらの版も、送った値を入れ替えて答える(Java 版の答えの型の誤りに、
-# Go 版も合わせている。design.md の受け口の節)。そのため、この2つの期待する値は、送った値を入れ替えて書く。
+# プロジェクトの作業の工程の systemTest と maintenance は、Java 版だけが、送った値を入れ替えて答える(変えた動きの一覧の CB-078)。
+# 2つの版に同じ期待する値を書けないので、values には、この2つの鍵を書かない。2つの版の間で、この2つの工程が保存したとおりに
+# 残ることは、export/cross-export.yaml が、Markdown の工程の行で確かめる。
 # 資格は取得の年月の新しい順に並ぶので、2つ目に足す資格(2021-04)は、足したときの答えの資格の並びの1つ目に入る。
 name: resumes-cross-resume
 group: 3
@@ -172,8 +173,6 @@ steps:
         '$.projects[0].process.detailedDesign': false
         '$.projects[0].process.implementation': true
         '$.projects[0].process.integrationTest': false
-        '$.projects[0].process.systemTest': false
-        '$.projects[0].process.maintenance': true
         '$.projects[0].techStack.frontend.languages': [TypeScript, JavaScript]
         '$.projects[0].techStack.frontend.frameworks': [React]
         '$.projects[0].techStack.frontend.libraries': []
@@ -330,8 +329,6 @@ steps:
         '$.projects[0].active': true
         '$.projects[0].process.requirements': false
         '$.projects[0].process.detailedDesign': true
-        '$.projects[0].process.systemTest': true
-        '$.projects[0].process.maintenance': false
         '$.projects[0].techStack.frontend.frameworks': []
         '$.projects[0].techStack.frontend.libraries': [Zustand]
         '$.projects[0].techStack.frontend.buildTools': [Vite]
