@@ -19,7 +19,7 @@ Codexによるクロスレビュー)で担保する。人間が関与するの�
 | `.kiro/steering/` | steering(プロジェクト知識) | - |
 | `doc/` | 設計図(クラス図・ER図・インフラ設計等)と人間向けの運用文書 | - |
 
-## 品質ゲート(すべて `run-check.sh` 経由。コマンドと順番は `/verify-frontend` `/verify-backend` `/verify-terraform` の各スキルに従う)
+## 品質ゲート(shellcheck のほかは `run-check.sh` 経由。コマンドと順番は `/verify-frontend` `/verify-backend` `/verify-terraform` の各スキルに従う)
 
 Claude は、1つのセッションの中では品質チェックを順に1つずつ動かす。セッションをまたぐ同時実行は `run-check.sh` が設定の数までに抑える。
 `run-check.sh` は、そのセッションの作業フォルダを読み込んだ1回きりのコンテナでコマンドを動かす。
