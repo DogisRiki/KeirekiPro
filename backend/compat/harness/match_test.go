@@ -325,8 +325,8 @@ func TestLoadChangedBehaviors_CB005HasNoMatch(t *testing.T) {
 			t.Errorf("%s が一覧にありません", id)
 		}
 	}
-	if len(got) != 77 {
-		t.Errorf("一覧の項目は77のはずですが、%d です", len(got))
+	if len(got) != 78 {
+		t.Errorf("一覧の項目は78のはずですが、%d です", len(got))
 	}
 	// CB-022 は、利用者の操作の筋書きの管理者で違いが出るので match を持つ(TestChangedBehaviors_RefreshTokenRoles で確かめる)
 	for _, id := range []string{
@@ -341,6 +341,14 @@ func TestLoadChangedBehaviors_CB005HasNoMatch(t *testing.T) {
 	// CB-076 は、断った利用者の情報の変更で Java 版だけが置く画像の違いだけを許す
 	if m := byID["CB-076"].Matches; len(m) != 1 || m[0] != (Match{Operation: "updateUserInfo", Target: TargetS3, Status: 400}) {
 		t.Errorf("CB-076 の match = %+v", m)
+	}
+	// CB-078 は、経歴書を返す操作の、プロジェクトの工程の総合テストと運用・保守の2つの鍵の違いだけを許す
+	wantProcess := Matches{
+		{Operation: "*", Target: TargetBody, Path: "$.projects[*].process.systemTest"},
+		{Operation: "*", Target: TargetBody, Path: "$.projects[*].process.maintenance"},
+	}
+	if m := byID["CB-078"].Matches; !slices.Equal(m, wantProcess) {
+		t.Errorf("CB-078 の match = %+v", m)
 	}
 	for _, m := range byID["CB-001"].Matches {
 		if !m.OrderOnly || m.Target != TargetBody {

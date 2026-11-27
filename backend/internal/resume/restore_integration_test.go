@@ -249,8 +249,10 @@ func readRestoreJavaCases(t *testing.T) []restoreJavaCase {
 }
 
 // restoredView は、戻した経歴書の答えの本文から、経歴書と項目の ID と、作った日時と直した日時を除いた形である。
-// 欄の名前と、値の無いときの書き方と、工程の maintenance と systemTest の入れ替えは、経歴書1件の取得の答え
-// (internal/httpapi の resumeBody)と同じである。Java 版は、戻しの答えに、経歴書1件の取得と同じ形を使う。
+// 欄の名前と、値の無いときの書き方は、経歴書1件の取得の答え(internal/httpapi の resumeBody)と同じである。Java 版は、
+// 戻しの答えに、経歴書1件の取得と同じ形を使う。工程は、testdata/backup/restore.json に控えた Java 版の答えと比べるので、
+// Java 版と同じく、maintenance の鍵に SystemTest の値を、systemTest の鍵に Maintenance の値を入れる。Go 版の resumeBody は、
+// 2つの値を入れ替えない(変えた動きの一覧の CB-078)。
 type restoredView struct {
 	ResumeName     string                      `json:"resumeName"`
 	Date           string                      `json:"date"`

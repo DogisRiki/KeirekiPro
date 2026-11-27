@@ -6,8 +6,9 @@
 # 名前と日付と姓と名と、6つの欄の項目の値が、経歴書 401 の値と同じことを確かめる。
 # 6つの欄の項目の添字は、経歴書を読む答えの項目の並び(職歴とプロジェクトは期間の新しい順、資格は取得の年月の新しい順、
 # ポートフォリオと SNS と自己PR は名前の順)に合わせる。
-# 経歴書を読む答えは、Java 版に合わせて、工程の systemTest の鍵に maintenance の値を、maintenance の鍵に systemTest の値を
-# 入れて答える。values の工程の2つの鍵は、この入れ替えに合わせて書く。
+# 経歴書を読む答えは、Java 版だけが、工程の systemTest の鍵に maintenance の値を、maintenance の鍵に systemTest の値を
+# 入れて答える(変えた動きの一覧の CB-078)。2つの版に同じ期待する値を書けないので、values には、この2つの鍵を書かない。
+# Go 版が戻した経歴書の、この2つの工程の値は、internal/resume/restore_integration_test.go が Java 版の答えと比べて確かめる。
 name: backup-cross-backup
 group: 5
 fixtures: [users/basic.sql, resumes/fonts.sql]
@@ -73,9 +74,7 @@ steps:
         '$.projects[0].process.detailedDesign': true
         '$.projects[0].process.implementation': false
         '$.projects[0].process.integrationTest': false
-        '$.projects[0].process.systemTest': true
         '$.projects[0].process.requirements': true
-        '$.projects[0].process.maintenance': false
         '$.projects[0].role': '移行の計画と、基盤の構成の設計を受け持った。'
         '$.projects[0].startDate': '2022-01'
         '$.projects[0].teamComp': '全体4名'
@@ -101,9 +100,7 @@ steps:
         '$.projects[1].process.detailedDesign': true
         '$.projects[1].process.implementation': true
         '$.projects[1].process.integrationTest': true
-        '$.projects[1].process.systemTest': false
         '$.projects[1].process.requirements': true
-        '$.projects[1].process.maintenance': true
         '$.projects[1].role': '開発のリーダーとして、技術の選定と設計と実装を受け持った。'
         '$.projects[1].startDate': '2018-04'
         '$.projects[1].teamComp': '全体5名(開発3名)'
@@ -136,9 +133,7 @@ steps:
         '$.projects[2].process.detailedDesign': true
         '$.projects[2].process.implementation': true
         '$.projects[2].process.integrationTest': true
-        '$.projects[2].process.systemTest': true
         '$.projects[2].process.requirements': false
-        '$.projects[2].process.maintenance': false
         '$.projects[2].role': '保守の担当として、障害の調べと直しを受け持った。'
         '$.projects[2].startDate': '2012-04'
         '$.projects[2].teamComp': '全体8名'
