@@ -52,9 +52,9 @@ func authJSON(status int, v any, cookies ...string) authResponse {
 	return authResponse{status: status, cookies: cookies, contentType: "application/json", body: jacksonJSON(v)}
 }
 
-// authText は、200 で、body をそのまま本文にした応答を作る。
-func authText(contentType, body string) authResponse {
-	return authResponse{status: http.StatusOK, contentType: contentType, body: []byte(body)}
+// authText は、200 で、body をそのまま本文にし、Content-Type を text/plain; charset=utf-8 にした応答を作る。
+func authText(body string) authResponse {
+	return authResponse{status: http.StatusOK, contentType: "text/plain; charset=utf-8", body: []byte(body)}
 }
 
 // badRequest は、400 と「入力エラーがあります。」の本文の応答を作る。

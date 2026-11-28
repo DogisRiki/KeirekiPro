@@ -325,8 +325,8 @@ func TestLoadChangedBehaviors_CB005HasNoMatch(t *testing.T) {
 			t.Errorf("%s が一覧にありません", id)
 		}
 	}
-	if len(got) != 82 {
-		t.Errorf("一覧の項目は82のはずですが、%d です", len(got))
+	if len(got) != 83 {
+		t.Errorf("一覧の項目は83のはずですが、%d です", len(got))
 	}
 	// CB-022 は、利用者の操作の筋書きの管理者で違いが出るので match を持つ(TestChangedBehaviors_RefreshTokenRoles で確かめる)
 	for _, id := range []string{
@@ -337,6 +337,11 @@ func TestLoadChangedBehaviors_CB005HasNoMatch(t *testing.T) {
 		if m := byID[id].Matches; len(m) != 0 {
 			t.Errorf("%s は記録だけの項目のはずですが、match があります: %+v", id, m)
 		}
+	}
+	// CB-083 は、ログインの開始の答えの Content-Type の違いだけを許す
+	if m := byID["CB-083"].Matches; len(m) != 1 ||
+		m[0] != (Match{Operation: "startOidcAuthorization", Target: TargetHeader, Path: "Content-Type"}) {
+		t.Errorf("CB-083 の match = %+v", m)
 	}
 	// CB-076 は、断った利用者の情報の変更で Java 版だけが置く画像の違いだけを許す
 	if m := byID["CB-076"].Matches; len(m) != 1 || m[0] != (Match{Operation: "updateUserInfo", Target: TargetS3, Status: 400}) {

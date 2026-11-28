@@ -3,7 +3,9 @@ package httpapi
 import (
 	"context"
 	"encoding/json"
+	"mime"
 	"net/http"
+	"strings"
 
 	"github.com/google/uuid"
 
@@ -357,26 +359,28 @@ func (h *resumeHandlers) DeleteSelfPromotion(
 // exportNotAcceptableMessage は、設定を付けない出力で、Accept の行から形式を選べないときの文言である。
 const exportNotAcceptableMessage = "対応していない形式が指定されました。"
 
-// exportFormatFromAccept は、Accept の行を型の並びとして読み、型が application/pdf の値があれば PDF を、無くて
-// 型が text/markdown の値があれば Markdown を返す。どちらも無いときと、Accept の行を読めないときは ok が false になる。
-// Java 版は、Accept の行の字の並びに application/pdf か text/markdown が含まれるかで選ぶ(変えた動きの一覧の CB-059)。
+// exportFormatFromAccept は、Accept の行を , で分けて mime.ParseMediaType で型の並びとして読み、型が application/pdf の
+// 値があれば PDF を、無くて型が text/markdown の値があれば Markdown を返す。どちらも無いときと、読めない値があるときは
+// ok が false になる(変えた動きの一覧の CB-059)。
 func exportFormatFromAccept(lines []string) (resume.ExportFormat, bool) {
-	types, ok := parseAccept(lines)
-	if !ok {
-		return "", false
-	}
-	has := func(typ, sub string) bool {
-		for _, m := range types {
-			if m.typ == typ && m.sub == sub {
-				return true
+	var pdf, markdown bool
+	for _, line := range lines {
+		for _, v := range strings.Split(line, ",") {
+			if strings.TrimSpace(v) == "" {
+				continue
 			}
+			t, _, err := mime.ParseMediaType(v)
+			if err != nil {
+				return "", false
+			}
+			pdf = pdf || t == "application/pdf"
+			markdown = markdown || t == "text/markdown"
 		}
-		return false
 	}
 	switch {
-	case has("application", "pdf"):
+	case pdf:
 		return resume.ExportPDF, true
-	case has("text", "markdown"):
+	case markdown:
 		return resume.ExportMarkdown, true
 	}
 	return "", false

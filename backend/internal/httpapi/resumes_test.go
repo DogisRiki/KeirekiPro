@@ -1369,6 +1369,8 @@ func TestExportHandlers_AcceptSelectsFormat(t *testing.T) {
 		{"application/json だけ", []string{"application/json"}, ""},
 		{"application/*", []string{"application/*"}, ""},
 		{"text/*", []string{"text/*"}, ""},
+		{"型だけの値の付いた PDF", []string{"application/pdf, application"}, resume.ExportPDF},
+		{"51の型", []string{strings.Repeat("text/plain, ", 50) + "application/pdf"}, resume.ExportPDF},
 	}
 	cb059 := []exportAcceptCase{
 		{"大文字の PDF", []string{"APPLICATION/PDF"}, resume.ExportPDF},
@@ -1377,9 +1379,8 @@ func TestExportHandlers_AcceptSelectsFormat(t *testing.T) {
 		{"application/pdf で終わる別の型", []string{"x-application/pdf"}, ""},
 		{"text/markdown で始まる別の型", []string{"text/markdown-x"}, ""},
 		{"引数の値に書いた PDF", []string{`text/plain;note="application/pdf"`}, ""},
-		{"読めない型の付いた PDF", []string{"application/pdf, application"}, ""},
 		{"読めない型の付いた Markdown", []string{"text/markdown, @"}, ""},
-		{"51の型", []string{strings.Repeat("text/plain, ", 50) + "application/pdf"}, ""},
+		{"読めない値の付いた PDF", []string{"application/pdf, /pdf"}, ""},
 	}
 	goOnly := []exportAcceptCase{
 		{"2行目の PDF", []string{"text/plain", "application/pdf"}, resume.ExportPDF},

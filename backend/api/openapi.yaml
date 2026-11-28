@@ -382,8 +382,9 @@ paths:
         画面はこの URL へ移動する。コールバック先は、本番は `app.api-base-url` + `/api/auth/oidc/callback`、
         開発は要求の scheme・host・port + `/api/auth/oidc/callback`。
         本文は URL の文字列そのもの(JSON の文字列としての引用符は付かない)。
-        Content-Type は Accept で変わる(Spring の文字列の変換器が書くため。`text/plain` のほか、
-        Accept に `application/json` が先に来ると `application/json` のまま引用符なしの本文になる)。
+        Content-Type は、Go 版では Accept によらず `text/plain; charset=utf-8`。Java 版は Accept で変わり、
+        Accept に `application/json` が先に来ると `application/json` のまま引用符なしの本文になる
+        (`compat/changed-behaviors.yaml` の CB-015)。
         `provider` が無い、または知らないプロバイダーのときは 500。
       security: []
       parameters:
