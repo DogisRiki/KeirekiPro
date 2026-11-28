@@ -240,7 +240,7 @@ func TestAccessToken_BumpTokenVersion(t *testing.T) {
 			t.Fatalf("BumpTokenVersion: %v", err)
 		}
 		version, updatedAt, found := tokenVersionRow(t, id)
-		// Java 版は LocalDateTime.now() を Asia/Tokyo の時刻で書くので、Go 版も東京の時刻の見た目で書く。
+		// 表の日時の列には、日本の時刻の見た目で書く。
 		wantUpdated := time.Date(2026, 11, 11, 13, 5, 6, 123_456_000, time.UTC)
 		if !found || version != 3 || !updatedAt.Equal(wantUpdated) {
 			t.Errorf("行 = %d, %s, %t, want 3, %s, true", version, updatedAt, found, wantUpdated)

@@ -110,7 +110,7 @@ func (s *Service) SetEmailAndPassword(ctx context.Context, in SetEmailAndPasswor
 				return e
 			}
 			u.Row.PendingEmail = pgtype.Text{String: *in.Email, Valid: true}
-			u.Row.UpdatedAt = s.javaNow()
+			u.Row.UpdatedAt = s.dbNow()
 		}
 
 		if err := s.setPhrase(&u, in.Password); err != nil {
@@ -139,6 +139,6 @@ func (s *Service) setPhrase(u *auth.StoredUser, phrase string) error {
 		return err
 	}
 	u.Row.Password = pgtype.Text{String: hash, Valid: true}
-	u.Row.UpdatedAt = s.javaNow()
+	u.Row.UpdatedAt = s.dbNow()
 	return nil
 }

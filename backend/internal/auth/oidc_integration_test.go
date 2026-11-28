@@ -531,7 +531,7 @@ func githubEmails(email string) string {
 // 移すことを確かめる(要件1.3)。連携の行の ID を先に、利用者の ID をあとに作り、確認済みのメールアドレスと役割 USER と、
 // 世代の番号 0 の行を足し、メールアドレスがあれば登録の完了のメールを送る。state の3つの記録は消す。
 func TestHandleOIDCCallback_NewUser(t *testing.T) {
-	now := javaWallClock(completionNow)
+	now := dbWallClock(completionNow)
 	t.Run("Google", func(t *testing.T) {
 		random, pid, uid := oidcLoginRandom()
 		s, client, mailer, f := newOIDCCallbackService(t, random)
@@ -645,7 +645,7 @@ func TestHandleOIDCCallback_NewUser(t *testing.T) {
 // アカウントがあればそのアカウントで、無ければ確認済みの同じメールアドレスのアカウントにつないでログインを終えることを
 // 確かめる(要件1.3)。
 func TestHandleOIDCCallback_LinkExisting(t *testing.T) {
-	now := javaWallClock(completionNow)
+	now := dbWallClock(completionNow)
 	verifiedUser := func(email string) userRow {
 		return userRow{
 			Email: someText(email), Password: someText(javaBcryptSample), Username: someText("既存の人"),
@@ -956,7 +956,7 @@ func TestHandleOIDCCallback_ErrorMessageEscape(t *testing.T) {
 // 一覧のうち、先頭から見て最初の、主で確認済みのメールアドレスだけを使い、一覧を読めないときはメールアドレスの無い
 // 利用者としてログインを続けることを確かめる(要件3.7)。
 func TestHandleOIDCCallback_GitHubPrimaryVerifiedOnly(t *testing.T) {
-	now := javaWallClock(completionNow)
+	now := dbWallClock(completionNow)
 	cases := []struct {
 		name  string
 		reply func(email string) fakeReply

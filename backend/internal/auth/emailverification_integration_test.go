@@ -286,10 +286,10 @@ var completionNow = time.Date(2026, 11, 11, 3, 4, 5, 123456000, time.UTC)
 // oldStamp は、テストで前もって足す行の日時である。
 var oldStamp = pgtype.Timestamp{Time: time.Date(2026, 1, 2, 3, 4, 5, 678901000, time.UTC), Valid: true}
 
-// javaWallClock は、Java 版が時刻 t を TIMESTAMP の列に書いた値を、pgx で読んだときの値である。
-// Java 版は Asia/Tokyo の時刻の見た目で書き、pgx は時間帯の無い列を UTC の時刻として読む。
-func javaWallClock(t time.Time) pgtype.Timestamp {
-	w := t.In(javaZone)
+// dbWallClock は、時刻 t を表の日時の列に書いた値を、pgx で読んだときの値である。
+// 列には日本の時刻の見た目で書き、pgx は時間帯の無い列を UTC の時刻として読む。
+func dbWallClock(t time.Time) pgtype.Timestamp {
+	w := t.In(japanZone)
 	return pgtype.Timestamp{
 		Time:  time.Date(w.Year(), w.Month(), w.Day(), w.Hour(), w.Minute(), w.Second(), w.Nanosecond(), time.UTC),
 		Valid: true,
@@ -636,7 +636,7 @@ func TestEmailVerificationComplete_RowsInOneTransaction(t *testing.T) {
 		if got, err := s.completeEmailVerification(ctx, usableClaims(r.ID, purposeRegistration, r.Email)); err != nil || got != resultVerified {
 			t.Fatalf("completeEmailVerification = %q, %v, want %q", got, err, resultVerified)
 		}
-		now := javaWallClock(completionNow)
+		now := dbWallClock(completionNow)
 		wantRows(t, r.ID, storedRows{
 			Found: true,
 			User: userRow{
@@ -776,8 +776,8 @@ func TestEmailVerificationComplete_AccountEmailVerified(t *testing.T) {
 		u, providers := accountEmailUser(email)
 		insertStoredUser(t, id, u, []string{"USER", "ADMIN"}, providers, 5)
 		want := readStoredRows(t, id)
-		want.User.UpdatedAt = javaWallClock(completionNow)
-		want.User.EmailVerifiedAt = javaWallClock(completionNow)
+		want.User.UpdatedAt = dbWallClock(completionNow)
+		want.User.EmailVerifiedAt = dbWallClock(completionNow)
 		if got, err := s.completeEmailVerification(ctx, usableClaims(id, purposeAccountEmail, email)); err != nil || got != resultVerified {
 			t.Fatalf("completeEmailVerification = %q, %v, want %q", got, err, resultVerified)
 		}
@@ -855,8 +855,8 @@ func TestEmailVerificationComplete_PendingEmailPromoted(t *testing.T) {
 		want := readStoredRows(t, id)
 		want.User.Email = someText(email)
 		want.User.PendingEmail = pgtype.Text{}
-		want.User.UpdatedAt = javaWallClock(completionNow)
-		want.User.EmailVerifiedAt = javaWallClock(completionNow)
+		want.User.UpdatedAt = dbWallClock(completionNow)
+		want.User.EmailVerifiedAt = dbWallClock(completionNow)
 		if got, err := s.completeEmailVerification(ctx, usableClaims(id, purposePendingEmail, email)); err != nil || got != resultVerified {
 			t.Fatalf("completeEmailVerification = %q, %v, want %q", got, err, resultVerified)
 		}

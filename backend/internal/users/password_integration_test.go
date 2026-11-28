@@ -59,7 +59,7 @@ func wantPhraseChanged(t *testing.T, id uuid.UUID, before auth.StoredUser, pendi
 	wantPhrase(t, id, changedPhrase, true)
 	want := before
 	want.Row.Password = after.Row.Password
-	want.Row.UpdatedAt = javaWallClock(testNow)
+	want.Row.UpdatedAt = dbWallClock(testNow)
 	want.Row.PendingEmail = pending
 	if !reflect.DeepEqual(after, want) {
 		t.Errorf("変えたあとの行\n 得た: %+v\n 期待: %+v", after, want)

@@ -471,7 +471,7 @@ func (s *Service) oidcLogin(ctx context.Context, provider string, info oidcUserI
 	var id uuid.UUID
 	var roles []string
 	err := s.inTransaction(ctx, func(q *sqlcgen.Queries) error {
-		now := s.javaNow()
+		now := s.dbNow()
 		u, found, err := s.findOIDCAccount(ctx, q, provider, info, now)
 		if err != nil {
 			return err

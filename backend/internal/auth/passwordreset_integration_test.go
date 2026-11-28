@@ -291,7 +291,7 @@ func TestPasswordReset_KeepsOtherColumns(t *testing.T) {
 	}
 	got := readStoredRows(t, id)
 	wantResetHash(t, got.User.Password.String, "Kept-Columns-3")
-	now := javaWallClock(completionNow)
+	now := dbWallClock(completionNow)
 	want.User.Password = got.User.Password
 	want.User.UpdatedAt = now
 	want.Version = 6

@@ -358,7 +358,7 @@ func (s *Service) completeRegistration(ctx context.Context, c emailVerificationC
 // 確認済みのメールアドレスと役割 USER を持つ利用者を保存し、世代の番号の行を 0 で足し、登録の完了のメールを送る。
 // Java 版は、メールを送る処理をトランザクションの中で同期して動かすので、送れなければ足した行をすべて取り消す。
 func (s *Service) createVerifiedUser(ctx context.Context, q *sqlcgen.Queries, r pendingRegistration) error {
-	now := s.javaNow()
+	now := s.dbNow()
 	id := pgtype.UUID{Bytes: r.ID, Valid: true}
 	u := StoredUser{
 		Row: sqlcgen.UpsertUserParams{
@@ -393,7 +393,7 @@ func (s *Service) verifyAccountEmail(ctx context.Context, id uuid.UUID, email st
 			return errBusiness(MessageInvalidVerificationLink)
 		}
 		if !u.Row.EmailVerifiedAt.Valid {
-			now := s.javaNow()
+			now := s.dbNow()
 			u.Row.UpdatedAt = now
 			u.Row.EmailVerifiedAt = now
 		}
@@ -415,18 +415,13 @@ func (s *Service) promotePendingEmail(ctx context.Context, id uuid.UUID, email s
 		if u.Row.Email.Valid {
 			return errBusiness(MessagePendingEmailMissing)
 		}
-		now := s.javaNow()
+		now := s.dbNow()
 		u.Row.Email = u.Row.PendingEmail
 		u.Row.PendingEmail = pgtype.Text{}
 		u.Row.UpdatedAt = now
 		u.Row.EmailVerifiedAt = now
 		return saveUser(ctx, q, u)
 	})
-}
-
-// javaNow は、今の時刻を、Java 版が TIMESTAMP の列に書くのと同じ Asia/Tokyo の時刻の見た目で返す。
-func (s *Service) javaNow() pgtype.Timestamp {
-	return pgtype.Timestamp{Time: s.deps.Now().In(javaZone), Valid: true}
 }
 
 // nullableText は、空の文字列を NULL にした文字列の列の値を作る。
