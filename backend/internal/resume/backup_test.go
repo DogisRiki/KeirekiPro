@@ -74,6 +74,13 @@ func TestBackup_OmittedFields(t *testing.T) {
 			want: `{"version":"1.0","exportedAt":"2026-11-24T01:02:03.456Z","resume":{"resumeName":"名前の空の経歴書","date":"2026-01-01",` +
 				`"lastName":"","firstName":""}}`,
 		},
+		{
+			// < > & はそのまま書き、U+2028 と制御の字は encoding/json のとおりに番号で書く
+			name:   "記号と区切りの字を持つ経歴書",
+			resume: Resume{Name: "<a>&b\u2028c\td", Date: Date{2026, 1, 1}},
+			want: `{"version":"1.0","exportedAt":"2026-11-24T01:02:03.456Z","resume":{"resumeName":"<a>&b\u2028c\td",` +
+				`"date":"2026-01-01"}}`,
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

@@ -1,7 +1,7 @@
 # バックアップの戻しで、形の誤ったファイルを戻す筋書き(要件1の受入基準1、要件6の受入基準1と2)。
-# user2 が、経歴書の欄の無い no-resume.json、職歴の欄の無いファイル、項目の並びに null の要素を持つファイル、値の型の違う
-# ファイル、知らない名前の欄を持つファイル、中身が並びのファイル、中身が数のファイルを、fixtures/backups/ から json_file で
-# 1つずつ戻す。no-resume.json と null の要素を持つファイルには、Java 版も Go 版も 500 で答える。
+# user2 が、職歴の欄の無いファイル、値の型の違うファイル、知らない名前の欄を持つファイル、中身が並びのファイル、中身が数の
+# ファイルを、fixtures/backups/ から json_file で1つずつ戻す。経歴書の欄の無いファイルと、項目の並びに null の要素を持つ
+# ファイルは、Java 版が 500 で、Go 版が 400 で答えるので、この筋書きで送らない(変えた動きの一覧の CB-090)。
 # 戻しの段には csrf: true を付ける。
 name: backup-malformed
 group: 5
@@ -14,13 +14,6 @@ steps:
       path: /api/auth/login
       json: {email: user2@example.com, password: Passw0rd!}
     expect: {status: 200}
-  - name: restore-no-resume
-    request:
-      method: POST
-      path: /api/resumes/restore
-      csrf: true
-      json_file: backups/no-resume.json
-    expect: {status: 500}
   - name: restore-no-careers
     request:
       method: POST
@@ -28,13 +21,6 @@ steps:
       csrf: true
       json_file: backups/malformed-no-careers.json
     expect: {status: 201}
-  - name: restore-null-element
-    request:
-      method: POST
-      path: /api/resumes/restore
-      csrf: true
-      json_file: backups/malformed-null-element.json
-    expect: {status: 500}
   - name: restore-types
     request:
       method: POST

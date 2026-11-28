@@ -437,9 +437,8 @@ func (h *resumeHandlers) BackupResume(
 	return h.exported(h.svc.BackupResume(ctx, id, req.ResumeId))
 }
 
-// RestoreResume は、本文のバックアップのファイルから経歴書を戻し、201 で答える。本文は読まずに処理に渡す。
-// 答えの本文は、ほかの経歴書の操作と違い、JavaJSON で書く。戻した経歴書の字に対になっていないサロゲートがあるとき、
-// Java 版はそのサロゲートを番号で書くが、encoding/json は U+FFFD に置き換えるためである。
+// RestoreResume は、本文のバックアップのファイルから経歴書を戻し、201 と、ほかの経歴書の操作と同じ経歴書の答えの本文で答える。
+// 本文は読まずに処理に渡す。
 func (h *resumeHandlers) RestoreResume(
 	ctx context.Context, req gen.RestoreResumeRequestObject,
 ) (gen.RestoreResumeResponseObject, error) {
@@ -451,7 +450,5 @@ func (h *resumeHandlers) RestoreResume(
 	if err != nil {
 		return h.fail(err)
 	}
-	return authResponse{
-		status: http.StatusCreated, contentType: "application/json", body: resume.JavaJSON(newResumeBody(r)),
-	}, nil
+	return authJSON(http.StatusCreated, newResumeBody(r)), nil
 }

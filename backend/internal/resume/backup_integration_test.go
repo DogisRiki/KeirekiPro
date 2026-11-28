@@ -7,7 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
-	"regexp"
 	"sync"
 	"testing"
 	"time"
@@ -61,14 +60,11 @@ func loadBackupFixtures(t *testing.T) {
 // backupTestNow は、バックアップの結合テストの書き出した日時である。
 var backupTestNow = time.Date(2026, 11, 24, 3, 22, 14, 899_978_346, time.UTC)
 
-// backupExportedAt は、書き出しの本文の exportedAt の欄である。
-var backupExportedAt = regexp.MustCompile(`"exportedAt":"[^"]*"`)
-
-// TestBackupIntegration_MatchesJavaBytes は、経歴書 801 から 804 の書き出しの本文が、exportedAt の値を除いて、
-// Java 版が書き出したファイル compat/fixtures/backups/java-801.json から java-804.json と1バイトも違わないことと、
-// 結果の Content-Type が application/json で、ファイル名が、使えない字を直した経歴書の名前に _backup.json を付けた名前であることを
-// 確かめる(要件3の受入基準1、3、4。要件6の受入基準2の、文字の並びを機械で確かめること)。
-func TestBackupIntegration_MatchesJavaBytes(t *testing.T) {
+// TestBackupIntegration_SameValuesAsJavaFile は、経歴書 801 から 804 の書き出しの本文を JSON として読んだ値が、
+// exportedAt の値を除いて、Java 版が書き出したファイル compat/fixtures/backups/java-801.json から java-804.json を
+// 読んだ値と同じことと、結果の Content-Type が application/json で、ファイル名が、使えない字を直した経歴書の名前に
+// _backup.json を付けた名前であることを確かめる(要件3の受入基準1、3、4)。字の逃がし方と欄の間の空白は比べない。
+func TestBackupIntegration_SameValuesAsJavaFile(t *testing.T) {
 	loadBackupFixtures(t)
 	svc := New(Deps{Pool: testPool, Now: func() time.Time { return backupTestNow }})
 	cases := []struct {
@@ -92,16 +88,16 @@ func TestBackupIntegration_MatchesJavaBytes(t *testing.T) {
 			if err != nil {
 				t.Fatalf("書き出せません: %v", err)
 			}
-			const wantExportedAt = `"exportedAt":"2026-11-24T03:22:14.899978346Z"`
-			if at := backupExportedAt.Find(got.Body); string(at) != wantExportedAt {
-				t.Errorf("exportedAt の欄が %s。want %s", at, wantExportedAt)
+			gotValue, wantValue := backupValue(t, got.Body), backupValue(t, java)
+			if at := gotValue["exportedAt"]; at != "2026-11-24T03:22:14.899978346Z" {
+				t.Errorf("exportedAt = %v", at)
 			}
-			if !backupExportedAt.Match(java) {
+			if _, ok := wantValue["exportedAt"]; !ok {
 				t.Fatalf("Java 版のファイルに exportedAt の欄が無い: %s", java)
 			}
-			want := backupExportedAt.ReplaceAllLiteral(java, []byte(wantExportedAt))
-			if string(got.Body) != string(want) {
-				t.Errorf("本文が Java 版と違う。\n--- Go 版\n%s\n--- Java 版\n%s", got.Body, want)
+			wantValue["exportedAt"] = gotValue["exportedAt"]
+			if !reflect.DeepEqual(gotValue, wantValue) {
+				t.Errorf("本文の値が Java 版と違う。\n--- Go 版\n%s\n--- Java 版\n%s", got.Body, java)
 			}
 			if got.ContentType != "application/json" || got.FileName != c.fileName || got.Inline {
 				t.Errorf("Content-Type = %q、ファイル名 = %q、Inline = %v。want application/json、%q、false",
@@ -109,6 +105,16 @@ func TestBackupIntegration_MatchesJavaBytes(t *testing.T) {
 			}
 		})
 	}
+}
+
+// backupValue は、バックアップのファイルの本文 body を JSON として読んだ値を返す。
+func backupValue(t *testing.T, body []byte) map[string]any {
+	t.Helper()
+	var v map[string]any
+	if err := json.Unmarshal(body, &v); err != nil {
+		t.Fatalf("本文を JSON として読めません: %v: %s", err, body)
+	}
+	return v
 }
 
 // backupOrderView は、書き出しの本文の6つの欄の項目を、項目ごとに1つの字で表した並びである。

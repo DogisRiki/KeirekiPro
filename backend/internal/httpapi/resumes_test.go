@@ -16,7 +16,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-	"unicode/utf8"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -125,10 +124,6 @@ const fullResumeJSON = `{"id":"00000000-0000-4000-8000-000000000301","resumeName
 	`{"id":"00000000-0000-4000-8000-000000000702","name":"作品2","overview":"","techStack":"Go","link":"https://example.com/b"}],` +
 	`"snsPlatforms":[{"id":"00000000-0000-4000-8000-000000000801","name":"GitHub","link":"https://github.com/example"}],` +
 	`"selfPromotions":[{"id":"00000000-0000-4000-8000-000000000901","title":"強み","content":"改行\nを含む"}]}`
-
-// restoredResumeJSON は、復元の答えの本文である。復元の答えは、対になっていないサロゲートを残すために resume.JavaJSON で書くので、
-// < と > と & を逃がさない。
-var restoredResumeJSON = strings.NewReplacer(`\u003c`, "<", `\u003e`, ">", `\u0026`, "&").Replace(fullResumeJSON)
 
 // fullMaster は、技術スタックのマスタである。Service は、名前の無い小分類も空の並びにして返す。
 func fullMaster() resume.TechStackMaster {
@@ -485,7 +480,6 @@ func resumeOps() []resumeOp {
 	user := handlerUserID.String()
 	resumeWant := jsonWant(http.StatusOK, fullResumeJSON)
 	createdWant := jsonWant(http.StatusCreated, fullResumeJSON)
-	restoredWant := jsonWant(http.StatusCreated, restoredResumeJSON)
 	noContent := wantResponse{status: http.StatusNoContent}
 	exportWant := wantResponse{status: http.StatusOK, contentType: "application/pdf", body: fakeExportBody}
 	ops := []resumeOp{
@@ -587,7 +581,7 @@ func resumeOps() []resumeOp {
 				return h.RestoreResume(ctx, gen.RestoreResumeRequestObject{Body: bodyOf(`{"version":"1.0"} 余り`)})
 			},
 			calls: []string{"RestoreResume(" + user + `, {"version":"1.0"} 余り)`},
-			want:  restoredWant,
+			want:  createdWant,
 		},
 	}
 	for _, it := range itemOps() {
@@ -1537,42 +1531,15 @@ func TestBackupHandlers_BackupResponse(t *testing.T) {
 }
 
 // TestBackupHandlers_RestoreResponse は、戻しの受け口が、処理が戻した経歴書を、状態の番号 201 と、application/json と、
-// JavaJSON で書いた経歴書の答えの本文で答えることを確かめる(要件1の受入基準1)。経歴書の名前と項目の字に、対に
-// なっていないサロゲートがあるときも、Java 版と同じく、U+FFFD に置き換えずに番号で書く。
+// ほかの経歴書の操作と同じ経歴書の答えの本文で答えることを確かめる(要件1の受入基準1)。
 func TestBackupHandlers_RestoreResponse(t *testing.T) {
-	lone := fullResume()
-	lone.Name = "経歴\xed\xa0\x80書<&>"
-	lone.Careers[0].CompanyName = "会社\xed\xb0\x80"
-	cases := []struct {
-		name     string
-		r        resume.Resume
-		want     string
-		contains []string
-	}{
-		{name: "経歴書", r: fullResume(), want: restoredResumeJSON},
-		{
-			name: "対になっていないサロゲートを含む経歴書", r: lone, want: string(resume.JavaJSON(newResumeBody(lone))),
-			contains: []string{`"resumeName":"経歴\uD800書<&>"`, `"companyName":"会社\uDC00"`},
-		},
-	}
-	for _, c := range cases {
-		f := newFakeResumes()
-		f.resume = c.r
-		resp, err := newResumeHandlers(f, false).RestoreResume(
-			loggedIn(), gen.RestoreResumeRequestObject{Body: bodyOf(`{"version":"1.0"}`)},
-		)
-		got := handled(t, resp, err)
-		checkResponse(t, c.name, got, jsonWant(http.StatusCreated, c.want))
-		for _, s := range c.contains {
-			if !strings.Contains(got.body, s) {
-				t.Errorf("%s の本文 %s に %s が無い", c.name, got.body, s)
-			}
-		}
-		if strings.ContainsRune(got.body, utf8.RuneError) {
-			t.Errorf("%s の本文 %s に U+FFFD がある", c.name, got.body)
-		}
-		checkResumeCalls(t, c.name, f, "RestoreResume("+handlerUserID.String()+`, {"version":"1.0"})`)
-	}
+	f := newFakeResumes()
+	f.resume = fullResume()
+	resp, err := newResumeHandlers(f, false).RestoreResume(
+		loggedIn(), gen.RestoreResumeRequestObject{Body: bodyOf(`{"version":"1.0"}`)},
+	)
+	checkResponse(t, "戻し", handled(t, resp, err), jsonWant(http.StatusCreated, fullResumeJSON))
+	checkResumeCalls(t, "戻し", f, "RestoreResume("+handlerUserID.String()+`, {"version":"1.0"})`)
 }
 
 // TestBackupHandlers_IgnoreHeaders は、New で作った経路で、書き出しの受け口が Accept のヘッダを見ずに 200 と
