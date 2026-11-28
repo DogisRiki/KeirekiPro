@@ -10,6 +10,7 @@ import (
 	"math/big"
 	"mime"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 
@@ -120,9 +121,9 @@ func (s *Service) oidcFailure(cause error) OIDCCallbackResult {
 	case errors.Is(cause, errOIDCUnverified):
 		location += "unverified_email"
 	case errors.Is(cause, errOIDCUserInfo):
-		location += javaURLEncode(MessageOIDCUserInfoFailed)
+		location += url.QueryEscape(MessageOIDCUserInfoFailed)
 	default:
-		location += javaURLEncode(MessageOIDCFailed)
+		location += url.QueryEscape(MessageOIDCFailed)
 	}
 	return OIDCCallbackResult{Location: location, Cause: cause}
 }
@@ -168,15 +169,15 @@ func (s *Service) removeOIDCSession(ctx context.Context, state string) error {
 // expires_in を Java 版の OidcTokenResponse の型に読めない本文、error の項目が空でない本文は、誤りにする。
 // アクセストークンが無いか null なら、Java 版の setBearerAuth(null) と同じく "null" を返す。expires_in の値は使わない。
 func (s *Service) exchangeOIDCCode(ctx context.Context, p config.Provider, code, verifier, redirectURI string) (string, error) {
-	form := javaForm([]queryParam{
-		{"grant_type", "authorization_code"},
-		{"code", code},
-		{"redirect_uri", redirectURI},
-		{"code_verifier", verifier},
-		{"client_id", p.ClientID},
-		{"client_secret", p.ClientSecret},
-	})
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, p.TokenURL, strings.NewReader(form))
+	form := url.Values{
+		"grant_type":    {"authorization_code"},
+		"code":          {code},
+		"redirect_uri":  {redirectURI},
+		"code_verifier": {verifier},
+		"client_id":     {p.ClientID},
+		"client_secret": {p.ClientSecret},
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, p.TokenURL, strings.NewReader(form.Encode()))
 	if err != nil {
 		return "", fmt.Errorf("auth: コードの交換の要求を作れない: %w", err)
 	}
@@ -460,42 +461,6 @@ func javaStringValueOf(raw json.RawMessage) (string, bool) {
 	default:
 		return "", false
 	}
-}
-
-// javaForm は、params を渡した順に、Java の URLEncoder.encode でエスケープした「名前=値」を & でつなぐ。
-// Spring の FormHttpMessageConverter が書く application/x-www-form-urlencoded の本文と同じである。
-func javaForm(params []queryParam) string {
-	var b strings.Builder
-	for i, p := range params {
-		if i > 0 {
-			b.WriteByte('&')
-		}
-		b.WriteString(javaURLEncode(p.name))
-		b.WriteByte('=')
-		b.WriteString(javaURLEncode(p.value))
-	}
-	return b.String()
-}
-
-// javaURLEncode は、Java の URLEncoder.encode(v, UTF_8) と同じく、英数字と . - * _ を残し、空白を + にし、
-// ほかは UTF-8 のバイトごとに大文字の %XX にする。
-func javaURLEncode(v string) string {
-	const hex = "0123456789ABCDEF"
-	var b strings.Builder
-	for i := 0; i < len(v); i++ {
-		c := v[i]
-		switch {
-		case 'a' <= c && c <= 'z', 'A' <= c && c <= 'Z', '0' <= c && c <= '9', c == '.', c == '-', c == '*', c == '_':
-			b.WriteByte(c)
-		case c == ' ':
-			b.WriteByte('+')
-		default:
-			b.WriteByte('%')
-			b.WriteByte(hex[c>>4])
-			b.WriteByte(hex[c&0x0f])
-		}
-	}
-	return b.String()
 }
 
 // oidcLogin は、Java 版の OidcLoginUseCase と同じく、1つのトランザクションでアカウントを決め、ログインする利用者の

@@ -80,19 +80,18 @@ func oidcKeys(state string) []string {
 	return []string{"oidc:state:" + state, "oidc:provider:" + state, "oidc:code_verifier:" + state}
 }
 
-// TestStartOIDC_URLParamsOrder は、ログインの開始の URL が、Java 版の OidcClient と同じく、接続先のあとに
-// client_id、response_type、scope、redirect_uri、state、code_challenge、code_challenge_method をこの順に並べ、
-// Spring の UriComponentsBuilder と同じく scope の空白を %20 にし、redirect_uri の : と / を残すことを確かめる。
-// code_challenge は code_verifier の SHA-256 の base64url である。provider の大文字と小文字は、
-// Java 版の OidcProviderFactory と同じく区別しない(要件1.3)。
-func TestStartOIDC_URLParamsOrder(t *testing.T) {
+// TestStartOIDC_URL は、ログインの開始の URL が、接続先のあとに、client_id、response_type、scope、redirect_uri、
+// state、code_challenge、code_challenge_method をこの順に並べ、scope の空白を「+」に、redirect_uri と scope の
+// 「:」と「/」を「%3A」と「%2F」にすることを確かめる。code_challenge は code_verifier の SHA-256 の base64url である。
+// provider の大文字と小文字は区別しない(要件1.3)。
+func TestStartOIDC_URL(t *testing.T) {
 	cases := []struct {
 		name, provider, prefix, scope string
 	}{
-		{"google", "google", "https://accounts.google.com/o/oauth2/v2/auth?client_id=google-client-id", "openid%20email%20profile"},
-		{"github", "github", "https://github.com/login/oauth/authorize?client_id=github-client-id", "read:user%20user:email"},
-		{"大文字の混じった Google", "Google", "https://accounts.google.com/o/oauth2/v2/auth?client_id=google-client-id", "openid%20email%20profile"},
-		{"大文字だけの GITHUB", "GITHUB", "https://github.com/login/oauth/authorize?client_id=github-client-id", "read:user%20user:email"},
+		{"google", "google", "https://accounts.google.com/o/oauth2/v2/auth?client_id=google-client-id", "openid+email+profile"},
+		{"github", "github", "https://github.com/login/oauth/authorize?client_id=github-client-id", "read%3Auser+user%3Aemail"},
+		{"大文字の混じった Google", "Google", "https://accounts.google.com/o/oauth2/v2/auth?client_id=google-client-id", "openid+email+profile"},
+		{"大文字だけの GITHUB", "GITHUB", "https://github.com/login/oauth/authorize?client_id=github-client-id", "read%3Auser+user%3Aemail"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -103,7 +102,7 @@ func TestStartOIDC_URLParamsOrder(t *testing.T) {
 				t.Fatalf("StartOIDC: %v", err)
 			}
 			want := c.prefix + "&response_type=code&scope=" + c.scope +
-				"&redirect_uri=http://localhost:8080/api/auth/oidc/callback&state=" + state +
+				"&redirect_uri=http%3A%2F%2Flocalhost%3A8080%2Fapi%2Fauth%2Foidc%2Fcallback&state=" + state +
 				"&code_challenge=" + rfc7636Challenge + "&code_challenge_method=S256"
 			if got != want {
 				t.Errorf("URL =\n%s\nwant\n%s", got, want)
@@ -934,24 +933,9 @@ func TestHandleOIDCCallback_ReadsResponsesLikeJava(t *testing.T) {
 	}
 }
 
-// TestHandleOIDCCallback_ErrorMessageURLEncoderEscape は、移る先の URL に入れる文言を、url.QueryEscape ではなく、
-// Java の URLEncoder.encode と同じ規則でエスケープすることを確かめる(要件1.3)。英数字と . - * _ を残し、空白を + にし、
-// ほかは UTF-8 のバイトごとに大文字の %XX にする。url.QueryEscape と違い、* を残し、~ をエスケープする。
-func TestHandleOIDCCallback_ErrorMessageURLEncoderEscape(t *testing.T) {
-	cases := []struct{ in, want string }{
-		{"a b*~", "a+b*%7E"},
-		{"-._*AZaz09", "-._*AZaz09"},
-		{"!'()", "%21%27%28%29"},
-		{"/?&=+%#", "%2F%3F%26%3D%2B%25%23"},
-		{"é", "%C3%A9"},
-		{"認証", "%E8%AA%8D%E8%A8%BC"},
-		{"", ""},
-	}
-	for _, c := range cases {
-		if got := javaURLEncode(c.in); got != c.want {
-			t.Errorf("javaURLEncode(%q) = %q, want %q", c.in, got, c.want)
-		}
-	}
+// TestHandleOIDCCallback_ErrorMessageEscape は、移る先の URL に入れる文言を、UTF-8 のバイトごとに大文字の %XX にして
+// 入れることを確かめる(要件1.3)。
+func TestHandleOIDCCallback_ErrorMessageEscape(t *testing.T) {
 	random, _, _ := oidcLoginRandom()
 	s, _, _, _ := newOIDCCallbackService(t, random)
 	state, code, errParam := uuid.NewString(), oidcCode, "access_denied"
