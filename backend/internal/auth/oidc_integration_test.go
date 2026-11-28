@@ -1092,9 +1092,9 @@ func TestHandleOIDCCallback_MissingState(t *testing.T) {
 			}
 			return strPtr(oidcCode), &state
 		}, true},
-		{"code_verifier の記録が数", func(t *testing.T, s *Service, client redis.UniversalClient) (*string, *string) {
+		{"code_verifier の記録が閉じていない JSON の文字列", func(t *testing.T, s *Service, client redis.UniversalClient) (*string, *string) {
 			state := putOIDCSession(t, s, "google")
-			if err := client.Set(t.Context(), oidcCodeVerifierKeyPrefix+state, "1", time.Minute).Err(); err != nil {
+			if err := client.Set(t.Context(), oidcCodeVerifierKeyPrefix+state, `"abc`, time.Minute).Err(); err != nil {
 				t.Fatal(err)
 			}
 			return strPtr(oidcCode), &state
@@ -1130,5 +1130,28 @@ func TestHandleOIDCCallback_MissingState(t *testing.T) {
 				wantKeysRemoved(t, client, *state)
 			}
 		})
+	}
+}
+
+// TestFindOIDCSession_ReadsBothForms は、provider と code_verifier の記録を、JSON の文字列にした形(今の書き方)と、
+// そのままの形(書き方を替えたあとの形)の、どちらで置いても読むことを確かめる。
+func TestFindOIDCSession_ReadsBothForms(t *testing.T) {
+	ctx := t.Context()
+	s, client := newRedisService(t)
+	for _, quote := range []bool{true, false} {
+		_, state := uniqueRandom()
+		values := map[string]string{oidcStateKeyPrefix + state: state, oidcProviderKeyPrefix + state: "github", oidcCodeVerifierKeyPrefix + state: rfc7636Verifier}
+		for k, v := range values {
+			if quote {
+				v = jsonQuoted(t, v)
+			}
+			if err := client.Set(ctx, k, v, time.Minute).Err(); err != nil {
+				t.Fatal(err)
+			}
+		}
+		provider, verifier, err := s.findOIDCSession(ctx, state)
+		if err != nil || provider != "github" || verifier != rfc7636Verifier {
+			t.Errorf("JSON の文字列にした形 %v の findOIDCSession = %q, %q, %v, want github, %q, nil", quote, provider, verifier, err, rfc7636Verifier)
+		}
 	}
 }

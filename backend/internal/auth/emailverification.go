@@ -145,7 +145,7 @@ func (s *Service) putCurrentEmailVerification(ctx context.Context, subjectID uui
 
 // findCurrentEmailVerification は、subjectID の今のリンクの jti を返す。無いときは偽を返す(Java 版の find)。
 func (s *Service) findCurrentEmailVerification(ctx context.Context, subjectID uuid.UUID) (string, bool, error) {
-	return s.getJSONString(ctx, emailVerificationCurrentKeyPrefix+subjectID.String())
+	return s.getText(ctx, emailVerificationCurrentKeyPrefix+subjectID.String())
 }
 
 // consumeCurrentEmailVerification は、subjectID の今のリンクの jti が jti と同じときだけ記録を消し、消せたら真を返す

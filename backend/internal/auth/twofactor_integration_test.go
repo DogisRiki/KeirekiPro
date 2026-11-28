@@ -272,10 +272,7 @@ func TestTwoFactor_Check(t *testing.T) {
 			}
 		}
 		// 情報の区切りの制御の字は空白でないので、途中の記録を読み、確認のコードが無いことで断る
-		if err := client.Set(ctx, "2fa:challenge:\u001c", jsonQuoted(t, `{"userId":null,"attempts":0}`), time.Minute).Err(); err != nil {
-			t.Fatal(err)
-		}
-		if err := client.Del(ctx, "2fa:null").Err(); err != nil {
+		if err := client.Set(ctx, "2fa:challenge:\u001c", jsonQuoted(t, `{"userId":"`+uuid.NewString()+`","attempts":0}`), time.Minute).Err(); err != nil {
 			t.Fatal(err)
 		}
 		_, err := s.checkTwoFactor(ctx, "\u001c", "000000")
@@ -308,212 +305,99 @@ func TestTwoFactor_Check(t *testing.T) {
 		}
 	})
 	t.Run("利用者の ID が無い途中の記録", func(t *testing.T) {
+		// 利用者の ID の無い途中の記録は、どの版も書かない。Go 版は見つからないとする(変えた動きの一覧の CB-131)
 		s, client, _ := newTwoFactorService(t, nil)
-		const token = "challenge-without-user"
-		if err := client.Set(ctx, "2fa:challenge:"+token, jsonQuoted(t, `{"attempts":0}`), time.Minute).Err(); err != nil {
-			t.Fatal(err)
-		}
-		if err := client.Set(ctx, "2fa:null", `"123456"`, time.Minute).Err(); err != nil {
-			t.Fatal(err)
-		}
-		got, err := s.checkTwoFactor(ctx, token, "123456")
-		if err != nil {
-			t.Fatalf("checkTwoFactor: %v", err)
-		}
-		if got != uuid.Nil {
-			t.Errorf("利用者の ID = %s, want uuid.Nil", got)
-		}
-		if keyExists(t, client, "2fa:challenge:"+token) || keyExists(t, client, "2fa:null") {
-			t.Error("確認が通ったのに値が残った")
+		for i, inner := range []string{`{"attempts":0}`, `{"userId":null,"attempts":0}`, `{"userId":"00000000-0000-0000-0000-000000000000","attempts":0}`} {
+			token := "challenge-without-user-" + strconv.Itoa(i)
+			stored := jsonQuoted(t, inner)
+			if err := client.Set(ctx, "2fa:challenge:"+token, stored, time.Minute).Err(); err != nil {
+				t.Fatal(err)
+			}
+			_, err := s.checkTwoFactor(ctx, token, "123456")
+			wantBusinessError(t, err, MessageInvalidTwoFactorSession)
+			if got := rawValue(t, client, "2fa:challenge:"+token); got != stored {
+				t.Errorf("途中の記録の値 = %s, want 変わらない %s", got, stored)
+			}
 		}
 	})
 }
 
-// jacksonUser は、TestTwoFactor_ReadsChallengeLikeJackson の途中の記録の利用者の ID である。
-const jacksonUser = "11111111-2222-3333-4444-001794379977"
-
-// jacksonChallengeCases は、開発環境の Java 版の Redis に、途中の記録 inner(を JSON の文字列にした値)と、
-// 確認のコード "123456" を 2fa:<jacksonUser> と 2fa:null に置き、誤ったコード "000000" で確認を求めた結果である。
-// want は、次のどれかである。
-//
-//   - "session": 「認証セッションが無効または期限切れです」で断り、値を変えない(Jackson が途中の記録を読めない)
-//   - "error": 予期せぬ誤りの 500 になり、値を変えない
-//   - "deleted": 「認証コードが無効または期限切れです」で断り、途中の記録を消す(利用者の確認のコードが無い)
-//   - "limit": 「試行回数の上限に達しました」で断り、途中の記録と確認のコードを消す
-//   - "{" で始まる値: 「認証コードが無効または期限切れです」で断り、途中の記録をこの JSON に書き直す
-var jacksonChallengeCases = []struct {
-	name, inner, want string
-}{
-	{"JSON でない", `abc`, "session"},
-	{"空", ``, "session"},
-	{"空白だけ", `  `, "session"},
-	{"null", `null`, "error"},
-	{"数", `5`, "session"},
-	{"並び", `[1]`, "session"},
-	{"閉じていない", `{"userId":"` + jacksonUser + `","attempts":0`, "session"},
-	{"末尾のコンマ", `{"userId":"` + jacksonUser + `","attempts":0,}`, "session"},
-	{"前の空白", `  {"userId":"` + jacksonUser + `","attempts":0}`, `{"userId":"` + jacksonUser + `","attempts":1}`},
-	{"あとの文字", `{"userId":"` + jacksonUser + `","attempts":0}}`, `{"userId":"` + jacksonUser + `","attempts":1}`},
-	{"2つのオブジェクト", `{"userId":"` + jacksonUser + `","attempts":0}{"attempts":3}`, `{"userId":"` + jacksonUser + `","attempts":1}`},
-	{"知らない項目", `{"userId":"` + jacksonUser + `","attempts":0,"x":1}`, `{"userId":"` + jacksonUser + `","attempts":1}`},
-	{"同じ項目が2回", `{"userId":"` + jacksonUser + `","attempts":3,"attempts":0}`, `{"userId":"` + jacksonUser + `","attempts":1}`},
-	{"回数が4", `{"userId":"` + jacksonUser + `","attempts":4}`, "limit"},
-	{"回数が7", `{"userId":"` + jacksonUser + `","attempts":7}`, "limit"},
-	{"回数が無い", `{"userId":"` + jacksonUser + `"}`, `{"userId":"` + jacksonUser + `","attempts":1}`},
-	{"回数が null", `{"userId":"` + jacksonUser + `","attempts":null}`, `{"userId":"` + jacksonUser + `","attempts":1}`},
-	{"回数が負", `{"userId":"` + jacksonUser + `","attempts":-10}`, `{"userId":"` + jacksonUser + `","attempts":-9}`},
-	{"回数が -0", `{"userId":"` + jacksonUser + `","attempts":-0}`, `{"userId":"` + jacksonUser + `","attempts":1}`},
-	{"回数が小数", `{"userId":"` + jacksonUser + `","attempts":2.5}`, `{"userId":"` + jacksonUser + `","attempts":3}`},
-	{"回数が負の小数", `{"userId":"` + jacksonUser + `","attempts":-2.5}`, `{"userId":"` + jacksonUser + `","attempts":-1}`},
-	{"回数が 2.0", `{"userId":"` + jacksonUser + `","attempts":2.0}`, `{"userId":"` + jacksonUser + `","attempts":3}`},
-	{"回数が 1e2", `{"userId":"` + jacksonUser + `","attempts":1e2}`, "limit"},
-	{"回数が 1.5e1", `{"userId":"` + jacksonUser + `","attempts":1.5e1}`, "limit"},
-	{"回数が 1e10", `{"userId":"` + jacksonUser + `","attempts":1e10}`, "session"},
-	{"回数が int の最大", `{"userId":"` + jacksonUser + `","attempts":2147483647}`, `{"userId":"` + jacksonUser + `","attempts":-2147483648}`},
-	{"回数が int の最大を越える", `{"userId":"` + jacksonUser + `","attempts":2147483648}`, "session"},
-	{"回数が真偽", `{"userId":"` + jacksonUser + `","attempts":true}`, "session"},
-	{"回数がオブジェクト", `{"userId":"` + jacksonUser + `","attempts":{}}`, "session"},
-	{"回数が文字列の数", `{"userId":"` + jacksonUser + `","attempts":"2"}`, `{"userId":"` + jacksonUser + `","attempts":3}`},
-	{"回数が前に空白の文字列", `{"userId":"` + jacksonUser + `","attempts":" 2"}`, `{"userId":"` + jacksonUser + `","attempts":3}`},
-	{"回数があとに空白の文字列", `{"userId":"` + jacksonUser + `","attempts":"2 "}`, `{"userId":"` + jacksonUser + `","attempts":3}`},
-	{"回数が + の付いた文字列", `{"userId":"` + jacksonUser + `","attempts":"+2"}`, `{"userId":"` + jacksonUser + `","attempts":3}`},
-	{"回数が - の付いた文字列", `{"userId":"` + jacksonUser + `","attempts":"-2"}`, `{"userId":"` + jacksonUser + `","attempts":-1}`},
-	{"回数が 0 で始まる文字列", `{"userId":"` + jacksonUser + `","attempts":"02"}`, `{"userId":"` + jacksonUser + `","attempts":3}`},
-	{"回数が空の文字列", `{"userId":"` + jacksonUser + `","attempts":""}`, `{"userId":"` + jacksonUser + `","attempts":1}`},
-	{"回数が空白の文字列", `{"userId":"` + jacksonUser + `","attempts":" "}`, `{"userId":"` + jacksonUser + `","attempts":1}`},
-	{"回数が null の文字列", `{"userId":"` + jacksonUser + `","attempts":"null"}`, `{"userId":"` + jacksonUser + `","attempts":1}`},
-	{"回数が int の最大の文字列", `{"userId":"` + jacksonUser + `","attempts":"2147483647"}`, `{"userId":"` + jacksonUser + `","attempts":-2147483648}`},
-	{"回数が int の最大を越える文字列", `{"userId":"` + jacksonUser + `","attempts":"2147483648"}`, "session"},
-	{"回数が数でない文字列", `{"userId":"` + jacksonUser + `","attempts":"x"}`, "session"},
-	{"回数が小数の文字列", `{"userId":"` + jacksonUser + `","attempts":"2.5"}`, "session"},
-	{"回数が指数の文字列", `{"userId":"` + jacksonUser + `","attempts":"1e2"}`, "session"},
-	{"回数が16進の文字列", `{"userId":"` + jacksonUser + `","attempts":"0x1"}`, "session"},
-	{"利用者の ID が無い", `{"attempts":0}`, `{"userId":null,"attempts":1}`},
-	{"利用者の ID が空の文字列", `{"userId":"","attempts":0}`, `{"userId":null,"attempts":1}`},
-	{"利用者の ID が空白の文字列", `{"userId":" ","attempts":0}`, `{"userId":null,"attempts":1}`},
-	{"利用者の ID が大文字", `{"userId":"` + strings.ToUpper(jacksonUser) + `","attempts":0}`, `{"userId":"` + jacksonUser + `","attempts":1}`},
-	{"利用者の ID の前に空白", `{"userId":" ` + jacksonUser + `","attempts":0}`, `{"userId":"` + jacksonUser + `","attempts":1}`},
-	{"利用者の ID のあとに空白", `{"userId":"` + jacksonUser + ` ","attempts":0}`, `{"userId":"` + jacksonUser + `","attempts":1}`},
-	{"利用者の ID が base64", `{"userId":"AAAAAAAAAAAAAAAAAAAAAA==","attempts":0}`, "deleted"},
-	{"利用者の ID が UUID でない", `{"userId":"zz","attempts":0}`, "session"},
-	{"利用者の ID にハイフンが無い", `{"userId":"` + strings.ReplaceAll(jacksonUser, "-", "") + `","attempts":0}`, "session"},
-	{"利用者の ID が波括弧で囲まれる", `{"userId":"{` + jacksonUser + `}","attempts":0}`, "session"},
-	{"利用者の ID が urn", `{"userId":"urn:uuid:` + jacksonUser + `","attempts":0}`, "session"},
-	{"利用者の ID が数", `{"userId":123,"attempts":0}`, "session"},
-	{"利用者の ID が真偽", `{"userId":true,"attempts":0}`, "session"},
-	{"利用者の ID がオブジェクト", `{"userId":{},"attempts":0}`, "session"},
-	{"利用者の ID が並び", `{"userId":[],"attempts":0}`, "session"},
-}
-
-// TestTwoFactor_ReadsChallengeLikeJackson は、途中の記録の中の JSON を、Java 版の Jackson と同じ規則で読むことを、
-// 開発環境の Java 版で確かめた結果と照らして確かめる。
-func TestTwoFactor_ReadsChallengeLikeJackson(t *testing.T) {
-	ctx := t.Context()
-	s, client, _ := newTwoFactorService(t, nil)
-	userCodeKey := "2fa:" + jacksonUser
-	for i, tt := range jacksonChallengeCases {
-		t.Run(tt.name, func(t *testing.T) {
-			token := "jackson-" + strconv.Itoa(i)
-			key := "2fa:challenge:" + token
-			stored := jsonQuoted(t, tt.inner)
-			for _, k := range []string{userCodeKey, "2fa:null"} {
-				if err := client.Set(ctx, k, `"123456"`, time.Minute).Err(); err != nil {
-					t.Fatal(err)
-				}
-			}
-			if err := client.Set(ctx, key, stored, 5*time.Minute).Err(); err != nil {
-				t.Fatal(err)
-			}
-			_, err := s.checkTwoFactor(ctx, token, "000000")
-			got := rawValue(t, client, key)
-			switch tt.want {
-			case "session":
-				wantBusinessError(t, err, MessageInvalidTwoFactorSession)
-				if got != stored {
-					t.Errorf("途中の記録の値 = %s, want 変わらない %s", got, stored)
-				}
-			case "error":
-				var e *Error
-				if err == nil || errors.As(err, &e) {
-					t.Errorf("誤り = %v, want *Error でない誤り", err)
-				}
-				if got != stored {
-					t.Errorf("途中の記録の値 = %s, want 変わらない %s", got, stored)
-				}
-			case "deleted":
-				wantBusinessError(t, err, MessageInvalidTwoFactorCode)
-				if got != "" {
-					t.Errorf("途中の記録の値 = %s, want 消える", got)
-				}
-			case "limit":
-				wantBusinessError(t, err, MessageTwoFactorAttemptsExceeded)
-				if got != "" || keyExists(t, client, userCodeKey) {
-					t.Errorf("途中の記録の値 = %s と確認のコード, want どちらも消える", got)
-				}
-			default:
-				wantBusinessError(t, err, MessageInvalidTwoFactorCode)
-				if want := jsonQuoted(t, tt.want); got != want {
-					t.Errorf("途中の記録の値 = %s, want %s", got, want)
-				}
-				assertTTL(t, client, key, 5*time.Minute)
-			}
-		})
-	}
-}
-
-// TestTwoFactor_ValueForms は、途中の記録と確認のコードの値そのものが JSON の文字列でないときに、
-// 開発環境の Java 版と同じ結果になることを確かめる。Java 版は、値が JSON の null なら無いとみなし、
-// JSON でないか、文字列でも null でもない JSON なら、予期せぬ誤りの 500 にする。
-func TestTwoFactor_ValueForms(t *testing.T) {
+// TestTwoFactor_ReadsBothForms は、途中の記録と確認のコードを、JSON の文字列にした形(今の書き方)と、
+// そのままの形(書き方を替えたあとの形)の、どちらで置いても読むことを確かめる。
+// 誤ったコードで置き直す途中の記録は、今の書き方の形で置くことも確かめる。
+func TestTwoFactor_ReadsBothForms(t *testing.T) {
 	ctx := t.Context()
 	s, client, _ := newTwoFactorService(t, nil)
 	userID := uuid.New()
-	codeKey := "2fa:" + userID.String()
-	inner := jsonQuoted(t, `{"userId":"`+userID.String()+`","attempts":0}`)
+	inner := `{"userId":"` + userID.String() + `","attempts":0}`
 	cases := []struct {
-		name, challenge, code, want string
+		name, challenge, code string
 	}{
-		{"途中の記録が null", `null`, `"123456"`, "session"},
-		{"途中の記録がオブジェクト", `{"userId":"` + userID.String() + `","attempts":0}`, `"123456"`, "error"},
-		{"途中の記録が JSON でない", `abc`, `"123456"`, "error"},
-		{"確認のコードが null", inner, `null`, "deleted"},
-		{"確認のコードが数", inner, `123456`, "error"},
-		{"確認のコードが JSON でない", inner, `abc`, "error"},
+		{"どちらも JSON の文字列", jsonQuoted(t, inner), `"123456"`},
+		{"どちらもそのまま", inner, `123456`},
+		{"途中の記録だけそのまま", inner, `"123456"`},
+		{"確認のコードだけそのまま", jsonQuoted(t, inner), `123456`},
 	}
 	for i, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
-			token := "value-form-" + strconv.Itoa(i)
+			token := "both-forms-" + strconv.Itoa(i)
 			key := "2fa:challenge:" + token
-			if err := client.Set(ctx, key, tt.challenge, time.Minute).Err(); err != nil {
-				t.Fatal(err)
+			codeKey := "2fa:" + userID.String()
+			for k, v := range map[string]string{key: tt.challenge, codeKey: tt.code} {
+				if err := client.Set(ctx, k, v, time.Minute).Err(); err != nil {
+					t.Fatal(err)
+				}
 			}
-			if err := client.Set(ctx, codeKey, tt.code, time.Minute).Err(); err != nil {
-				t.Fatal(err)
+			_, err := s.checkTwoFactor(ctx, token, "000000")
+			wantBusinessError(t, err, MessageInvalidTwoFactorCode)
+			if got, want := rawValue(t, client, key), jsonQuoted(t, `{"userId":"`+userID.String()+`","attempts":1}`); got != want {
+				t.Errorf("誤ったコードのあとの途中の記録の値 = %s, want %s", got, want)
 			}
-			// 確認のコードが数のときは、合うコードでも Java 版は 500 にする
-			_, err := s.checkTwoFactor(ctx, token, "123456")
-			got := rawValue(t, client, key)
-			switch tt.want {
-			case "session":
-				wantBusinessError(t, err, MessageInvalidTwoFactorSession)
-				if got != tt.challenge {
-					t.Errorf("途中の記録の値 = %s, want 変わらない", got)
-				}
-			case "deleted":
-				wantBusinessError(t, err, MessageInvalidTwoFactorCode)
-				if got != "" {
-					t.Errorf("途中の記録の値 = %s, want 消える", got)
-				}
-			default:
-				var e *Error
-				if err == nil || errors.As(err, &e) {
-					t.Errorf("誤り = %v, want *Error でない誤り", err)
-				}
-				if got != tt.challenge || rawValue(t, client, codeKey) != tt.code {
-					t.Error("誤りなのに値が変わった")
-				}
+			got, err := s.checkTwoFactor(ctx, token, "123456")
+			if err != nil {
+				t.Fatalf("checkTwoFactor: %v", err)
+			}
+			if got != userID {
+				t.Errorf("利用者の ID = %s, want %s", got, userID)
 			}
 		})
+	}
+}
+
+// TestTwoFactor_UnreadableValues は、途中の記録を JSON として読めないときは、途中の記録が無いときと同じく断って
+// 値を変えないことと、閉じていない JSON の文字列は誤りにすることを確かめる。
+// どれも、どの版も書かない値である(変えた動きの一覧の CB-131)。
+func TestTwoFactor_UnreadableValues(t *testing.T) {
+	ctx := t.Context()
+	s, client, _ := newTwoFactorService(t, nil)
+	userID := uuid.New()
+	if err := client.Set(ctx, "2fa:"+userID.String(), `"123456"`, time.Minute).Err(); err != nil {
+		t.Fatal(err)
+	}
+	for i, stored := range []string{
+		`abc`, `5`, `[1]`, `null`,
+		jsonQuoted(t, `{"userId":"`+userID.String()+`","attempts":"2"}`),
+		jsonQuoted(t, `{"userId":"zz","attempts":0}`),
+		jsonQuoted(t, `{"userId":"`+userID.String()+`","attempts":0}}`),
+	} {
+		token := "unreadable-" + strconv.Itoa(i)
+		key := "2fa:challenge:" + token
+		if err := client.Set(ctx, key, stored, time.Minute).Err(); err != nil {
+			t.Fatal(err)
+		}
+		_, err := s.checkTwoFactor(ctx, token, "123456")
+		wantBusinessError(t, err, MessageInvalidTwoFactorSession)
+		if got := rawValue(t, client, key); got != stored {
+			t.Errorf("途中の記録の値 = %s, want 変わらない %s", got, stored)
+		}
+	}
+
+	if err := client.Set(ctx, "2fa:challenge:broken", `"{`, time.Minute).Err(); err != nil {
+		t.Fatal(err)
+	}
+	var e *Error
+	if _, err := s.checkTwoFactor(ctx, "broken", "123456"); err == nil || errors.As(err, &e) {
+		t.Errorf("閉じていない JSON の文字列の誤り = %v, want *Error でない誤り", err)
 	}
 }
 

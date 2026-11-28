@@ -20,8 +20,8 @@ import (
 // 途中の記録は、キー 2fa:challenge:<値> に、{"userId":"…","attempts":n} の JSON を、さらに JSON の文字列にして置く。
 // どちらも有効な時間は10分である。
 //
-// Java 版は、途中の記録の中の JSON を、Jackson で TwoFactorAuthChallenge に読む。Jackson は、型の違う値を
-// ゆるく読むので、Go 版も、開発環境の Java 版で確かめた同じ規則で読む(parseTwoFactorChallenge)。
+// 読むときは、getText のとおり、JSON の文字列にした形と、そのままの形の、どちらでも読む。
+// 途中の記録は、encoding/json で読み、読めない記録と、利用者の ID の無い記録は、見つからないとする。
 
 const (
 	twoFactorCodeKeyPrefix      = "2fa:"
@@ -32,21 +32,10 @@ const (
 	twoFactorMaxAttempts = 5
 )
 
-// twoFactorChallenge は、Java 版の TwoFactorAuthChallenge と同じ項目と順の、途中の記録である。
-// Java 版は、利用者の ID が無い記録も読み、ID を null として書き直すので、UserID は nil を取れる。
-// Attempts は、Java 版の int と同じく、32ビットで数え、上限を越えると負の数に回る。
+// twoFactorChallenge は、途中の記録である。項目の名前と順は、Java 版が読み書きする形と同じにする。
 type twoFactorChallenge struct {
-	UserID   *uuid.UUID `json:"userId"`
-	Attempts int32      `json:"attempts"`
-}
-
-// codeKey は、途中の記録の利用者の確認のコードのキーを返す。利用者の ID が無いときは、Java 版の
-// "2fa:" + null と同じく、2fa:null を返す。
-func (c twoFactorChallenge) codeKey() string {
-	if c.UserID == nil {
-		return twoFactorCodeKeyPrefix + "null"
-	}
-	return twoFactorCodeKeyPrefix + c.UserID.String()
+	UserID   uuid.UUID `json:"userId"`
+	Attempts int       `json:"attempts"`
 }
 
 // issueTwoFactor は、Java 版の TwoFactorAuthIssueUseCase と同じく、6桁の確認のコードを置き、途中の記録を置き、
@@ -63,7 +52,7 @@ func (s *Service) issueTwoFactor(ctx context.Context, userID uuid.UUID, email st
 	if err != nil {
 		return "", err
 	}
-	if err := s.putTwoFactorChallenge(ctx, token, twoFactorChallenge{UserID: &userID}, twoFactorLifetime); err != nil {
+	if err := s.putTwoFactorChallenge(ctx, token, twoFactorChallenge{UserID: userID}, twoFactorLifetime); err != nil {
 		return "", err
 	}
 	if err := s.sendMail(ctx, email, twoFactorCodeMail(s.deps.App, code)); err != nil {
@@ -74,7 +63,7 @@ func (s *Service) issueTwoFactor(ctx context.Context, userID uuid.UUID, email st
 
 // checkTwoFactor は、Java 版の TwoFactorAuthVerifyUseCase のうち、利用者を読む前までを写す。
 // 途中の記録の値 token と確認のコード code を照らし、合えば途中の記録と確認のコードを消して、利用者の ID を返す。
-// 途中の記録に利用者の ID が無いときは、uuid.Nil を返す。照らす順と、消す順と、断るときの文言は Java 版と同じである。
+// 照らす順と、消す順と、断るときの文言は Java 版と同じである。
 func (s *Service) checkTwoFactor(ctx context.Context, token, code string) (uuid.UUID, error) {
 	if !notBlank(token) {
 		return uuid.Nil, errBusiness(MessageInvalidTwoFactorSession)
@@ -87,7 +76,7 @@ func (s *Service) checkTwoFactor(ctx context.Context, token, code string) (uuid.
 		return uuid.Nil, errBusiness(MessageInvalidTwoFactorSession)
 	}
 	challengeKey := twoFactorChallengeKeyPrefix + token
-	codeKey := challenge.codeKey()
+	codeKey := twoFactorCodeKeyPrefix + challenge.UserID.String()
 	saved, ok, err := s.findTwoFactorCode(ctx, codeKey)
 	if err != nil {
 		return uuid.Nil, err
@@ -120,16 +109,13 @@ func (s *Service) checkTwoFactor(ctx context.Context, token, code string) (uuid.
 	if err := s.deleteKey(ctx, codeKey); err != nil {
 		return uuid.Nil, err
 	}
-	if challenge.UserID == nil {
-		return uuid.Nil, nil
-	}
-	return *challenge.UserID, nil
+	return challenge.UserID, nil
 }
 
 // incrementTwoFactorAttempts は、Java 版の incrementAttempts と同じく、途中の記録を読み直して回数を1つ増やし、
 // 残りの有効な時間のまま置き直して、増やしたあとの回数を返す。残りの有効な時間が0以下なら10分にする。
 // 途中の記録が無いときは、何も置かずに0を返す。
-func (s *Service) incrementTwoFactorAttempts(ctx context.Context, token string) (int32, error) {
+func (s *Service) incrementTwoFactorAttempts(ctx context.Context, token string) (int, error) {
 	challenge, ok, err := s.findTwoFactorChallenge(ctx, token)
 	if err != nil || !ok {
 		return 0, err
@@ -159,21 +145,23 @@ func (s *Service) putTwoFactorChallenge(ctx context.Context, token string, c two
 	return s.setJSON(ctx, twoFactorChallengeKeyPrefix+token, inner, ttl)
 }
 
-// findTwoFactorChallenge は、途中の記録を読む。Java 版の find と同じく、キーが無いときと、
-// 値が JSON の null のときと、中の JSON を途中の記録として読めないときは、見つからないとする。
-// 値が JSON でないときと、JSON の文字列でも null でもないときは、Java 版が例外にするので、誤りを返す。
+// findTwoFactorChallenge は、途中の記録を読む。キーが無いときと、記録を JSON として読めないときと、
+// 記録に利用者の ID が無いときは、見つからないとする。
 func (s *Service) findTwoFactorChallenge(ctx context.Context, token string) (twoFactorChallenge, bool, error) {
-	text, ok, err := s.getJSONString(ctx, twoFactorChallengeKeyPrefix+token)
+	text, ok, err := s.getText(ctx, twoFactorChallengeKeyPrefix+token)
 	if err != nil || !ok {
 		return twoFactorChallenge{}, false, err
 	}
-	return parseTwoFactorChallenge(text)
+	var c twoFactorChallenge
+	if json.Unmarshal([]byte(text), &c) != nil || c.UserID == uuid.Nil {
+		return twoFactorChallenge{}, false, nil
+	}
+	return c, true, nil
 }
 
-// findTwoFactorCode は、確認のコードを読む。Java 版の find と同じく、キーが無いときと、値が JSON の null のときは、
-// 見つからないとする。値が JSON でないときと、JSON の文字列でも null でもないときは、誤りを返す。
+// findTwoFactorCode は、確認のコードを読む。キーが無いときは、見つからないとする。
 func (s *Service) findTwoFactorCode(ctx context.Context, key string) (string, bool, error) {
-	return s.getJSONString(ctx, key)
+	return s.getText(ctx, key)
 }
 
 // getJSONString は、キーの値を JSON として読み、JSON の文字列ならその文字列を返す。
@@ -205,36 +193,6 @@ func (s *Service) deleteKey(ctx context.Context, key string) error {
 		return fmt.Errorf("auth: Redis の値を消せない: %w", err)
 	}
 	return nil
-}
-
-// parseTwoFactorChallenge は、途中の記録の中の JSON を、Java 版の Jackson の
-// readValue(text, TwoFactorAuthChallenge.class) と同じ規則で読む。開発環境の Java 版で確かめた規則は次のとおりである。
-//
-//   - 先頭の1つの JSON の値だけを読み、そのあとの文字は見ない。読めないとき、または値が JSON のオブジェクトでないときは、
-//     見つからないとする。値が null のときは、Java 版が例外にするので、誤りを返す
-//   - 知らない項目は飛ばす。同じ項目が2回あるときは、あとの値を使う
-//   - userId と attempts は、parseJacksonUUID と parseJacksonInt の規則で読む。読めないときは見つからないとする
-func parseTwoFactorChallenge(text string) (twoFactorChallenge, bool, error) {
-	fields, ok, err := parseJacksonObject(text)
-	if err != nil || !ok {
-		return twoFactorChallenge{}, false, err
-	}
-	var c twoFactorChallenge
-	if raw, ok := fields["userId"]; ok {
-		id, ok := parseJacksonUUID(raw)
-		if !ok {
-			return twoFactorChallenge{}, false, nil
-		}
-		c.UserID = id
-	}
-	if raw, ok := fields["attempts"]; ok {
-		n, ok := parseJacksonInt(raw)
-		if !ok {
-			return twoFactorChallenge{}, false, nil
-		}
-		c.Attempts = n
-	}
-	return c, true, nil
 }
 
 // parseJacksonObject は、Java 版の Jackson の readValue(text, 記録の型.class) と同じ規則で、

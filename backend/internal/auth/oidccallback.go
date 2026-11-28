@@ -129,8 +129,8 @@ func (s *Service) oidcFailure(cause error) OIDCCallbackResult {
 }
 
 // findOIDCSession は、Java 版の RedisOidcAuthorizationSessionStore の find と同じく、oidc:state:<state> のキーが
-// あるかを確かめてから、provider と code_verifier の記録を読む。キーが無いとき、どちらかの記録が JSON の文字列で
-// ないとき(無いときと null のときを含む)は、誤りを返す。
+// あるかを確かめてから、provider と code_verifier の記録を読む。キーが無いときと、どちらかの記録が無いときは、
+// 誤りを返す。記録は、getText のとおり、JSON の文字列にした形と、そのままの形の、どちらでも読む。
 func (s *Service) findOIDCSession(ctx context.Context, state string) (provider, verifier string, err error) {
 	n, err := s.deps.Redis.Exists(ctx, oidcStateKeyPrefix+state).Result()
 	if err != nil {
@@ -139,11 +139,11 @@ func (s *Service) findOIDCSession(ctx context.Context, state string) (provider, 
 	if n == 0 {
 		return "", "", errors.New("auth: state の記録が無いか期限が切れた")
 	}
-	provider, ok, err := s.getJSONString(ctx, oidcProviderKeyPrefix+state)
+	provider, ok, err := s.getText(ctx, oidcProviderKeyPrefix+state)
 	if err != nil {
 		return "", "", err
 	}
-	verifier, ok2, err := s.getJSONString(ctx, oidcCodeVerifierKeyPrefix+state)
+	verifier, ok2, err := s.getText(ctx, oidcCodeVerifierKeyPrefix+state)
 	if err != nil {
 		return "", "", err
 	}

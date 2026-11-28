@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 	"unicode/utf16"
 	"unicode/utf8"
@@ -173,6 +174,38 @@ func (s *Service) getJSON(ctx context.Context, key string, dst any) (bool, error
 		return false, fmt.Errorf("auth: Redis の値を JSON として読めない: %w", err)
 	}
 	return true, nil
+}
+
+// getText は、キーの文字列の値を読む。キーが無いときは偽を返す。
+// 値は、JSON の文字列にした形(今の Go 版と Java 版が書く形)と、そのままの形の、どちらでも読む。
+// 書き方をそのままの形に替える出荷の前に、読み方だけを替えておくためである(backend/CLAUDE.md の2回の出荷)。
+func (s *Service) getText(ctx context.Context, key string) (string, bool, error) {
+	raw, err := s.deps.Redis.Get(ctx, key).Result()
+	if errors.Is(err, redis.Nil) {
+		return "", false, nil
+	}
+	if err != nil {
+		return "", false, fmt.Errorf("auth: Redis の値を読めない: %w", err)
+	}
+	text, err := decodeStoredText(raw)
+	if err != nil {
+		return "", false, err
+	}
+	return text, true, nil
+}
+
+// decodeStoredText は、Redis に置かれた文字列の値 raw を読む。raw が「"」で始まれば、JSON の文字列として読み、
+// ほかはそのままの文字列とする。そのままの形で書く値(確認のコード、ID、トークン、記録の JSON のオブジェクト)は、
+// どれも「"」で始まらないので、2つの形を取り違えない。
+func decodeStoredText(raw string) (string, error) {
+	if !strings.HasPrefix(raw, `"`) {
+		return raw, nil
+	}
+	var text string
+	if err := json.Unmarshal([]byte(raw), &text); err != nil {
+		return "", fmt.Errorf("auth: Redis の値を JSON の文字列として読めない: %w", err)
+	}
+	return text, nil
 }
 
 // hsetJSON は、ハッシュの項目の値を1つずつ JSON にして置き、キーに有効な時間を付ける。

@@ -34,10 +34,11 @@ func (s *Service) storePasswordResetToken(ctx context.Context, token string, use
 	return s.setJSON(ctx, passwordResetKeyPrefix+token, userID.String(), ttl)
 }
 
-// findPasswordResetUserID は、再設定の値 token の利用者の ID を返す。記録が無いときと、記録が JSON の null のときは、
-// 偽を返す(Java 版の findUserId)。記録が文字列でないときと、UUID でないときは、Java 版が例外にするので、誤りを返す。
+// findPasswordResetUserID は、再設定の値 token の利用者の ID を返す。記録が無いときは、偽を返す(Java 版の findUserId)。
+// 記録は、getText のとおり、JSON の文字列にした形と、そのままの形の、どちらでも読む。
+// 記録が UUID でないときは、Java 版が例外にするので、誤りを返す。
 func (s *Service) findPasswordResetUserID(ctx context.Context, token string) (uuid.UUID, bool, error) {
-	text, ok, err := s.getJSONString(ctx, passwordResetKeyPrefix+token)
+	text, ok, err := s.getText(ctx, passwordResetKeyPrefix+token)
 	if err != nil || !ok {
 		return uuid.Nil, false, err
 	}
