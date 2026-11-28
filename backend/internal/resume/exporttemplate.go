@@ -8,8 +8,6 @@ import (
 	"io"
 	"strings"
 	"text/template"
-
-	"github.com/DogisRiki/KeirekiPro/backend/internal/auth"
 )
 
 // markdownTemplateText は、Markdown のひな形である。Java 版の templates/resume/markdown/default.md を写した。
@@ -29,7 +27,7 @@ var exportTemplateFuncs = template.FuncMap{
 	// join は、技術スタックの名前を、Java 版の #strings.listJoin と同じく「, 」でつなぎ、字を書き換えて出す。
 	"join": func(v []string) string { return exportTextEscaper.Replace(strings.Join(v, ", ")) },
 	// notBlank は、値があり、Java の Character.isWhitespace に当たらない字を含むかを返す。Thymeleaf の #strings.isEmpty の逆である。
-	"notBlank": func(s *string) bool { return s != nil && auth.NotBlank(*s) },
+	"notBlank": func(s *string) bool { return s != nil && notBlank(*s) },
 	// deref は、値のある文字列の中身を返す。
 	"deref": func(s *string) string { return *s },
 }
@@ -65,9 +63,9 @@ var pdfHTMLTemplateText string
 // pdfHTMLTemplateFuncs は、PDF のひな形から呼ぶ関数である。利用者が書いた字は html/template が書き換えるので、書き換える関数は持たない。
 var pdfHTMLTemplateFuncs = htmltemplate.FuncMap{
 	// notBlank は、値があり、Java の Character.isWhitespace に当たらない字を含むかを返す。Thymeleaf の #strings.isEmpty の逆である。
-	"notBlank": func(s *string) bool { return s != nil && auth.NotBlank(*s) },
+	"notBlank": func(s *string) bool { return s != nil && notBlank(*s) },
 	// notBlankText は、notBlank の、値が必ずある文字列の版である。
-	"notBlankText": auth.NotBlank,
+	"notBlankText": notBlank,
 	// deref は、値のある文字列の中身を返す。
 	"deref": func(s *string) string { return *s },
 }

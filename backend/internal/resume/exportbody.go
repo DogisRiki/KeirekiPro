@@ -95,7 +95,7 @@ func validateExportBody(b exportBody) *auth.Error {
 
 // checkExportChoice は、Java 版の @NotBlank と、選べる値を | でつないだ @Pattern を写す。
 func checkExportChoice(f auth.FieldErrors, field string, s *string, required, invalid string, choices ...string) {
-	f.Check(field, s != nil && auth.NotBlank(*s), required)
+	f.Check(field, s != nil && notBlank(*s), required)
 	f.Check(field, s == nil || containsString(choices, *s), invalid)
 }
 

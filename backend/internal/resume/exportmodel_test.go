@@ -111,6 +111,7 @@ func TestExportModel_Formats(t *testing.T) {
 	})
 
 	t.Run("成果の行", func(t *testing.T) {
+		checkDiffTableInChangedBehaviors(t, map[string]string{"改行しない空白だけの成果の行": "CB-117"})
 		cases := []struct {
 			in   string
 			want []string
@@ -119,6 +120,10 @@ func TestExportModel_Formats(t *testing.T) {
 			{" 　\t", nil},
 			{"- a\r\n*  b\r• c\n・ d\n  \n　\n-\te \n-\n*x\n-\t f\n- g\nh", []string{"・a", "・b", "・c", "・ d", "・e", "-", "*x", "-\t f", "- g", "h"}},
 			{"1行目\n\n2行目\n", []string{"1行目", "2行目"}},
+			// 行の前後の ASCII の制御の字は除き、全角の空白は字下げとして残す。
+			{"\u0001a\u001f\n　字下げの行\u3000", []string{"a", "　字下げの行\u3000"}},
+			// 改行しない空白だけの行は、空白だけの行として除く(変えた動きの一覧の CB-117)。
+			{"a\n\u00a0\n\u202f\nb", []string{"a", "b"}},
 		}
 		for _, c := range cases {
 			got := buildExportProject(Project{Achievement: c.in}).Achievements

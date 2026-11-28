@@ -265,11 +265,6 @@ func TestExported_Validators(t *testing.T) {
 			t.Errorf("EmailCreateErrors(%q) = %v, want %v", in, EmailCreateErrors(in), emailCreateErrors(in))
 		}
 	}
-	for _, r := range []rune{' ', '\t', '　', ' ', 'a'} {
-		if IsJavaWhitespace(r) != isJavaWhitespace(r) {
-			t.Errorf("IsJavaWhitespace(%U) = %v, want %v", r, IsJavaWhitespace(r), isJavaWhitespace(r))
-		}
-	}
 }
 
 // TestExported_EmailInUse は、EmailInUse が、users の email の列にメールアドレスを持つ利用者が居るときだけ真を返すことを確かめる。

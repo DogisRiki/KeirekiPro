@@ -9,8 +9,8 @@ import (
 	"github.com/google/uuid"
 )
 
-// javaStripRunes は、research.md の試作の記録の P6 に書いた、Java の String.strip() が名前の前後から取り除く字である。
-var javaStripRunes = func() []rune {
+// spaceRunes は、unicode.IsSpace が空白とし、名前の前後から取り除く字である。
+var spaceRunes = func() []rune {
 	var rs []rune
 	add := func(from, to rune) {
 		for r := from; r <= to; r++ {
@@ -18,18 +18,20 @@ var javaStripRunes = func() []rune {
 		}
 	}
 	add(0x0009, 0x000D)
-	add(0x001C, 0x0020)
+	add(0x0020, 0x0020)
+	add(0x0085, 0x0085)
+	add(0x00A0, 0x00A0)
 	add(0x1680, 0x1680)
-	add(0x2000, 0x2006)
-	add(0x2008, 0x200A)
+	add(0x2000, 0x200A)
 	add(0x2028, 0x2029)
+	add(0x202F, 0x202F)
 	add(0x205F, 0x205F)
 	add(0x3000, 0x3000)
 	return rs
 }()
 
-// javaKeptRunes は、P6 に書いた、空白に見えるが Java の String.strip() が取り除かない字である。
-var javaKeptRunes = []rune{0x00A0, 0x2007, 0x202F, 0x0085, 0x200B}
+// keptRunes は、空白に見えるか空白に近いが、unicode.IsSpace が空白としないので取り除かない字である。
+var keptRunes = []rune{0x001C, 0x001F, 0x200B, 0x180E, 0xFEFF}
 
 func TestNormalizeUsername(t *testing.T) {
 	const (
@@ -52,12 +54,14 @@ func TestNormalizeUsername(t *testing.T) {
 		{"前にタブ、後ろに改行", "\t山田\n", "山田", ""},
 		{"前後に全角の空白", "\u3000山田\u3000", "山田", ""},
 		{"全角の空白だけ", "\u3000", "", required},
-		{"前後にノーブレークスペース", "\u00a0山田\u00a0", "\u00a0山田\u00a0", ""},
-		{"前に数字幅の空白", "\u2007山田", "\u2007山田", ""},
+		// 改行しない空白と次の行の字は取り除き、情報の区切りの制御文字は残す(変えた動きの一覧の CB-113)。
+		{"前後にノーブレークスペース", "\u00a0山田\u00a0", "山田", ""},
+		{"前に数字幅の空白", "\u2007山田", "山田", ""},
 		{"前にゼロ幅の空白", "\u200b山田", "\u200b山田", ""},
-		{"前に NEL", "\u0085山田", "\u0085山田", ""},
+		{"前に NEL", "\u0085山田", "山田", ""},
+		{"ノーブレークスペースだけ", "\u00a0", "", required},
 		{"前後に行と段落の区切り", "\u2028山田\u2029", "山田", ""},
-		{"前後に情報の区切りの制御文字", "\u001c山田\u001f", "山田", ""},
+		{"前後に情報の区切りの制御文字", "\u001c山田\u001f", "\u001c山田\u001f", ""},
 		{"前後に数式の空白とオガムの空白", "\u205f山田\u1680", "山田", ""},
 		{"前にモンゴル語の母音の区切り", "\u180e山田", "\u180e山田", ""},
 		{"前に BOM", "\ufeff山田", "\ufeff山田", ""},
@@ -87,7 +91,7 @@ func TestNormalizeUsername(t *testing.T) {
 		})
 	}
 
-	// 前後の空白の判定を、P6 の一覧と、すべての字で比べる。字 r を名前の前と後ろに付け、取り除かれるかを見る。
+	// 前後の空白の判定を、spaceRunes の一覧と、すべての字で比べる。字 r を名前の前と後ろに付け、取り除かれるかを見る。
 	t.Run("前後から取り除く字", func(t *testing.T) {
 		for r := rune(0); r <= utf8.MaxRune; r++ {
 			if !utf8.ValidRune(r) {
@@ -95,11 +99,11 @@ func TestNormalizeUsername(t *testing.T) {
 			}
 			got, message := normalizeUsername(string(r) + "a" + string(r))
 			stripped := got == "a" && message == ""
-			if want := slices.Contains(javaStripRunes, r); stripped != want {
-				t.Errorf("字 U+%04X を取り除く = %v、P6 の一覧 = %v(答え %+q 文言 %q)", r, stripped, want, got, message)
+			if want := slices.Contains(spaceRunes, r); stripped != want {
+				t.Errorf("字 U+%04X を取り除く = %v、空白の一覧 = %v(答え %+q 文言 %q)", r, stripped, want, got, message)
 			}
 		}
-		for _, r := range javaKeptRunes {
+		for _, r := range keptRunes {
 			if got, _ := normalizeUsername(string(r) + "a" + string(r)); got != string(r)+"a"+string(r) {
 				t.Errorf("字 U+%04X の答え = %+q、期待 = 取り除かない", r, got)
 			}

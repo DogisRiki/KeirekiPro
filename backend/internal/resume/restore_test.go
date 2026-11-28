@@ -133,6 +133,7 @@ func TestBuildRestored_Rules(t *testing.T) {
 		}
 	})
 
+	checkDiffTableInChangedBehaviors(t, map[string]string{"使えない字を含む名前と空白だけの値の戻し": "CB-116"})
 	emoji := strings.Repeat("\U0001F600", 25)
 	cases := []struct {
 		name   string
@@ -147,8 +148,12 @@ func TestBuildRestored_Rules(t *testing.T) {
 		{"BMP の外の字25字の名前は50文字", func(r *rsResume) { r.Name = ptr(emoji) }, true},
 		{"BMP の外の字25字と1字の名前は51文字", func(r *rsResume) { r.Name = ptr(emoji + "あ") }, false},
 		{"置き換えの字 U+FFFD は1文字", func(r *rsResume) { r.Name = ptr("�" + strings.Repeat("あ", 49)) }, true},
-		{"使えない字を含む名前", func(r *rsResume) { r.Name = ptr("経歴書/一") }, false},
+		// 使えない字は確かめない(変えた動きの一覧の CB-116)。
+		{"使えない字を含む名前", func(r *rsResume) { r.Name = ptr("経歴書/一") }, true},
 		{"使えない字と行の区切りの字を含む名前", func(r *rsResume) { r.Name = ptr("経歴書/一\u2028") }, true},
+		// 空白だけかは unicode.IsSpace で決める(変えた動きの一覧の CB-116)。
+		{"改行しない空白だけの名前", func(r *rsResume) { r.Name = ptr("\u00a0") }, false},
+		{"情報の区切りの制御の字だけの名前", func(r *rsResume) { r.Name = ptr("\u001c") }, true},
 		{". で始まる名前", func(r *rsResume) { r.Name = ptr(".経歴書") }, false},
 		{". で終わる名前", func(r *rsResume) { r.Name = ptr("経歴書.") }, false},
 		// 日付

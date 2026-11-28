@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"strings"
 	"unicode/utf8"
-
-	"github.com/DogisRiki/KeirekiPro/backend/internal/auth"
 )
 
 // exportTitle は、2つのひな形の見出しである。
@@ -172,7 +170,7 @@ func buildExportProject(p Project) exportProject {
 // companyPeriodLabel は、勤務先の名前と同じ名前の最初の職歴の期間を返す。勤務先の名前が空白だけのときと、
 // 同じ名前の職歴が無いときは、空の文字列を返す。
 func companyPeriodLabel(company string, careers []Career) string {
-	if !auth.NotBlank(company) {
+	if !notBlank(company) {
 		return ""
 	}
 	for _, c := range careers {
@@ -183,8 +181,9 @@ func companyPeriodLabel(company string, careers []Career) string {
 	return ""
 }
 
-// javaTrim は、Java の String.trim と同じく、前後の U+0020 以下の字を除く。
-func javaTrim(s string) string {
+// trimSpaceAndControl は、前後の半角の空白と ASCII の制御の字(U+0000〜U+001F)を除く。
+// 全角の空白は、行の頭の字下げに使うので残す。
+func trimSpaceAndControl(s string) string {
 	return strings.TrimFunc(s, func(r rune) bool { return r <= ' ' })
 }
 
@@ -197,7 +196,7 @@ func formatExportFullName(last, first *string) string {
 	if first != nil {
 		f = *first
 	}
-	return javaTrim(l + " " + f)
+	return trimSpaceAndControl(l + " " + f)
 }
 
 // formatExportYearMonth は、年月を「2006年1月」の形にする。値が無いときは空の文字列を返す。
@@ -253,13 +252,13 @@ func buildExportProcess(p Process) exportProcess {
 // 行の区切りは、Java の String.lines と同じく \r\n と \r と \n である。行ごとに前後の空白を除き、
 // 頭の「- 」「* 」「• 」などを「・」に直し、空白だけの行を除く。
 func splitAchievementLines(raw string) []string {
-	if !auth.NotBlank(raw) {
+	if !notBlank(raw) {
 		return nil
 	}
 	var lines []string
 	for _, l := range strings.Split(strings.ReplaceAll(strings.ReplaceAll(raw, "\r\n", "\n"), "\r", "\n"), "\n") {
-		l = normalizeBulletPrefix(javaTrim(l))
-		if auth.NotBlank(l) {
+		l = normalizeBulletPrefix(trimSpaceAndControl(l))
+		if notBlank(l) {
 			lines = append(lines, l)
 		}
 	}
@@ -273,11 +272,11 @@ func normalizeBulletPrefix(s string) string {
 	}
 	for _, p := range []string{"- ", "* ", "• "} {
 		if rest, ok := strings.CutPrefix(s, p); ok {
-			return "・" + javaTrim(rest)
+			return "・" + trimSpaceAndControl(rest)
 		}
 	}
 	if rest, ok := cutBulletPattern(s); ok {
-		return "・" + javaTrim(rest)
+		return "・" + trimSpaceAndControl(rest)
 	}
 	return s
 }
@@ -303,10 +302,10 @@ func normalizeExportList(values []*string) []string {
 	var out []string
 	seen := map[string]bool{}
 	for _, v := range values {
-		if v == nil || !auth.NotBlank(*v) {
+		if v == nil || !notBlank(*v) {
 			continue
 		}
-		s := javaTrim(*v)
+		s := trimSpaceAndControl(*v)
 		if !seen[s] {
 			seen[s] = true
 			out = append(out, s)
@@ -436,7 +435,7 @@ func buildExportTechSections(ts TechStack) []exportTechSection {
 			// Java 版の putTechLine と同じく、整えた並びをつないだ値が空白だけなら、行を出さない。
 			// 前後の空白を除くと空になる名前 "\u0001" は、整えた並びに "" として残るためである。
 			if v := normalizeExportList(in.values); v != nil {
-				if joined := strings.Join(v, "、"); auth.NotBlank(joined) {
+				if joined := strings.Join(v, "、"); notBlank(joined) {
 					lines = append(lines, exportTechLine{Label: in.label, Value: joined})
 				}
 			}

@@ -56,7 +56,7 @@ func exportRuleTargetOf(r *Resume) exportRuleTarget {
 // 氏名が無いときは、姓と名を確かめない。
 func (t exportRuleTarget) missing() []string {
 	var m []string
-	if !auth.NotBlank(t.name) {
+	if !notBlank(t.name) {
 		m = append(m, MessageExportNameRequired)
 	}
 	if !t.hasDate {
@@ -65,10 +65,10 @@ func (t exportRuleTarget) missing() []string {
 	if t.fullName == nil {
 		m = append(m, MessageExportFullNameRequired)
 	} else {
-		if t.fullName.lastName == nil || !auth.NotBlank(*t.fullName.lastName) {
+		if t.fullName.lastName == nil || !notBlank(*t.fullName.lastName) {
 			m = append(m, MessageExportLastNameRequired)
 		}
-		if t.fullName.firstName == nil || !auth.NotBlank(*t.fullName.firstName) {
+		if t.fullName.firstName == nil || !notBlank(*t.fullName.firstName) {
 			m = append(m, MessageExportFirstNameRequired)
 		}
 	}
