@@ -5,9 +5,11 @@ import (
 	"crypto/sha256"
 	"crypto/sha512"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"hash"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -73,10 +75,32 @@ func hmacSigner(newHash func() hash.Hash, key []byte) func(string) []byte {
 // devKeySigner は、Java 版の開発環境の鍵から導いた鍵で、HS256 で署名する関数である。
 var devKeySigner = hmacSigner(sha256.New, emailVerificationKey(javaDevSigningKey))
 
-// TestEmailVerificationToken_IssueMatchesJava は、Java 版と同じ項目でリンクの値を作ると、Java 版が送った値と
-// 1文字も違わない値になり、Java 版が送った値を読むと同じ項目になることを確かめる。ECS の入れ替えの途中で、
-// 一方の版が送ったリンクを他方の版が読めるようにするためである。lexp は、時刻の秒の端数を切り捨てて書く。
-func TestEmailVerificationToken_IssueMatchesJava(t *testing.T) {
+// testJWTHeader は、HS256 の JWT のヘッダの JSON である。
+const testJWTHeader = `{"alg":"HS256","typ":"JWT"}`
+
+// decodeJWTSegment は、JWT の i 番目の部分を base64url で戻し、JSON として読む。
+func decodeJWTSegment(t *testing.T, token string, i int) map[string]any {
+	t.Helper()
+	parts := strings.Split(token, ".")
+	if len(parts) != 3 {
+		t.Fatalf("値 %q が3つの部分に分かれない", token)
+	}
+	raw, err := base64.RawURLEncoding.DecodeString(parts[i])
+	if err != nil {
+		t.Fatalf("%d 番目の部分を戻せない: %v", i, err)
+	}
+	var v map[string]any
+	if err := json.Unmarshal(raw, &v); err != nil {
+		t.Fatalf("%d 番目の部分を JSON として読めない: %v", i, err)
+	}
+	return v
+}
+
+// TestEmailVerificationToken_Issue は、リンクの値が、HS256 のヘッダと、aud、jti、sub、purpose、email、lexp の
+// 6つの項目を持ち、Go 版が作った値と Java 版が送った値のどちらを読んでも同じ項目になることを確かめる。
+// ECS の入れ替えの途中で、一方の版が送ったリンクを他方の版が読めるようにするためである。
+// lexp は、時刻の秒の端数を切り捨てて書く。
+func TestEmailVerificationToken_Issue(t *testing.T) {
 	issuedAt := time.Unix(javaSampleIssuedAt, 900_000_000)
 	svc := newEmailVerificationTokenService(issuedAt)
 	want := emailVerificationClaims{
@@ -92,13 +116,27 @@ func TestEmailVerificationToken_IssueMatchesJava(t *testing.T) {
 	if err != nil {
 		t.Fatalf("issueEmailVerificationToken: %v", err)
 	}
-	if sample := javaSampleToken(t); got != sample {
-		t.Errorf("作った値 = %s\nwant %s", got, sample)
+	wantHeader := map[string]any{"alg": "HS256", "typ": "JWT"}
+	if header := decodeJWTSegment(t, got, 0); !reflect.DeepEqual(header, wantHeader) {
+		t.Errorf("ヘッダ = %v, want %v", header, wantHeader)
+	}
+	wantPayload := map[string]any{
+		"aud":     "keirekipro-email-verification",
+		"jti":     javaSampleJTI,
+		"sub":     javaSampleSubject,
+		"purpose": "REGISTRATION",
+		"email":   javaSampleEmail,
+		"lexp":    float64(javaSampleIssuedAt + 24*3600),
+	}
+	if payload := decodeJWTSegment(t, got, 1); !reflect.DeepEqual(payload, wantPayload) {
+		t.Errorf("本体 = %v, want %v", payload, wantPayload)
 	}
 
-	claims, ok := svc.readEmailVerificationToken(javaSampleToken(t))
-	if !ok || !sameEmailVerificationClaims(claims, want) {
-		t.Errorf("Java 版の値を読んだ項目 = %+v, %v, want %+v", claims, ok, want)
+	for name, token := range map[string]string{"Go 版が作った値": got, "Java 版が送った値": javaSampleToken(t)} {
+		claims, ok := svc.readEmailVerificationToken(token)
+		if !ok || !sameEmailVerificationClaims(claims, want) {
+			t.Errorf("%sを読んだ項目 = %+v, %v, want %+v", name, claims, ok, want)
+		}
 	}
 }
 
@@ -139,12 +177,11 @@ func samplePayload(drop string, extra ...string) string {
 	return "{" + strings.Join(out, ",") + "}"
 }
 
-// TestEmailVerificationToken_ReadRejects は、Java 版の read が空を返す値を、Go 版も読まないことを確かめる。
-// 期待は、testdata/emailverification/Probe.java で、Java 版と同じ java-jwt 4.6.2 に同じ形の値を読ませた結果である。
+// TestEmailVerificationToken_ReadRejects は、署名か項目が合わない値を読まないことを確かめる。
 func TestEmailVerificationToken_ReadRejects(t *testing.T) {
 	now := time.Unix(javaSampleIssuedAt+60, 0)
 	svc := newEmailVerificationTokenService(now)
-	header := emailVerificationHeader
+	header := testJWTHeader
 	sample := javaSampleToken(t)
 	parts := strings.Split(sample, ".")
 	cases := []struct {
@@ -153,6 +190,7 @@ func TestEmailVerificationToken_ReadRejects(t *testing.T) {
 	}{
 		{"空の文字列", ""},
 		{"区切りの無い文字列", "abc"},
+		{"署名の末尾に = がある", sample + "="},
 		{"本体を書き換えた値", parts[0] + "." + base64.RawURLEncoding.EncodeToString([]byte(samplePayload("", `"email":"other@example.com"`))) + "." + parts[2]},
 		{"鍵を導かずに設定の鍵で署名した値", rawJWT(header, samplePayload(""), hmacSigner(sha256.New, []byte(javaDevSigningKey)))},
 		{"ほかの鍵から導いた鍵で署名した値", rawJWT(header, samplePayload(""), hmacSigner(sha256.New, emailVerificationKey(testSigningKey)))},
@@ -187,13 +225,11 @@ func TestEmailVerificationToken_ReadRejects(t *testing.T) {
 	}
 }
 
-// TestEmailVerificationToken_ReadAcceptsLikeJava は、Java 版の java-jwt が受け付ける、Go 版が作らない形の値も、
-// Go 版が読むことを確かめる。
-// 期待は、testdata/emailverification/Probe.java で、Java 版と同じ java-jwt 4.6.2 に同じ形の値を読ませた結果である。
-func TestEmailVerificationToken_ReadAcceptsLikeJava(t *testing.T) {
+// TestEmailVerificationToken_ReadAccepts は、Go 版が作らない形でも、署名と項目が合う値を読むことを確かめる。
+func TestEmailVerificationToken_ReadAccepts(t *testing.T) {
 	now := time.Unix(javaSampleIssuedAt+60, 0)
 	svc := newEmailVerificationTokenService(now)
-	header := emailVerificationHeader
+	header := testJWTHeader
 	want := emailVerificationClaims{
 		JTI:           javaSampleJTI,
 		SubjectID:     uuid.MustParse(javaSampleSubject),
@@ -208,11 +244,7 @@ func TestEmailVerificationToken_ReadAcceptsLikeJava(t *testing.T) {
 		token string
 		want  emailVerificationClaims
 	}{
-		// Java の Base64.getUrlDecoder は、末尾の = を受け付ける
-		{"署名の末尾に = がある", javaSampleToken(t) + "=", want},
-		// java-jwt の withAudience は、値の aud に、求める aud がすべて含まれていれば受け付ける
 		{"aud が並びで、ほかの値も含む", rawJWT(header, samplePayload("", `"aud":["other","keirekipro-email-verification"]`), devKeySigner), want},
-		// java-jwt は、jti が null でなければ、空の文字列も受け付ける
 		{"jti が空の文字列", rawJWT(header, samplePayload("", `"jti":""`), devKeySigner), emptyJTI},
 		{"exp と nbf と iat が今の時刻と合う", rawJWT(header, samplePayload("", `"exp":1794390000`, `"nbf":1794378000`, `"iat":1794378000`), devKeySigner), want},
 		{"知らない項目がある", rawJWT(header, samplePayload("", `"x":{"y":[1,2]}`), devKeySigner), want},
