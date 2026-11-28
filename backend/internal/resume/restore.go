@@ -225,15 +225,13 @@ func (b *restoreBuilder) period(start, end jsonYearMonth, active bool) Period {
 	return p
 }
 
-// link は、リンクを Java 版の Link の決まりで確かめる。空白だけでなく、URI として読め、スキームが ASCII の大文字と小文字を
-// 区別せずに https であること。
+// link は、リンクが空白だけでなく、https: で始まることを確かめる。
 func (b *restoreBuilder) link(s *string) string {
 	if s == nil || !auth.NotBlank(*s) {
 		b.ok = false
 		return ""
 	}
-	scheme, ok := parseJavaURI(javaChars(*s))
-	if !ok || !equalsIgnoreCaseASCII(scheme, "https") {
+	if !hasHTTPSScheme(*s) {
 		b.ok = false
 	}
 	return *s

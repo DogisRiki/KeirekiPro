@@ -206,7 +206,9 @@ func TestBuildRestored_Rules(t *testing.T) {
 		{"リンクが空白だけのポートフォリオ", func(r *rsResume) { r.Portfolios[0].Link = ptr("  ") }, false},
 		{"https でないリンク", func(r *rsResume) { r.Portfolios[0].Link = ptr("http://example.com") }, false},
 		{"スキームの無いリンク", func(r *rsResume) { r.Portfolios[0].Link = ptr("example.com/a") }, false},
-		{"URI として読めないリンク", func(r *rsResume) { r.Portfolios[0].Link = ptr("https://example.com/a b") }, false},
+		// Java 版は URI として読めないリンクを断った。Go 版は https: で始まれば戻す(CB-110)
+		{"URI として読めないリンク", func(r *rsResume) { r.Portfolios[0].Link = ptr("https://example.com/a b") }, true},
+		{"url: を前に付けたリンク", func(r *rsResume) { r.Portfolios[0].Link = ptr("url:https://example.com") }, true},
 		{"大文字の HTTPS のリンク", func(r *rsResume) { r.Portfolios[0].Link = ptr("HTTPS://example.com") }, true},
 		{"ホストの無い https のリンク", func(r *rsResume) { r.Portfolios[0].Link = ptr("https:x") }, true},
 		// SNS(SnsPlatform と Link)
