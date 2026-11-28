@@ -33,7 +33,7 @@ func ValidateSetEmailAndPassword(email *string, password string, confirmPassword
 	}
 	if email != nil {
 		f.Check("email", auth.UTF16Len(*email) <= emailMaxLength, MessageEmailTooLong)
-		f.Check("email", auth.IsEmailLikeHibernate(*email), MessageEmailInvalid)
+		f.Check("email", auth.IsEmailFormat(*email), MessageEmailInvalid)
 	}
 	checkPhrase(f, "password", password, MessagePhraseRequired, MessagePhraseLength, MessagePhrasePattern)
 	return f.Result()

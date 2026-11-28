@@ -618,7 +618,7 @@ func TestHandleOIDCCallback_NewUser(t *testing.T) {
 		{"null の名前の利用者には登録の完了のメールを作れない", `{"sub":"S","email":"E","email_verified":true,"name":null}`},
 		{"Google の利用者の ID が無い", `{"email":"E","email_verified":true,"name":"n"}`},
 		{"Google の利用者の ID が空白だけ", `{"sub":" \t","email":"E","email_verified":true,"name":"n"}`},
-		{"Commons の確かめを通らないメールアドレス", `{"sub":"S","email":"user@localhost","email_verified":true,"name":"n"}`},
+		{"保存できる形でないメールアドレス", `{"sub":"S","email":"user@localhost","email_verified":true,"name":"n"}`},
 	}
 	for _, c := range failures {
 		t.Run(c.name, func(t *testing.T) {

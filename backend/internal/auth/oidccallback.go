@@ -661,7 +661,7 @@ func (s *Service) createOIDCUser(ctx context.Context, q *sqlcgen.Queries, provid
 	if info.providerUserID == nil || !notBlank(*info.providerUserID) {
 		return StoredUser{}, errors.New("auth: Google か GitHub の利用者の ID が無い")
 	}
-	if info.email != nil && len(emailCreateErrors(*info.email)) > 0 {
+	if info.email != nil && len(emailErrors(*info.email)) > 0 {
 		return StoredUser{}, errors.New("auth: Google か GitHub のメールアドレスの形が正しくない")
 	}
 	id := pgtype.UUID{Bytes: uid, Valid: true}

@@ -258,11 +258,11 @@ func TestExported_Validators(t *testing.T) {
 		if PasswordPatternOK(in) != passwordPatternOK(in) {
 			t.Errorf("PasswordPatternOK(%q) = %v, want %v", in, PasswordPatternOK(in), passwordPatternOK(in))
 		}
-		if IsEmailLikeHibernate(in) != isEmailLikeHibernate(in) {
-			t.Errorf("IsEmailLikeHibernate(%q) = %v, want %v", in, IsEmailLikeHibernate(in), isEmailLikeHibernate(in))
+		if IsEmailFormat(in) != isEmailFormat(in) {
+			t.Errorf("IsEmailFormat(%q) = %v, want %v", in, IsEmailFormat(in), isEmailFormat(in))
 		}
-		if !reflect.DeepEqual(EmailCreateErrors(in), emailCreateErrors(in)) {
-			t.Errorf("EmailCreateErrors(%q) = %v, want %v", in, EmailCreateErrors(in), emailCreateErrors(in))
+		if !reflect.DeepEqual(EmailErrors(in), emailErrors(in)) {
+			t.Errorf("EmailErrors(%q) = %v, want %v", in, EmailErrors(in), emailErrors(in))
 		}
 	}
 }

@@ -127,14 +127,14 @@ func PasswordPatternOK(s string) bool {
 	return passwordPatternOK(s)
 }
 
-// IsEmailLikeHibernate は、Hibernate Validator の @Email と同じく、s がメールアドレスの形かを返す。
-func IsEmailLikeHibernate(s string) bool {
-	return isEmailLikeHibernate(s)
+// IsEmailFormat は、s がメールアドレスの形かを返す。空の値は誤りにしない。
+func IsEmailFormat(s string) bool {
+	return isEmailFormat(s)
 }
 
-// EmailCreateErrors は、Java 版の Email.create と同じく、メールアドレスの空と形の誤りの文言を返す。誤りが無ければ nil を返す。
-func EmailCreateErrors(email string) []string {
-	return emailCreateErrors(email)
+// EmailErrors は、保存するメールアドレスの空と形の誤りの文言を返す。誤りが無ければ nil を返す。
+func EmailErrors(email string) []string {
+	return emailErrors(email)
 }
 
 // EmailInUse は、Java 版の UserEmailDuplicationCheckService と同じく、users の email の列に email を持つ利用者が居るかを返す。

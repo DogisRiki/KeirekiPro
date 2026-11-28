@@ -1,10 +1,7 @@
 package auth
 
 import (
-	"io/fs"
-	"os"
 	"reflect"
-	"strconv"
 	"strings"
 	"testing"
 )
@@ -19,10 +16,10 @@ const validPhrase = "Abcdefg1"
 
 func TestValidate_Boundaries(t *testing.T) {
 	type fields = map[string][]string
-	// emailOf は、長さが n の、形の正しいメールアドレスを返す。後ろの部分は63文字のラベルを「.」でつなぐ。
+	// emailOf は、長さが n の、形の正しいメールアドレスを返す。前の部分は64文字にし、後ろの部分は63文字までのラベルを「.」でつなぐ。後ろの部分は253文字を超えない。
 	emailOf := func(n int) string {
-		domain := strings.Repeat("c", 63) + "." + strings.Repeat("c", 63) + "." + strings.Repeat("c", 63) + "."
-		return "a@" + domain + strings.Repeat("d", n-2-len(domain))
+		domain := strings.Repeat("c", 63) + "." + strings.Repeat("c", 63) + "."
+		return strings.Repeat("a", 64) + "@" + domain + strings.Repeat("d", n-65-len(domain))
 	}
 	tests := []struct {
 		name string
@@ -166,50 +163,10 @@ func TestValidate_NotBlank(t *testing.T) {
 	}
 }
 
-// TestValidate_IDNAToASCII は、ドメインの部分の変換が、Java 版が使う JDK 21 の java.net.IDN.toASCII と同じ結果を
-// 返すかを確かめる。メールアドレスの検査は変えたあとの長さだけを見るので、Punycode の符号そのものはこのテストで確かめる。
-// testdata/nameprep/idna_vectors.txt の期待は、testdata/nameprep/Vectors.java で、Java の IDN.toASCII を動かして作った。
-// 期待の「!」は、Java が IllegalArgumentException を投げたことを表す。
-func TestValidate_IDNAToASCII(t *testing.T) {
-	lines := readVectorLines(t, "idna_vectors.txt", 40)
-	for _, line := range lines {
-		quoted, want, ok := strings.Cut(line, "\t")
-		if !ok {
-			t.Fatalf("行の形が誤り: %q", line)
-		}
-		domain, err := strconv.Unquote(quoted)
-		if err != nil {
-			t.Fatalf("行 %q: %v", line, err)
-		}
-		got, ok := idnaToASCII(domain)
-		if !ok {
-			got = "!"
-		}
-		if got != want {
-			t.Errorf("idnaToASCII(%s) = %q, Java 版は %q", quoted, got, want)
-		}
-	}
-}
-
-// readVectorLines は、testdata/nameprep の中のファイル name を行に分けて返す。行が minLines 行に満たなければテストを止める。
-func readVectorLines(t *testing.T, name string, minLines int) []string {
-	t.Helper()
-	data, err := fs.ReadFile(os.DirFS("testdata/nameprep"), name)
-	if err != nil {
-		t.Fatal(err)
-	}
-	lines := strings.Split(strings.TrimSuffix(string(data), "\n"), "\n")
-	if len(lines) < minLines {
-		t.Fatalf("%s の行が %d 行しかない", name, len(lines))
-	}
-	return lines
-}
-
-// TestValidate_EmailLikeHibernate は、メールアドレスの形の判定が、Java 版の Hibernate Validator 9.1.5 の
-// EmailValidator と同じかを確かめる。testdata/nameprep/email_vectors.txt の期待は、testdata/nameprep/Vectors.java で、
-// Java 版の判定を動かして作った。
-func TestValidate_EmailLikeHibernate(t *testing.T) {
-	named := []struct {
+// TestValidate_EmailFormat は、メールアドレスの形の判定を確かめる。
+func TestValidate_EmailFormat(t *testing.T) {
+	c63 := strings.Repeat("c", 63)
+	tests := []struct {
 		email string
 		want  bool
 	}{
@@ -218,15 +175,19 @@ func TestValidate_EmailLikeHibernate(t *testing.T) {
 		{"noat", false},
 		{"a@b@example.com", false},
 		{"\"a@b\"@example.com", true},
+		{"a..b@example.com", false},
 		{strings.Repeat("a", 64) + "@example.com", true},
 		{strings.Repeat("a", 65) + "@example.com", false},
 		{"a@example.", false},
-		{"a@例え。", true},
-		{"a@。", true},
+		{"a@example..com", false},
+		{"a@b!c.com", true},
+		{"a@例え。テスト", true},
+		{"a@例え。", false},
 		{"a@例え。。テスト", false},
 		{"a@[127.0.0.1]", true},
 		{"a@[IPv6:2001:db8::1]", true},
-		{"a@ｘｎ--abc.com", true},
+		{"a@ｘｎ--p1ai.com", true},
+		{"a@xn--abc.com", false},
 		{"a@xn--あ.com", false},
 		{"a@" + ch(0x05D0) + "a" + ch(0x05D1) + ".com", false},
 		{"a@" + ch(0x0627) + ch(0x0653) + ".com", true},
@@ -234,24 +195,12 @@ func TestValidate_EmailLikeHibernate(t *testing.T) {
 		{"a@" + ch(0x1F600) + ".com", false},
 		{"a@" + strings.Repeat("b", 63) + ".com", true},
 		{"a@" + strings.Repeat("b", 64) + ".com", false},
+		{"a@" + c63 + "." + c63 + "." + c63 + "." + strings.Repeat("d", 61), true},
+		{"a@" + c63 + "." + c63 + "." + c63 + "." + strings.Repeat("d", 62), false},
 	}
-	for _, tt := range named {
-		if got := isEmailLikeHibernate(tt.email); got != tt.want {
-			t.Errorf("isEmailLikeHibernate(%q) = %v, 期待 %v", tt.email, got, tt.want)
-		}
-	}
-
-	for _, line := range readVectorLines(t, "email_vectors.txt", 3800) {
-		want, quoted, ok := strings.Cut(line, "\t")
-		if !ok {
-			t.Fatalf("行の形が誤り: %q", line)
-		}
-		email, err := strconv.Unquote(quoted)
-		if err != nil {
-			t.Fatalf("行 %q: %v", line, err)
-		}
-		if got := isEmailLikeHibernate(email); strconv.FormatBool(got) != want {
-			t.Errorf("isEmailLikeHibernate(%s) = %v, Java 版は %s", quoted, got, want)
+	for _, tt := range tests {
+		if got := isEmailFormat(tt.email); got != tt.want {
+			t.Errorf("isEmailFormat(%q) = %v, 期待 %v", tt.email, got, tt.want)
 		}
 	}
 }
