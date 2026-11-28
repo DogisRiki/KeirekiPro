@@ -111,15 +111,17 @@ func TestExportModel_Formats(t *testing.T) {
 	})
 
 	t.Run("成果の行", func(t *testing.T) {
-		checkDiffTableInChangedBehaviors(t, map[string]string{"改行しない空白だけの成果の行": "CB-117"})
+		checkDiffTableInChangedBehaviors(t, map[string]string{"改行しない空白だけの成果の行": "CB-117", "箇条書きの記号のあとの制御の字と行の区切りの字": "CB-129"})
 		cases := []struct {
 			in   string
 			want []string
 		}{
 			{"", nil},
 			{" 　\t", nil},
-			{"- a\r\n*  b\r• c\n・ d\n  \n　\n-\te \n-\n*x\n-\t f\n- g\nh", []string{"・a", "・b", "・c", "・ d", "・e", "-", "*x", "-\t f", "- g", "h"}},
+			{"- a\r\n*  b\r• c\n・ d\n  \n　\n-\te \n-\n*x\n-\t\u2028f\n-\u2028g\nh", []string{"・a", "・b", "・c", "・ d", "・e", "-", "*x", "・\u2028f", "-\u2028g", "h"}},
 			{"1行目\n\n2行目\n", []string{"1行目", "2行目"}},
+			// 記号のあとの ASCII の制御の字は空白として除き、全角の空白のあとの記号は直さない(変えた動きの一覧の CB-129)。
+			{"-\u0001a\n*　b\n•\u0085c", []string{"・a", "*　b", "•\u0085c"}},
 			// 行の前後の ASCII の制御の字は除き、全角の空白は字下げとして残す。
 			{"\u0001a\u001f\n　字下げの行\u3000", []string{"a", "　字下げの行\u3000"}},
 			// 改行しない空白だけの行は、空白だけの行として除く(変えた動きの一覧の CB-117)。
