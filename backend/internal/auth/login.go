@@ -4,9 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"regexp"
-	"strconv"
-	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -281,43 +278,19 @@ func accountFromRows(rows []sqlcgen.GetUserRowsByEmailRow) (account, bool, error
 	}, true, nil
 }
 
-// springBcryptPattern は、Spring Security の BCryptPasswordEncoder が照らす前に確かめるハッシュの形である。
-// Spring は版の文字の無い $2$ も受け付けるが、Go の bcrypt は、Spring と違って $2$ でも鍵の末尾に0のバイトを
-// 足して計算し、結果が合わないので、Go 版は $2$ を照らさずに合わないとする。
-var springBcryptPattern = regexp.MustCompile(`^\$2[aby]\$(\d\d)\$[./0-9A-Za-z]{53}$`)
-
-// bcryptAlphabet は、bcrypt の base64 の文字の並びである。
-const bcryptAlphabet = "./ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
-
-// passwordMatches は、Spring Security の BCryptPasswordEncoder.matches と同じ規則で、パスワードとハッシュを照らす。
-// 開発環境の Java 版で確かめた規則は次のとおりである。
-//   - ハッシュが無いか空なら、合わない
-//   - ハッシュの形が springBcryptPattern に合わなければ、合わない
-//   - 強さが4から31の外なら、Java 版は例外にして 500 で答えるので、誤りを返す
-//   - 塩の22文字目に、使われない下位の4ビットが立っていれば、Java 版は塩を正規の形に書き直して比べるので、合わない
-//   - パスワードは、先頭の72バイトだけを使う。Go の bcrypt.CompareHashAndPassword も先頭の72バイトだけを使うので、切り詰めない
-//     (72バイトを超えると誤りにするのは、ハッシュを作る bcrypt.GenerateFromPassword だけである)
+// passwordMatches は、パスワードとハッシュを bcrypt で照らす。ハッシュが無いか空なら、合わないとする。
+// ハッシュが bcrypt の形として読めないときは、照らせない誤りを返す。
+// パスワードは、bcrypt.CompareHashAndPassword の決まりのとおり、先頭の72バイトだけを使う。
 func passwordMatches(password string, hash pgtype.Text) (bool, error) {
 	if !hash.Valid || hash.String == "" {
 		return false, nil
 	}
-	m := springBcryptPattern.FindStringSubmatch(hash.String)
-	if m == nil {
-		return false, nil
-	}
-	if cost, _ := strconv.Atoi(m[1]); cost < bcrypt.MinCost || cost > bcrypt.MaxCost {
-		return false, fmt.Errorf("auth: パスワードのハッシュの強さ %d が範囲の外にある", cost)
-	}
-	const saltLastIndex = len("$2a$10$") + 21
-	if strings.IndexByte(bcryptAlphabet, hash.String[saltLastIndex])%16 != 0 {
-		return false, nil
-	}
 	err := bcrypt.CompareHashAndPassword([]byte(hash.String), []byte(password))
+	if err == nil {
+		return true, nil
+	}
 	if errors.Is(err, bcrypt.ErrMismatchedHashAndPassword) {
 		return false, nil
 	}
-	if err != nil {
-		return false, fmt.Errorf("auth: パスワードを照らせない: %w", err)
-	}
-	return true, nil
+	return false, fmt.Errorf("auth: パスワードを照らせない: %w", err)
 }

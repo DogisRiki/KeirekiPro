@@ -366,9 +366,9 @@ func TestLogin_PendingRegistration409(t *testing.T) {
 	wantBusinessError(t, err, MessageLoginFailed)
 }
 
-// TestLogin_PasswordLikeSpring は、パスワードとハッシュの照らし方が、開発環境の Java 版の
-// BCryptPasswordEncoder で確かめた結果と同じであることを確かめる。
-func TestLogin_PasswordLikeSpring(t *testing.T) {
+// TestLogin_PasswordMatches は、パスワードとハッシュを bcrypt で照らすことと、今まで Java 版の
+// BCryptPasswordEncoder が作ったハッシュも照らせることと、bcrypt の形として読めないハッシュでは照らせない誤りを返すことを確かめる。
+func TestLogin_PasswordMatches(t *testing.T) {
 	body := strings.TrimPrefix(javaBcryptSample, "$2a$10$")
 	long72 := strings.Repeat("a", 72)
 	h72 := *hashOf(t, long72)
@@ -380,14 +380,12 @@ func TestLogin_PasswordLikeSpring(t *testing.T) {
 		{"2b", "$2b$10$" + body, javaSamplePhrase, true},
 		{"2y", "$2y$10$" + body, javaSamplePhrase, true},
 		{"違うパスワード", javaBcryptSample, javaSamplePhrase + "x", false},
-		{"2x", "$2x$10$" + body, javaSamplePhrase, false},
-		{"版の文字が無い", "$2$10$" + body, javaSamplePhrase, false},
+		{"版の文字が x", "$2x$10$" + body, javaSamplePhrase, true},
+		{"版の文字が無い", "$2$10$" + body, javaSamplePhrase, true},
 		{"空", "", javaSamplePhrase, false},
-		{"短い", "$2a$10$abc", javaSamplePhrase, false},
-		{"末尾に余り", javaBcryptSample + "x", javaSamplePhrase, false},
-		{"ハッシュの末尾が正規でない", strings.TrimSuffix(javaBcryptSample, "q") + "r", javaSamplePhrase, false},
-		{"塩の末尾が正規でない", "$2a$10$" + body[:21] + "/" + body[22:], javaSamplePhrase, false},
-		{"強さが2桁の数でない", "$2a$1x$" + body, javaSamplePhrase, false},
+		{"ハッシュの末尾の余りを読まない", javaBcryptSample + "x", javaSamplePhrase, true},
+		{"ハッシュの末尾が違う", strings.TrimSuffix(javaBcryptSample, "q") + "r", javaSamplePhrase, false},
+		{"塩の末尾の使われないビットが立っている", "$2a$10$" + body[:21] + "/" + body[22:], javaSamplePhrase, true},
 		{"72バイト", h72, long72, true},
 		{"73バイトは72バイトに切り詰める", h72, long72 + "b", true},
 		{"71バイト", h72, long72[:71], false},
@@ -404,12 +402,11 @@ func TestLogin_PasswordLikeSpring(t *testing.T) {
 	if got, err := passwordMatches(javaSamplePhrase, pgtype.Text{}); err != nil || got {
 		t.Errorf("ハッシュが無いとき passwordMatches = %v, %v, want false", got, err)
 	}
-	// Java 版は、強さが4から31の外のハッシュで例外にし、500 で答える
-	for _, cost := range []string{"03", "32"} {
-		got, err := passwordMatches(javaSamplePhrase, pgtype.Text{String: "$2a$" + cost + "$" + body, Valid: true})
+	for _, hash := range []string{"$2a$03$" + body, "$2a$32$" + body, "$2a$1x$" + body, "$2a$10$abc", "not-a-hash", "$3a$10$" + body} {
+		got, err := passwordMatches(javaSamplePhrase, pgtype.Text{String: hash, Valid: true})
 		var e *Error
 		if err == nil || errors.As(err, &e) || got {
-			t.Errorf("強さ %s のとき passwordMatches = %v, %v, want 業務の誤りでない誤り", cost, got, err)
+			t.Errorf("%q のとき passwordMatches = %v, %v, want 業務の誤りでない誤り", hash, got, err)
 		}
 	}
 }
