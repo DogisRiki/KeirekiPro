@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io/fs"
-	"regexp"
 	"strings"
 	"text/template"
 
@@ -15,14 +14,11 @@ import (
 	"github.com/DogisRiki/KeirekiPro/backend/internal/platform/config"
 )
 
-// このファイルは、Java 版の SesFreeMarkerNotificationDispatcher を写す。Java 版と同じひな形のファイル
-// (src/main/resources/mail/*.ftl)を読み、${名前} に値を差し込み、文字だけの本文のメールを SES で送る。
+// このファイルは、メールのひな形のファイル(assets/mail/*.txt)を text/template で読み、値を差し込み、
+// 文字だけの本文のメールを SES で送る。
 
 // mailCharset は、件名と本文の文字の符号である。
 const mailCharset = "UTF-8"
-
-// mailPlaceholder は、ひな形の中の、値を差し込む ${名前} の書き方である。
-var mailPlaceholder = regexp.MustCompile(`\$\{([A-Za-z][A-Za-z0-9]*)\}`)
 
 // mail は、送る1通のメールの、ひな形のファイルの名前と、件名と、差し込む値である。
 type mail struct {
@@ -31,11 +27,11 @@ type mail struct {
 	values   map[string]string
 }
 
-// emailVerificationMail は、メールアドレスの確認のメールを作る(Java 版の EmailVerificationNotification)。
+// emailVerificationMail は、メールアドレスの確認のメールを作る。
 // link は確認のリンクで、lifetime は「24時間」や「10分」のようなリンクの有効な時間の文である。
 func emailVerificationMail(app config.App, link, lifetime string) mail {
 	return mail{
-		template: "email-verification.ftl",
+		template: "email-verification.txt",
 		subject:  "【" + app.ApplicationName + "】メールアドレスの確認",
 		values: map[string]string{
 			"verificationLink": link,
@@ -46,10 +42,10 @@ func emailVerificationMail(app config.App, link, lifetime string) mail {
 	}
 }
 
-// passwordResetMail は、パスワードの再設定のメールを作る(Java 版の PasswordResetNotification)。
+// passwordResetMail は、パスワードの再設定のメールを作る。
 func passwordResetMail(app config.App, link string) mail {
 	return mail{
-		template: "password-reset.ftl",
+		template: "password-reset.txt",
 		subject:  "【" + app.ApplicationName + "】パスワードリセットのご案内",
 		values: map[string]string{
 			"resetLink": link,
@@ -59,10 +55,10 @@ func passwordResetMail(app config.App, link string) mail {
 	}
 }
 
-// twoFactorCodeMail は、2段階認証の確認のコードのメールを作る(Java 版の TwoFactorCodeNotification)。
+// twoFactorCodeMail は、2段階認証の確認のコードのメールを作る。
 func twoFactorCodeMail(app config.App, code string) mail {
 	return mail{
-		template: "two-factor-auth.ftl",
+		template: "two-factor-auth.txt",
 		subject:  "【" + app.SiteName + "】2段階認証コードのお知らせ",
 		values: map[string]string{
 			"code":     code,
@@ -72,10 +68,10 @@ func twoFactorCodeMail(app config.App, code string) mail {
 	}
 }
 
-// userRegisteredMail は、新規の登録の完了のメールを作る(Java 版の UserRegisteredNotification)。
+// userRegisteredMail は、新規の登録の完了のメールを作る。
 func userRegisteredMail(app config.App, username string) mail {
 	return mail{
-		template: "user-registered.ftl",
+		template: "user-registered.txt",
 		subject:  "【" + app.SiteName + "】新規登録完了のお知らせ",
 		values: map[string]string{
 			"username": username,
@@ -85,10 +81,10 @@ func userRegisteredMail(app config.App, username string) mail {
 	}
 }
 
-// userDeletedMail は、退会の完了のメールを作る(Java 版の UserDeletedNotification)。
+// userDeletedMail は、退会の完了のメールを作る。
 func userDeletedMail(app config.App, username string) mail {
 	return mail{
-		template: "user-deleted.ftl",
+		template: "user-deleted.txt",
 		subject:  "【" + app.SiteName + "】退会手続き完了のお知らせ",
 		values: map[string]string{
 			"username": username,
@@ -99,7 +95,7 @@ func userDeletedMail(app config.App, username string) mail {
 }
 
 // sendMail は、m のひな形に値を差し込み、送り主を App.SESFromAddress にして to へ SES で送る。
-// SES の誤りは包んで返す。Java 版と同じく、送り出しを再試行しない。
+// SES の誤りは包んで返す。送り出しを再試行しない。
 func (s *Service) sendMail(ctx context.Context, to string, m mail) error {
 	body, err := renderMail(s.deps.MailTemplates, m)
 	if err != nil {
@@ -134,21 +130,14 @@ func renderMail(fsys fs.FS, m mail) (string, error) {
 	return b.String(), nil
 }
 
-// loadMailTemplate は、ひな形のファイルを読み、${名前} を text/template の {{.名前}} に置き換えて組み立てる。
-// ひな形は FreeMarker の書き方で書かれているが、Go 版は ${名前} の差し込みだけを受け付ける。
-// ${名前} のほかの $ と {{ を含むひな形は、Java 版と同じ本文になるとは限らないので、誤りにする。
+// loadMailTemplate は、ひな形のファイルを読み、text/template で組み立てる。
+// 差し込む値が無い {{.名前}} は、空の文字にせず、差し込むときの誤りにする。
 func loadMailTemplate(fsys fs.FS, name string) (*template.Template, error) {
 	src, err := fs.ReadFile(fsys, name)
 	if err != nil {
 		return nil, fmt.Errorf("メールのひな形 %s を読めない: %w", name, err)
 	}
-	text := string(src)
-	rest := mailPlaceholder.ReplaceAllString(text, "")
-	if strings.Contains(rest, "$") || strings.Contains(rest, "{{") {
-		return nil, fmt.Errorf("メールのひな形 %s に、${名前} のほかの書き方がある", name)
-	}
-	converted := mailPlaceholder.ReplaceAllString(text, "{{.$1}}")
-	tmpl, err := template.New(name).Option("missingkey=error").Parse(converted)
+	tmpl, err := template.New(name).Option("missingkey=error").Parse(string(src))
 	if err != nil {
 		return nil, fmt.Errorf("メールのひな形 %s を組み立てられない: %w", name, err)
 	}
