@@ -1056,79 +1056,127 @@ func TestResumeRoutes_Wired(t *testing.T) {
 	}
 }
 
-// wholeBodyCase は、testdata/resumebody/cases.json の1つの本文と、Java 版の答えである。
-type wholeBodyCase struct {
-	Name     string                    `json:"name"`
-	Endpoint string                    `json:"endpoint"`
-	Body     *string                   `json:"body"`
-	Status   int                       `json:"status"`
-	Response any                       `json:"response"`
-	DB       map[string]map[string]any `json:"db"`
+// wholeBodyRoute は、本文の全体の扱いを確かめる経路と、本文が1つの値として読めたときの答えである。
+type wholeBodyRoute struct {
+	name     string
+	endpoint string
+	// obj は、経路が受ける本文の値である。
+	obj string
+	// created は、obj を受けて作ったときの答えの本文を、maskWholeBody の置き換えの形の JSON で書いたものである。
+	created string
+	// db は、obj を受けて作ったときに、データベースに書く行である。表の名前ごとに、列の名前と値を持つ。
+	db map[string]map[string]any
+	// null は、本文の全体が null のときの答えの本文である。
+	null string
 }
 
-// wholeBodyDiffs は、cases.json の本文のうち、Go 版の答えが Java 版と違う本文と、違いを載せた一覧の番号である。
-// Java 版は本文の全体が null の要求を断るが、Go 版は encoding/json のとおりにすべての欄の値が無いことにして、
-// 入力の検査の誤りで答える(CB-054)。
-var wholeBodyDiffs = map[string]string{
-	"resume-null": "CB-054",
-	"career-null": "CB-054",
+var wholeBodyRoutes = []wholeBodyRoute{
+	{
+		name:     "resume",
+		endpoint: "POST /api/resumes",
+		obj:      `{"resumeName":"余り"}`,
+		created:  `{"date":"<today>","id":"<resumeId>","resumeName":"余り"}`,
+		db:       map[string]map[string]any{"resumes": {"name": "余り", "first_name": nil, "last_name": nil}},
+		null:     `{"errors":{"resumeName":["職務経歴書名は入力必須です。"]},"message":"入力エラーがあります。"}`,
+	},
+	{
+		name:     "career",
+		endpoint: "POST /api/resumes/{resumeId}/careers",
+		obj:      `{"companyName":"A社","startDate":"2020-01","endDate":null,"isActive":true}`,
+		created: `{"careers":[{"active":true,"companyName":"A社","endDate":null,"id":"<itemId>","startDate":"2020-01"}],` +
+			`"date":"1900-01-01","firstName":"太郎","id":"<resumeId>","lastName":"山田","resumeName":"控えの経歴書"}`,
+		db: map[string]map[string]any{"careers": {
+			"company_name": "A社", "end_date": nil, "is_active": true, "start_date": "2020-01-01",
+		}},
+		null: `{"errors":{"companyName":["会社名は入力必須です。"],"isActive":["在籍中は入力必須です。"],` +
+			`"startDate":["開始年月は入力必須です。"]},"message":"入力エラーがあります。"}`,
+	},
 }
 
-// wholeBodyTables は、正解の db に書かれた表の、ログインした利用者の行を選ぶ問い合わせである。
+// wholeBodyUnreadable は、本文を1つの JSON の物として読めないときの答えの本文である。
+const wholeBodyUnreadable = `{"errors":{},"message":"入力エラーがあります。"}`
+
+// wholeBodyShapes は、本文の全体の形である。生成したコードは、本文の最初の値を encoding/json の Decoder で読み、
+// 最初の値のあとの余りを読まない。created が真の形は、obj を受けて作る。偽の形は、読めない本文として断る。
+// cb は、Java 版と答えが違い、変えた動きの一覧に載せた番号である。
+var wholeBodyShapes = []struct {
+	name    string
+	body    func(obj string) *string
+	created bool
+	cb      string
+}{
+	{"trailing-garbage", func(obj string) *string { return ptr(obj + " xyz") }, true, ""},
+	{"trailing-object", func(obj string) *string { return ptr(obj + `{"a":1}`) }, true, ""},
+	{"trailing-bracket", func(obj string) *string { return ptr(obj + " ]") }, true, ""},
+	{"trailing-comma", func(obj string) *string { return ptr(obj + ",") }, true, ""},
+	{"trailing-newlines", func(obj string) *string { return ptr(obj + "\n\n") }, true, ""},
+	{"leading-spaces", func(obj string) *string { return ptr("  \n" + obj) }, true, ""},
+	{"empty", func(string) *string { return nil }, false, ""},
+	{"blank", func(string) *string { return ptr("  \n") }, false, ""},
+	{"array", func(string) *string { return ptr("[]") }, false, ""},
+	{"array-of-object", func(obj string) *string { return ptr("[" + obj + "]") }, false, ""},
+	{"string", func(string) *string { return ptr(`"文字列"`) }, false, ""},
+	{"number", func(string) *string { return ptr("123") }, false, ""},
+	{"true", func(string) *string { return ptr("true") }, false, ""},
+	{"truncated", func(obj string) *string { return ptr(strings.TrimSuffix(obj, "}")) }, false, ""},
+	{"invalid-json", func(string) *string { return ptr(`{key:"x"}`) }, false, ""},
+	// 本文の全体が null のときは、encoding/json のとおりにすべての欄の値が無いことにして、入力の検査の誤りで答える。
+	// Java 版は、読めない本文として断った(CB-054)
+	{"null", func(string) *string { return ptr("null") }, false, "CB-054"},
+}
+
+// wholeBodyTables は、wholeBodyRoute の db に書いた表の、ログインした利用者の行を選ぶ問い合わせである。
 var wholeBodyTables = map[string]string{
 	"resumes": "SELECT to_jsonb(t) FROM resumes t WHERE t.user_id = $1",
 	"careers": "SELECT to_jsonb(t) FROM careers t JOIN resumes r ON r.id = t.resume_id WHERE r.user_id = $1",
 }
 
 // TestResumeRoutes_WholeBody は、New で作った経路に、最初の値のあとに余りのある本文、空の本文、並びと null と文字列の
-// 本文を送り、Java 版の答えと比べる(要件1の受入基準1)。本文の全体の扱いは、internal/resume の本文の読み手ではなく、
-// 生成したコードが決める。Java 版と違う答えになる本文が wholeBodyDiffs と合うこと、表の番号が変えた動きの一覧に
-// あること、ほかの本文に Java 版と同じ状態の番号と本文で答え、同じ行をデータベースに書くことを確かめる。
+// 本文を送り、表の答えと比べる(要件1の受入基準1)。本文の全体の扱いは、internal/resume の本文の読み手ではなく、
+// 生成したコードが決める。表の番号が変えた動きの一覧にあることと、作った本文で、表の行をデータベースに書くことも確かめる。
 func TestResumeRoutes_WholeBody(t *testing.T) {
-	b, err := os.ReadFile("testdata/resumebody/cases.json")
-	if err != nil {
-		t.Fatal(err)
-	}
-	var file struct {
-		Cases []wholeBodyCase `json:"cases"`
-	}
-	if err := json.Unmarshal(b, &file); err != nil {
-		t.Fatal(err)
-	}
-	checkWholeBodyDiffTable(t, file.Cases)
+	checkWholeBodyDiffTable(t)
 	pool := startResumeDB(t)
 	svc := resume.New(resume.Deps{Pool: pool, Now: time.Now})
-	for _, c := range file.Cases {
-		t.Run(c.Name, func(t *testing.T) {
-			userID, resumeID := seedWholeBody(t, pool, c.Endpoint)
-			method, path, _ := strings.Cut(strings.ReplaceAll(c.Endpoint, "{resumeId}", resumeID), " ")
-			before := time.Now().In(jst).Format(time.DateOnly)
-			rec := sendRoute(resumeServer(t, svc, userID), method, path, c.Body)
-			after := time.Now().In(jst).Format(time.DateOnly)
-			diffs := wholeBodyDiff(t, pool, c, rec, userID, resumeID, before, after)
-			id, listed := wholeBodyDiffs[c.Name]
-			switch {
-			case len(diffs) > 0 && !listed:
-				t.Errorf("Java 版と違うのに表に無い: %s", strings.Join(diffs, "; "))
-			case len(diffs) == 0 && listed:
-				t.Errorf("表に %s で載っているのに、Java 版と同じ答え", id)
-			}
-		})
+	for _, route := range wholeBodyRoutes {
+		for _, shape := range wholeBodyShapes {
+			t.Run(route.name+"-"+shape.name, func(t *testing.T) {
+				userID, resumeID := seedWholeBody(t, pool, route.endpoint)
+				method, path, _ := strings.Cut(strings.ReplaceAll(route.endpoint, "{resumeId}", resumeID), " ")
+				before := time.Now().In(jst).Format(time.DateOnly)
+				rec := sendRoute(resumeServer(t, svc, userID), method, path, shape.body(route.obj))
+				after := time.Now().In(jst).Format(time.DateOnly)
+
+				status, want := http.StatusBadRequest, wholeBodyUnreadable
+				switch {
+				case shape.created:
+					status, want = http.StatusCreated, route.created
+				case shape.name == "null":
+					want = route.null
+				}
+				checkWholeBodyResponse(t, rec, status, want, resumeID, before, after)
+				if !shape.created {
+					return
+				}
+				for table, cols := range route.db {
+					var row map[string]any
+					if err := pool.QueryRow(t.Context(), wholeBodyTables[table], userID).Scan(&row); err != nil {
+						t.Fatalf("表 %s の行を読めません: %v", table, err)
+					}
+					for column, v := range cols {
+						if !reflect.DeepEqual(row[column], v) {
+							t.Errorf("%s.%s = %v, want %v", table, column, row[column], v)
+						}
+					}
+				}
+			})
+		}
 	}
 }
 
-// checkWholeBodyDiffTable は、wholeBodyDiffs の本文が cases.json にあり、番号が変えた動きの一覧にあることを確かめる。
-func checkWholeBodyDiffTable(t *testing.T, cases []wholeBodyCase) {
+// checkWholeBodyDiffTable は、wholeBodyShapes の番号が変えた動きの一覧にあることを確かめる。
+func checkWholeBodyDiffTable(t *testing.T) {
 	t.Helper()
-	names := map[string]bool{}
-	for _, c := range cases {
-		names[c.Name] = true
-	}
-	for name := range wholeBodyDiffs {
-		if !names[name] {
-			t.Errorf("表の本文 %s が cases.json に無い", name)
-		}
-	}
 	b, err := os.ReadFile("../../compat/changed-behaviors.yaml")
 	if err != nil {
 		t.Fatal(err)
@@ -1143,27 +1191,25 @@ func checkWholeBodyDiffTable(t *testing.T, cases []wholeBodyCase) {
 	for _, it := range items {
 		known[it.ID] = true
 	}
-	for name, id := range wholeBodyDiffs {
-		if !known[id] {
-			t.Errorf("本文 %s の番号 %q は、変えた動きの一覧に無い", name, id)
+	for _, shape := range wholeBodyShapes {
+		if shape.cb != "" && !known[shape.cb] {
+			t.Errorf("本文の形 %s の番号 %q は、変えた動きの一覧に無い", shape.name, shape.cb)
 		}
 	}
 }
 
-// wholeBodyDiff は、Go 版の答えと書いた行を、Java 版の答えと比べ、違いを返す。答えの本文は、作成と更新の日時を除き、
+// checkWholeBodyResponse は、答えの状態の番号と本文を確かめる。答えの本文は、作成と更新の日時を除き、
 // 経歴書の ID を <resumeId>、ほかの ID を <itemId>、今日の日付を <today> に置き換えて比べる。
-func wholeBodyDiff(
-	t *testing.T, pool *pgxpool.Pool, c wholeBodyCase, rec *httptest.ResponseRecorder,
-	userID uuid.UUID, resumeID, before, after string,
-) []string {
+func checkWholeBodyResponse(
+	t *testing.T, rec *httptest.ResponseRecorder, status int, want, resumeID, before, after string,
+) {
 	t.Helper()
-	var diffs []string
-	if rec.Code != c.Status {
-		diffs = append(diffs, fmt.Sprintf("状態の番号 = %d, want %d", rec.Code, c.Status))
+	if rec.Code != status {
+		t.Errorf("状態の番号 = %d, want %d", rec.Code, status)
 	}
 	var got any
 	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
-		return append(diffs, fmt.Sprintf("本文 %q を JSON として読めない", rec.Body.String()))
+		t.Fatalf("本文 %q を JSON として読めない", rec.Body.String())
 	}
 	if m, ok := got.(map[string]any); ok {
 		delete(m, "createdAt")
@@ -1173,33 +1219,17 @@ func wholeBodyDiff(
 		}
 	}
 	got = maskWholeBody(got, resumeID, before, after)
-	if !reflect.DeepEqual(got, c.Response) {
+	var wantValue any
+	if err := json.Unmarshal([]byte(want), &wantValue); err != nil {
+		t.Fatalf("表の答え %s が JSON でない: %v", want, err)
+	}
+	if !reflect.DeepEqual(got, wantValue) {
 		gotJSON, _ := json.Marshal(got)
-		wantJSON, _ := json.Marshal(c.Response)
-		diffs = append(diffs, fmt.Sprintf("本文 = %s, want %s", gotJSON, wantJSON))
+		t.Errorf("本文 = %s, want %s", gotJSON, want)
 	}
-	if rec.Code != http.StatusCreated {
-		return diffs
-	}
-	for table, want := range c.DB {
-		query, ok := wholeBodyTables[table]
-		if !ok {
-			t.Fatalf("表 %s の行の選び方が無い", table)
-		}
-		var row map[string]any
-		if err := pool.QueryRow(t.Context(), query, userID).Scan(&row); err != nil {
-			t.Fatalf("表 %s の行を読めません: %v", table, err)
-		}
-		for column, v := range want {
-			if !reflect.DeepEqual(row[column], v) {
-				diffs = append(diffs, fmt.Sprintf("%s.%s = %v, want %v", table, column, row[column], v))
-			}
-		}
-	}
-	return diffs
 }
 
-// maskWholeBody は、答えの本文の値のうち、経歴書の ID と、ほかの UUID と、今日の日付を、正解のファイルの置き換えの形にする。
+// maskWholeBody は、答えの本文の値のうち、経歴書の ID と、ほかの UUID と、今日の日付を、表の答えの置き換えの形にする。
 func maskWholeBody(v any, resumeID, before, after string) any {
 	switch x := v.(type) {
 	case map[string]any:
