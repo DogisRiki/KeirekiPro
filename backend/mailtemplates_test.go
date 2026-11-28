@@ -5,17 +5,18 @@ import (
 	"testing"
 )
 
-// 埋め込んだメールのひな形から、認証の操作が使う4つのファイルを読めることを確かめる。
-func TestMailTemplates_FourFilesReadable(t *testing.T) {
+// 埋め込んだメールのひな形から、メールを送る操作が使う5つのファイルを読めることを確かめる。
+func TestMailTemplates_FiveFilesReadable(t *testing.T) {
 	templates, err := MailTemplates()
 	if err != nil {
 		t.Fatalf("MailTemplates: %v", err)
 	}
 	for _, name := range []string{
-		"email-verification.ftl",
-		"password-reset.ftl",
-		"two-factor-auth.ftl",
-		"user-registered.ftl",
+		"email-verification.txt",
+		"password-reset.txt",
+		"two-factor-auth.txt",
+		"user-deleted.txt",
+		"user-registered.txt",
 	} {
 		body, err := fs.ReadFile(templates, name)
 		if err != nil {

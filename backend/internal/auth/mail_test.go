@@ -141,24 +141,18 @@ func deref(p *string) string {
 	return *p
 }
 
-func TestMail_RejectsOtherTemplateSyntax(t *testing.T) {
+func TestMail_TemplateErrors(t *testing.T) {
 	bad := map[string]string{
-		"ドルだけ":         "金額は $5 です\n",
-		"波括弧の無いドル":     "${a}と$a\n",
-		"閉じないドル":       "${a\n",
-		"名前でない差し込み":    "${a.b}\n",
-		"空の差し込み":       "${}\n",
-		"関数の呼び出し":      "${a?upper_case}\n",
-		"Go のひな形の書き方":  "{{.a}}\n",
-		"Go のひな形の開始だけ": "{{\n",
-		"波括弧で囲んだ差し込み":  "{${a}}\n",
+		"閉じない差し込み": "{{.a\n",
+		"知らない関数":   "{{upper .a}}\n",
+		"差し込む値が無い": "{{.a}}{{.b}}\n",
 	}
 	for name, body := range bad {
 		t.Run(name, func(t *testing.T) {
-			fsys := fstest.MapFS{"x.ftl": {Data: []byte(body)}}
+			fsys := fstest.MapFS{"x.txt": {Data: []byte(body)}}
 			client := &fakeSES{}
 			s := New(Deps{SES: client, MailTemplates: fsys})
-			err := s.sendMail(context.Background(), "a@example.com", mail{template: "x.ftl", subject: "s", values: map[string]string{"a": "1"}})
+			err := s.sendMail(context.Background(), "a@example.com", mail{template: "x.txt", subject: "s", values: map[string]string{"a": "1"}})
 			if err == nil {
 				t.Fatalf("sendMail(%q) = nil, want 誤り", body)
 			}
@@ -168,38 +162,28 @@ func TestMail_RejectsOtherTemplateSyntax(t *testing.T) {
 		})
 	}
 
-	t.Run("差し込む値が無い", func(t *testing.T) {
-		fsys := fstest.MapFS{"x.ftl": {Data: []byte("${a}${b}\n")}}
-		client := &fakeSES{}
-		s := New(Deps{SES: client, MailTemplates: fsys})
-		err := s.sendMail(context.Background(), "a@example.com", mail{template: "x.ftl", subject: "s", values: map[string]string{"a": "1"}})
-		if err == nil || len(client.got) != 0 {
-			t.Fatalf("sendMail = %v, 呼び出し %d 回, want 誤りで呼ばれない", err, len(client.got))
-		}
-	})
-
 	t.Run("ひな形が無い", func(t *testing.T) {
 		client := &fakeSES{}
 		s := New(Deps{SES: client, MailTemplates: fstest.MapFS{}})
-		err := s.sendMail(context.Background(), "a@example.com", mail{template: "x.ftl", subject: "s"})
+		err := s.sendMail(context.Background(), "a@example.com", mail{template: "x.txt", subject: "s"})
 		if err == nil || len(client.got) != 0 {
 			t.Fatalf("sendMail = %v, 呼び出し %d 回, want 誤りで呼ばれない", err, len(client.got))
 		}
 	})
 
-	t.Run("差し込みだけのひな形は値をそのまま差し込む", func(t *testing.T) {
-		fsys := fstest.MapFS{"x.ftl": {Data: []byte("[${a}] }} ${b}\n")}}
+	t.Run("値をそのまま差し込む", func(t *testing.T) {
+		fsys := fstest.MapFS{"x.txt": {Data: []byte("[{{.a}}] }} ${a} {{.b}}\n")}}
 		client := &fakeSES{}
 		s := New(Deps{SES: client, MailTemplates: fsys})
 		err := s.sendMail(context.Background(), "a@example.com",
-			mail{template: "x.ftl", subject: "s", values: map[string]string{"a": "<&>{{.b}}", "b": "${a}"}})
+			mail{template: "x.txt", subject: "s", values: map[string]string{"a": "<&>{{.b}}", "b": "${a}"}})
 		if err != nil {
 			t.Fatal(err)
 		}
 		if len(client.got) != 1 {
 			t.Fatalf("SendEmail の呼び出し = %d 回, want 1 回", len(client.got))
 		}
-		if got := deref(client.got[0].Message.Body.Text.Data); got != "[<&>{{.b}}] }} ${a}\n" {
+		if got := deref(client.got[0].Message.Body.Text.Data); got != "[<&>{{.b}}] }} ${a} ${a}\n" {
 			t.Errorf("本文 = %q", got)
 		}
 	})
