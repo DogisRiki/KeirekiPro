@@ -186,9 +186,33 @@ jobs:
       - name: Test spec backing check
         run: bash .github/scripts/tests/test-check-spec-backing.sh
 
+      # 200行を超える spec の無い PR を、所有者の承認で通すための確かめ(#975)。
+      # 確かめ方は escape-hatch の「Check owner approval」と同じにする。
+      # PR の最新のコミット(head)に付いた所有者のレビューだけを見るので、
+      # 承認のあとにコミットを足すと、承認は無効になる
+      - name: Check owner approval
+        id: approval
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          owner="${{ github.repository_owner }}"
+          head_sha="${{ github.event.pull_request.head.sha }}"
+          # --paginate には --slurp を併用する(ページ単位でjqが適用され判定を誤るため)。
+          # gh の --jq は --slurp と併用できない仕様のため、jq へパイプして評価する。
+          verdict=$(gh api "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/reviews" --paginate --slurp \
+            | jq -r --arg owner "$owner" --arg head "$head_sha" '[.[][] | select(.user.login == $owner) | select(.commit_id == $head) | select(.state == "APPROVED" or .state == "CHANGES_REQUESTED" or .state == "DISMISSED")] | sort_by(.submitted_at) | last | .state // "NONE"')
+          echo "Owner review verdict: $verdict"
+          if [ "$verdict" = "APPROVED" ]; then
+            echo "approved=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "approved=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Check PR size (Lane B gate)
         env:
           PR_BODY: ${{ github.event.pull_request.body }}
+          OWNER_APPROVED: ${{ steps.approval.outputs.approved }}
         run: |
           # 既定シェルは bash -e で pipefail が付かない。git が失敗しても
           # awk が 0 を出して通過してしまうため明示的に有効化する
@@ -259,11 +283,12 @@ jobs:
             exit 0
           fi
 
-          # 上限超過: spec に裏付けられた Lane A の PR のみ許可する。
-          # spec の実在・必須ファイル・プレースホルダ・承認フラグの検証は
-          # check-spec-backing.sh が行う(フラグは自己申告であり人間承認の
-          # 証明にはならない。#177 で受容済み)
-          echo "実装差分 ${lines} 行 > 上限 ${PR_SIZE_LIMIT} 行のため、spec の裏付けを検証します(テスト ${test_lines} 行は計上対象外)。"
+          # 上限超過: spec に裏付けられた Lane A の PR か、所有者が最新のコミットを
+          # 承認した spec の無い PR だけを通す(#975)。
+          # spec の実在・必須ファイル・プレースホルダ・承認フラグの検証と、
+          # 所有者の承認の判定は check-spec-backing.sh が行う(フラグは自己申告であり
+          # 人間承認の証明にはならない。#177 で受容済み)
+          echo "実装差分 ${lines} 行 > 上限 ${PR_SIZE_LIMIT} 行のため、spec の裏付けか所有者の承認を確かめます(テスト ${test_lines} 行は計上対象外)。"
           bash .github/scripts/check-spec-backing.sh
 
   # どの会話の始めにも読み込まれる文書(ルートの CLAUDE.md など)の量の検査。

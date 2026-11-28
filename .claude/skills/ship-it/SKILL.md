@@ -162,7 +162,8 @@ auto-mergeは、PRが作られると仕組み(ワークフロー)が予約する
          読み直しの間に main が進み、仕組みがブランチを合わせて検査がやり直されたときに当たる
       5. 所有者の承認を待っている: `reviewDecision` が `REVIEW_REQUIRED` のとき(CODEOWNERS の承認待ちを含む)、
          または承認待ちのゲートの検査が赤のとき。承認待ちのゲートの検査は、`.github/audit/required-checks.json` で
-         `approval_gated: true` の検査(今は `escape-hatch` `dependency-gate` `pre-merge-check` `dependency-cooldown`)である。
+         `approval_gated: true` の検査(今は `escape-hatch` `size-check` `dependency-gate` `pre-merge-check` `dependency-cooldown`)である。
+         spec 無しのPRの `size-check` の赤は、所有者が最新のコミットを承認すると緑になる(#975)。
          `dependency-cooldown` の赤は、下の「`dependency-cooldown` の赤の見分け」で記録のコメントがあると分かったときだけ、
          承認待ちのゲートの赤に数える。
          この項に当たるのは、承認待ちのゲートのほかに必須の検査の赤が無いときに限る。
@@ -179,10 +180,8 @@ auto-mergeは、PRが作られると仕組み(ワークフロー)が予約する
 
          この項を6より先に置くのは、承認待ちのゲートの赤を `/review-loop` で直そうとしないためである
       6. 必須の検査に赤がある: 修正して手順4の形でpushし、1に戻る(以降のレビュー対応は `/review-loop` に従う)。
-         ただし、spec 無しのPRが `size-check` で赤になったときは、修正してpushしない。
-         `/start` の「途中で見立てが外れたとき」に従い、spec に切り替えるか小さく分けるかを決めて理由を示し、7に進む。
          `codeql-complete` が赤のときは、下の「`codeql-complete` の赤の扱い」に従う
-      7. 所有者に提案して答えを待っている(`size-check` で止まったとき、ゲートの設定の変更、コンテナの脆弱性の抑制の追加など):
+      7. 所有者に提案して答えを待っている(ゲートの設定の変更、コンテナの脆弱性の抑制の追加など):
          状態を報告して見届けを終える
       8. 必須の検査がすべて通り、`autoMergeRequest` が `null`: 自動マージの予約が付いていない。
          自分で予約を付けず、状態を報告して見届けを終える
@@ -310,8 +309,8 @@ auto-mergeは、PRが作られると仕組み(ワークフロー)が予約する
 ## Rules
 
 - verify全PASSまでpushしない。手順7でPRが main と衝突していないときは、`gh pr update-branch` でサーバーで main を取り込み、手元で push しない
-- 1つのPRに複数の関心事を混ぜない(200行のsize-checkは分割のシグナル)
-- マイグレーション・依存追加・ゲート設定変更を含む場合は、PR本文冒頭に「人間承認が必要な変更」として明記する
+- 1つのPRに複数の関心事を混ぜない
+- マイグレーション・依存追加・ゲート設定変更を含む場合と、spec 無しで実装の差分が200行を超える場合は、PR本文冒頭に「人間承認が必要な変更」として明記する
 - `Refs: #<Issue番号>` は `Closes` と併記しても消さない。codex-reviewがこの行からIssue本文を
   取得してspec適合の判定基準にしている
 

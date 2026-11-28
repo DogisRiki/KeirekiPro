@@ -47,7 +47,7 @@ CI環境(GitHub Actions = Docker Compose無し)では `bash .claude/scripts/para
 - **コンテナイメージの脆弱性の抑制(`.github/container-scan-suppressions.json`)を自分の判断で足さない。** これは `container-scan` を緑にする唯一の手段であり、「見かけの合格」を作る経路にあたる。追加が要ると判断したときは、脆弱性ごとに理由と期限を添えて人間に提案する。`.github/` 配下のためCODEOWNERSとescape-hatchが承認を機械強制する
 - **`container-scan` の実行を自律側からキャンセルしない。** キャンセルされたジョブは `cancelled` として報告され、必須ステータスチェックは成功にならない(2026-08-20 実測。緑は残らない)。ただしその後に再検査を発火させるイベントが無いため、**再実行するまでPRは赤のまま進まなくなる。** 実行が長い(本番イメージの組み立てを含む)ことを理由に止めない
 - **CodeQL の警告を却下しない。却下は所有者だけが行う**
-- 200行(実装のコード差分。テストとドキュメントは計上しない)を超えるPRは、spec駆動(Lane A)のPRとしてPR本文に `Spec: .kiro/specs/<feature>` を記載したものしか通らない(size-checkが機械判定する)。
+- 200行(実装のコード差分。テストとドキュメントは計上しない)を超えるPRは、PR本文に `Spec: .kiro/specs/<feature>` を書いた spec のPRか、所有者が最新のコミットを承認した spec 無しのPRしか通らない(size-checkが機械判定する)
 - 本番デプロイ(release.yaml)・`terraform apply` は起動しない(人間の専権)
 - DependabotのPRをcloseしない。とくにdockerレーンは、closeするとそのタグの更新が恒久的にブロックされ、復旧経路が限られる(Dependabot側の照合キーにdigestが含まれないため)。`@dependabot recreate` / `rebase` を自分の判断で打たない(クールダウン中はPRがcloseされる)。赤で止まっているPRの扱いは `doc/開発フロー/監査手順.md` に従う
 - 同一の失敗が3回続いたら停止して人間に報告する(修正の無限ループを作らない)。止まる前に `bash .claude/scripts/usage/usage.sh mark same-failure` を1回呼ぶ(このコマンドが失敗しても、停止と報告を続ける)
@@ -87,7 +87,7 @@ CI環境(GitHub Actions = Docker Compose無し)では `bash .claude/scripts/para
 spec で進めるか(Lane A)、spec 無しで進めるか(Lane B)は、着手時に `/start` が決める。
 AIがIssueの本文とその時点のコードを調べ、4つの観点で判断し、判断と観点ごとの理由を所有者に示す。spec が要らないと判断したときも、AIは示したところで止まり、所有者の返事を受けてから実装する。
 
-- 変更の行数の見込みは、着手時の判断に使わない。200行の検査は、着手時の判断をすり抜けた変更を止める最後の網であり、着手時に spec の要否を決める基準ではない
+- 変更の行数の見込みは、着手時の判断に使わない。200行の検査は、spec 無しの大きな変更を所有者の承認まで止めるもので、着手時に spec の要否を決める基準ではない
 - 観点ごとの定義(「当たる」「当たらない」、3つの材料、1回尋ねれば決まる)は、`.claude/skills/start/SKILL.md` の「Step 5: 判断する」の「観点の定義」の表と表の下の箇条のとおりとする
 
 ### パスと役割分担
