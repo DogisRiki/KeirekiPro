@@ -3,7 +3,6 @@ package auth
 import (
 	"bytes"
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -164,96 +163,12 @@ func (s *Service) findTwoFactorCode(ctx context.Context, key string) (string, bo
 	return s.getText(ctx, key)
 }
 
-// getJSONString は、キーの値を JSON として読み、JSON の文字列ならその文字列を返す。
-// キーが無いときと、値が JSON の null のときは、偽を返す(Java 版の RedisTemplate の get が null を返す場合)。
-// JSON の文字列でも null でもない値は、Java 版の (String) の型の変換が例外にするので、誤りを返す。
-func (s *Service) getJSONString(ctx context.Context, key string) (string, bool, error) {
-	var raw json.RawMessage
-	ok, err := s.getJSON(ctx, key, &raw)
-	if err != nil || !ok {
-		return "", false, err
-	}
-	var v any
-	if err := json.Unmarshal(raw, &v); err != nil {
-		return "", false, fmt.Errorf("auth: Redis の値を JSON として読めない: %w", err)
-	}
-	switch t := v.(type) {
-	case nil:
-		return "", false, nil
-	case string:
-		return t, true, nil
-	default:
-		return "", false, fmt.Errorf("auth: Redis の値が JSON の文字列でない: %T", v)
-	}
-}
-
 // deleteKey は、キーを消す。Java 版の redisTemplate.delete にあたり、キーが無くても誤りにしない。
 func (s *Service) deleteKey(ctx context.Context, key string) error {
 	if err := s.deps.Redis.Del(ctx, key).Err(); err != nil {
 		return fmt.Errorf("auth: Redis の値を消せない: %w", err)
 	}
 	return nil
-}
-
-// parseJacksonObject は、Java 版の Jackson の readValue(text, 記録の型.class) と同じ規則で、
-// 文字列 text の先頭の1つの JSON の値を、JSON のオブジェクトとして読み、項目ごとの JSON を返す。
-// 前の空白は飛ばし、値のあとの文字は見ない。同じ項目が2回あるときは、あとの値を使う。
-// 読めないとき、または値が JSON のオブジェクトでないときは、偽を返す。
-// 値が null のときは、Java 版が null の記録を Optional.of に渡して例外にするので、誤りを返す。
-func parseJacksonObject(text string) (map[string]json.RawMessage, bool, error) {
-	var top json.RawMessage
-	if err := json.NewDecoder(strings.NewReader(text)).Decode(&top); err != nil {
-		return nil, false, nil
-	}
-	top = bytes.TrimLeft(top, " \t\r\n")
-	if bytes.Equal(top, []byte("null")) {
-		return nil, false, fmt.Errorf("auth: Redis の記録が null である")
-	}
-	var fields map[string]json.RawMessage
-	if top[0] != '{' || json.Unmarshal(top, &fields) != nil {
-		return nil, false, nil
-	}
-	return fields, true, nil
-}
-
-// parseJacksonUUID は、Jackson の UUIDDeserializer と同じ規則で、JSON の値を UUID として読む。
-// null は nil とする。文字列は前後の U+0020 以下の文字を除き、空なら nil、36文字ならハイフンで区切った16進、
-// 24文字なら16バイトの base64 として読む。ほかの文字列と、文字列でも null でもない値は読めないとする。
-func parseJacksonUUID(raw json.RawMessage) (*uuid.UUID, bool) {
-	var v any
-	if json.Unmarshal(raw, &v) != nil {
-		return nil, false
-	}
-	if v == nil {
-		return nil, true
-	}
-	s, ok := v.(string)
-	if !ok {
-		return nil, false
-	}
-	s = javaTrim(s)
-	switch len(s) {
-	case 0:
-		return nil, true
-	case 36:
-		id, err := uuid.Parse(s)
-		if err != nil {
-			return nil, false
-		}
-		return &id, true
-	case 24:
-		b, err := base64.StdEncoding.DecodeString(s)
-		if err != nil {
-			return nil, false
-		}
-		id, err := uuid.FromBytes(b)
-		if err != nil {
-			return nil, false
-		}
-		return &id, true
-	default:
-		return nil, false
-	}
 }
 
 // parseJacksonInt は、Jackson が JSON の値を Java の int の項目に読む規則で、値を読む。

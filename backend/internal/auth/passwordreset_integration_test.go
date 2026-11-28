@@ -100,6 +100,28 @@ func TestPasswordResetToken_ValueIsUserIDJSON(t *testing.T) {
 		}
 	})
 
+	// uuid.Parse が読む形は、どの版も書かない形でも読む(変えた動きの一覧の CB-132)
+	for _, tc := range []struct {
+		name string
+		raw  string
+	}{
+		{name: "値がハイフンの無い UUID", raw: `"0a0d6b7d385d45a0bdb3ede0e6f3ea5d"`},
+		{name: "値が大文字の UUID", raw: `"0A0D6B7D-385D-45A0-BDB3-EDE0E6F3EA5D"`},
+		{name: "値が波括弧で囲んだ UUID", raw: `"{0a0d6b7d-385d-45a0-bdb3-ede0e6f3ea5d}"`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			token := uniqueResetToken()
+			userID := uuid.MustParse("0a0d6b7d-385d-45a0-bdb3-ede0e6f3ea5d")
+			if err := client.Set(ctx, "password-reset:"+token, tc.raw, time.Minute).Err(); err != nil {
+				t.Fatal(err)
+			}
+			got, ok, err := s.findPasswordResetUserID(ctx, token)
+			if err != nil || !ok || got != userID {
+				t.Errorf("findPasswordResetUserID = %v, %v, %v, want %v, true, nil", got, ok, err, userID)
+			}
+		})
+	}
+
 	t.Run("消す", func(t *testing.T) {
 		token := uniqueResetToken()
 		if err := s.storePasswordResetToken(ctx, token, uuid.New(), passwordResetTokenValidity); err != nil {
@@ -131,7 +153,6 @@ func TestPasswordResetToken_ValueIsUserIDJSON(t *testing.T) {
 		{name: "値が JSON のオブジェクト", raw: `{"userId":"0a0d6b7d-385d-45a0-bdb3-ede0e6f3ea5d"}`},
 		{name: "値が UUID でない文字列", raw: `"not-a-uuid"`},
 		{name: "値が空の文字列", raw: `""`},
-		{name: "値がハイフンの無い UUID", raw: `"0a0d6b7d385d45a0bdb3ede0e6f3ea5d"`},
 		{name: "値が閉じていない JSON の文字列", raw: `"0a0d6b7d-385d-45a0-bdb3-ede0e6f3ea5d`},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
