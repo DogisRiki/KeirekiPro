@@ -52,7 +52,7 @@ func (s *Service) InTransaction(ctx context.Context, fn func(q *sqlcgen.Queries)
 	return s.inTransaction(ctx, fn)
 }
 
-// PasswordMatches は、Spring Security の BCryptPasswordEncoder.matches と同じ規則で、パスワードとハッシュを照らす。
+// PasswordMatches は、パスワードとハッシュを bcrypt で照らす。照らし方は passwordMatches のとおりである。
 func PasswordMatches(password string, hash pgtype.Text) (bool, error) {
 	return passwordMatches(password, hash)
 }
