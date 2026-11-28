@@ -248,9 +248,8 @@ func buildExportProcess(p Process) exportProcess {
 	}
 }
 
-// splitAchievementLines は、成果の文を行に分ける。Java 版の splitLines を写した。
-// 行の区切りは、Java の String.lines と同じく \r\n と \r と \n である。行ごとに前後の空白を除き、
-// 頭の「- 」「* 」「• 」などを「・」に直し、空白だけの行を除く。
+// splitAchievementLines は、成果の文を行に分ける。行の区切りは \r\n と \r と \n である。
+// 行ごとに前後の空白を除き、頭の「- 」「* 」「• 」などを「・」に直し、空白だけの行を除く。
 func splitAchievementLines(raw string) []string {
 	if !notBlank(raw) {
 		return nil
@@ -265,35 +264,19 @@ func splitAchievementLines(raw string) []string {
 	return lines
 }
 
-// normalizeBulletPrefix は、行の頭の箇条書きの記号を「・」に直す。Java 版の normalizeBulletPrefix を写した。
+// normalizeBulletPrefix は、頭の「-」「*」「•」のあとに半角の空白か ASCII の制御の字が1つ以上続く行の、
+// 記号と空白を「・」に直す。s は、前後の空白を除いた行である。記号のあとに空白の無い行と、記号だけの行は、そのまま返す。
 func normalizeBulletPrefix(s string) string {
-	if strings.HasPrefix(s, "・") {
-		return s
-	}
-	for _, p := range []string{"- ", "* ", "• "} {
-		if rest, ok := strings.CutPrefix(s, p); ok {
-			return "・" + trimSpaceAndControl(rest)
-		}
-	}
-	if rest, ok := cutBulletPattern(s); ok {
-		return "・" + trimSpaceAndControl(rest)
-	}
-	return s
-}
-
-// cutBulletPattern は、Java の正規表現 ^[\-\*•]\s+.*$ が s の全体に当たるとき、頭の記号と空白を除いた残りを返す。
-// \s は Java の既定の範囲(空白、\t、\n、\v、\f、\r)である。. は行の区切りの字(\n、\r、U+0085、U+2028、U+2029)に当たらない。
-func cutBulletPattern(s string) (string, bool) {
 	r, size := utf8.DecodeRuneInString(s)
 	if r != '-' && r != '*' && r != '•' {
-		return "", false
+		return s
 	}
 	body := s[size:]
-	rest := strings.TrimLeft(body, " \t\n\v\f\r")
-	if len(rest) == len(body) || strings.ContainsAny(rest, "\n\r\u0085  ") {
-		return "", false
+	rest := trimSpaceAndControl(body)
+	if len(rest) == len(body) {
+		return s
 	}
-	return rest, true
+	return "・" + rest
 }
 
 // normalizeExportList は、技術スタックの名前の並びから、値の無い名前と空白だけの名前を除き、前後の空白を除き、
