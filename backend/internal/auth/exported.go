@@ -112,7 +112,7 @@ func ErrCredentialsNotFound(message string) *Error {
 	return errCredentialsNotFound(message)
 }
 
-// NotBlank は、Jakarta Validation の @NotBlank と同じく、s が Java の空白でない文字を含むかを返す。
+// NotBlank は、s が空白(unicode.IsSpace)でない字を1つ以上含むかを返す。
 func NotBlank(s string) bool {
 	return notBlank(s)
 }

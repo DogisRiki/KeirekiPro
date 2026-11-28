@@ -68,6 +68,9 @@ func TestValidate_ChangePasswordBoundaries(t *testing.T) {
 			"newPassword": {MessageNewPhraseRequired, MessageNewPhrasePattern},
 		}},
 		{"全角の空白だけ", ValidateChangePassword("　", validPhrase), fieldMessages{"nowPassword": {MessageNowPhraseRequired}}},
+		// 空白だけかは unicode.IsSpace で決める(変えた動きの一覧の CB-119)。
+		{"改行しない空白と次の行の字だけ", ValidateChangePassword("\u00a0\u2007\u202f\u0085", validPhrase), fieldMessages{"nowPassword": {MessageNowPhraseRequired}}},
+		{"情報の区切りの制御の字は空白でない", ValidateChangePassword("\u001c\u001f", validPhrase), nil},
 		{"現在のパスワードは長さと形を検査しない", ValidateChangePassword("a", validPhrase), nil},
 		{"7文字", ValidateChangePassword("x", "Abcdef1"), fieldMessages{"newPassword": {MessageNewPhraseLength}}},
 		{"8文字", ValidateChangePassword("x", "Abcdef12"), nil},
