@@ -19,8 +19,8 @@ const (
 
 var devOrigins = []string{originFrontend, originAPIDocs}
 
-// corsVary は、Java 版の記録のとおり、すべての応答に値ごとに別の行で付く Vary である。
-var corsVary = []string{"Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers"}
+// corsVary は、すべての応答に1行で付く Vary である。
+var corsVary = []string{"Origin, Access-Control-Request-Method, Access-Control-Request-Headers"}
 
 // serveCORS は、CORS の処理の後ろに、通ったかを記録する処理を置いて、要求を1つ送る。
 func serveCORS(t *testing.T, allowed []string, req *http.Request) (*httptest.ResponseRecorder, bool) {
@@ -63,7 +63,7 @@ func assertHeaders(t *testing.T, rec *httptest.ResponseRecorder, want map[string
 	}
 }
 
-// assertCORSRejected は、Java 版と同じく、403 と本文 Invalid CORS request を返し、後ろの処理に渡さなかったことを確かめる。
+// assertCORSRejected は、403 と、application/json の「アクセス権限がありません。」で答え、後ろの処理に渡さなかったことを確かめる。
 func assertCORSRejected(t *testing.T, rec *httptest.ResponseRecorder, passed bool) {
 	t.Helper()
 	if passed {
@@ -72,16 +72,18 @@ func assertCORSRejected(t *testing.T, rec *httptest.ResponseRecorder, passed boo
 	if rec.Code != http.StatusForbidden {
 		t.Errorf("ステータス = %d, want 403", rec.Code)
 	}
-	if got := rec.Body.String(); got != "Invalid CORS request" {
-		t.Errorf("本文 = %q, want Invalid CORS request", got)
+	if got, want := rec.Body.String(), `{"message":"アクセス権限がありません。"}`; got != want {
+		t.Errorf("本文 = %q, want %q", got, want)
 	}
 	assertHeaders(t, rec, map[string]string{
+		"Content-Type":                     "application/json",
 		"Access-Control-Allow-Origin":      "",
 		"Access-Control-Allow-Credentials": "",
 	})
 }
 
-// 許す送り元のプリフライトに、200 と、Java 版の記録のとおりの5つのヘッダを返し、Access-Control-Max-Age を付けず、後ろの処理に渡さないことを確かめる。
+// 許す送り元のプリフライトに、200 と4つのヘッダで答え、Access-Control-Expose-Headers と Access-Control-Max-Age を付けず、後ろの処理に渡さないことを確かめる。
+// Access-Control-Allow-Headers は、求められたヘッダの値をそのまま返す。
 func TestCORS_PreflightAllowed(t *testing.T) {
 	for _, origin := range devOrigins {
 		t.Run(origin, func(t *testing.T) {
@@ -95,16 +97,16 @@ func TestCORS_PreflightAllowed(t *testing.T) {
 			assertHeaders(t, rec, map[string]string{
 				"Access-Control-Allow-Origin":      origin,
 				"Access-Control-Allow-Methods":     "GET,POST,PUT,DELETE,PATCH,OPTIONS",
-				"Access-Control-Allow-Headers":     "content-type, x-xsrf-token",
+				"Access-Control-Allow-Headers":     "content-type,x-xsrf-token",
 				"Access-Control-Allow-Credentials": "true",
-				"Access-Control-Expose-Headers":    "Content-Disposition, X-Request-Id",
+				"Access-Control-Expose-Headers":    "",
 				"Access-Control-Max-Age":           "",
 			})
 		})
 	}
 }
 
-// Access-Control-Request-Headers の無いプリフライトに、Access-Control-Allow-Headers を Java 版の記録のとおりに扱うことを確かめる。
+// Access-Control-Request-Headers の無いプリフライトに、Access-Control-Allow-Headers を付けないことを確かめる。
 func TestCORS_PreflightWithoutRequestHeaders(t *testing.T) {
 	rec, passed := serveCORS(t, devOrigins, preflight(originAPIDocs, http.MethodPost, ""))
 	if passed || rec.Code != http.StatusOK {
@@ -116,7 +118,7 @@ func TestCORS_PreflightWithoutRequestHeaders(t *testing.T) {
 	})
 }
 
-// 許す6つのメソッドのほかのメソッドのプリフライトに、403 と Invalid CORS request を返すことを確かめる。
+// 許す6つのメソッドのほかのメソッドのプリフライトに、403 で答えることを確かめる。
 func TestCORS_PreflightMethodNotAllowed(t *testing.T) {
 	for _, method := range []string{http.MethodTrace, http.MethodHead, "post"} {
 		t.Run(method, func(t *testing.T) {
@@ -126,7 +128,7 @@ func TestCORS_PreflightMethodNotAllowed(t *testing.T) {
 	}
 }
 
-// 許さない送り元からの要求に、プリフライトかどうかによらず、403 と Invalid CORS request を返すことを確かめる。
+// 許さない送り元からの要求に、プリフライトかどうかによらず、403 で答えることを確かめる。
 func TestCORS_OriginNotAllowed(t *testing.T) {
 	t.Run("プリフライト", func(t *testing.T) {
 		rec, passed := serveCORS(t, devOrigins, preflight(originEvil, http.MethodPost, ""))
@@ -143,26 +145,6 @@ func TestCORS_OriginNotAllowed(t *testing.T) {
 		req.Header.Set("Origin", originAPIDocs)
 		rec, passed := serveCORS(t, []string{originApp}, req)
 		assertCORSRejected(t, rec, passed)
-	})
-	// 本物の受け口は、Content-Type の無い応答に本文から推した Content-Type を付ける。テストの記録用の応答の部品はそれをしないので、
-	// Java 版と同じく Content-Type を付けないことは、本物の受け口を立てて確かめる
-	t.Run("Content-Type を付けない", func(t *testing.T) {
-		next := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNoContent) })
-		server := httptest.NewServer(middleware.CORS(devOrigins)(next))
-		t.Cleanup(server.Close)
-		req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, server.URL, nil)
-		if err != nil {
-			t.Fatalf("要求を作れません: %v", err)
-		}
-		req.Header.Set("Origin", originEvil)
-		res, err := server.Client().Do(req)
-		if err != nil {
-			t.Fatalf("要求を送れません: %v", err)
-		}
-		_ = res.Body.Close()
-		if got := res.Header.Values("Content-Type"); res.StatusCode != http.StatusForbidden || len(got) != 0 {
-			t.Errorf("応答 = %d, Content-Type = %q, want 403 で Content-Type が無い", res.StatusCode, got)
-		}
 	})
 }
 
@@ -183,7 +165,7 @@ func TestCORS_ActualRequestHeaders(t *testing.T) {
 	})
 }
 
-// 許す送り元からのプリフライトでない HEAD に、Java 版と同じく 403 と Invalid CORS request を返し、
+// 許す送り元からのプリフライトでない HEAD に 403 で答え、
 // GET には Access-Control-Allow-Origin を付けて後ろの処理に渡すことを確かめる。
 func TestCORS_ActualRequestMethod(t *testing.T) {
 	t.Run("HEAD", func(t *testing.T) {
