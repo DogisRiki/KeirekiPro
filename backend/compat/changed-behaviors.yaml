@@ -1003,7 +1003,40 @@
   java: application/json;charset=UTF-8 を返す
   go: application/json を返す。本文は、どちらの版も {"message":"アクセス権限がありません。"} である
   画面に影響が無い理由: 画面は、答えの本文を JSON として読み、文言を出すので、charset の有無で画面の動きは変わらない。JSON の文字は UTF-8 と決まっている(RFC 8259)。Spring の書き方を写すのをやめた(Issue #969)
-  # match を書かない。比べる検査は偽の送信の検査で断る要求を送らない。Go 版の答えは internal/httpapi/middleware/csrf_test.go が確かめる。
+  # match は、筋書きが偽の送信の検査で断られる要求を送る操作の、403 の Content-Type の違いだけを許す。管理者の経路で断る 403 には当てない。Go 版の答えは internal/httpapi/middleware/csrf_test.go が確かめる。
+  match:
+    - operation: createResume
+      target: header
+      path: Content-Type
+      status: 403
+    - operation: restoreResume
+      target: header
+      path: Content-Type
+      status: 403
+    - operation: updateUserInfo
+      target: header
+      path: Content-Type
+      status: 403
+    - operation: deleteUser
+      target: header
+      path: Content-Type
+      status: 403
+    - operation: setEmailAndPassword
+      target: header
+      path: Content-Type
+      status: 403
+    - operation: changePassword
+      target: header
+      path: Content-Type
+      status: 403
+    - operation: removeAuthProvider
+      target: header
+      path: Content-Type
+      status: 403
+    - operation: sendAccountEmailVerification
+      target: header
+      path: Content-Type
+      status: 403
 
 - id: CB-085
   group: 1
