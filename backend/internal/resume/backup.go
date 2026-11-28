@@ -1,7 +1,9 @@
 package resume
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -183,11 +185,27 @@ func buildBackup(r Resume, now time.Time) (Export, error) {
 		return Export{}, errBackupDate
 	}
 	f := bkFile{Version: backupVersion, ExportedAt: javaInstant(now), Resume: newBkResume(r)}
+	body, err := backupJSON(f)
+	if err != nil {
+		return Export{}, err
+	}
 	return Export{
-		Body:        JavaJSON(f),
+		Body:        body,
 		ContentType: contentTypeBackup,
 		FileName:    sanitizeFileName(r.Name) + backupFileSuffix,
 	}, nil
+}
+
+// backupJSON は、バックアップのファイル f を、Go の標準のライブラリ encoding/json で JSON の本文にする。
+// 経歴書の文の < > & は、そのまま書く。最後の改行は付けない。
+func backupJSON(f bkFile) ([]byte, error) {
+	var b bytes.Buffer
+	enc := json.NewEncoder(&b)
+	enc.SetEscapeHTML(false)
+	if err := enc.Encode(f); err != nil {
+		return nil, fmt.Errorf("resume: バックアップのファイルを JSON にできない: %w", err)
+	}
+	return bytes.TrimSuffix(b.Bytes(), []byte("\n")), nil
 }
 
 // backupYearsInRange は、経歴書の日付と、職歴とプロジェクトの期間と、資格の年月の年が、どれも 1 から 9999 にあるかを返す。
