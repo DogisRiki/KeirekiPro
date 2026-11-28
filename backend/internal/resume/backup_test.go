@@ -95,9 +95,10 @@ func TestBackup_OmittedFields(t *testing.T) {
 	}
 }
 
-// TestBackup_ExportedAtFraction は、書き出した日時の秒の小数を、Java の Instant.toString と同じく、
-// 0 なら書かず、0 でなければ 3、6、9 桁のうち値を表せる最も短い桁数で書くことを確かめる(要件3の受入基準1)。
+// TestBackup_ExportedAtFraction は、書き出した日時を、世界標準時の time.RFC3339Nano の形で書くことを確かめる。
+// 秒の小数は、0 なら書かず、0 でなければ末尾の 0 を除いて書く(要件3の受入基準1、変えた動きの一覧の CB-130)。
 func TestBackup_ExportedAtFraction(t *testing.T) {
+	checkDiffTableInChangedBehaviors(t, map[string]string{"書き出した日時の秒の小数の桁数": "CB-130"})
 	cases := []struct {
 		nanos int
 		want  string
@@ -105,11 +106,11 @@ func TestBackup_ExportedAtFraction(t *testing.T) {
 		{0, "2026-11-24T01:02:03Z"},
 		{456_000_000, "2026-11-24T01:02:03.456Z"},
 		{1_000_000, "2026-11-24T01:02:03.001Z"},
-		{100_000_000, "2026-11-24T01:02:03.100Z"},
-		{456_700_000, "2026-11-24T01:02:03.456700Z"},
+		{100_000_000, "2026-11-24T01:02:03.1Z"},
+		{456_700_000, "2026-11-24T01:02:03.4567Z"},
 		{1_000, "2026-11-24T01:02:03.000001Z"},
 		{456_789_012, "2026-11-24T01:02:03.456789012Z"},
-		{882_047_430, "2026-11-24T01:02:03.882047430Z"},
+		{882_047_430, "2026-11-24T01:02:03.88204743Z"},
 		{1, "2026-11-24T01:02:03.000000001Z"},
 	}
 	for _, c := range cases {
