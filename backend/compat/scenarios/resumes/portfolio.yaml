@@ -191,7 +191,8 @@ steps:
       csrf: true
       json:
         <<: *portfolio
-        link: https://example.com/my portfolio
+        link: https://my portfolio.example.com/
+        # ホスト名に空白を含むリンクは、どちらの版も断る。パスの空白は、Go 版だけが通すので送らない(CB-109)。
     expect: {status: 400, fields: [$.errors.link]}
   - name: update-link-http
     request:
