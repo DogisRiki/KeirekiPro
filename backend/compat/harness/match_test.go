@@ -325,14 +325,14 @@ func TestLoadChangedBehaviors_CB005HasNoMatch(t *testing.T) {
 			t.Errorf("%s が一覧にありません", id)
 		}
 	}
-	if len(got) != 83 {
-		t.Errorf("一覧の項目は83のはずですが、%d です", len(got))
+	if len(got) != 85 {
+		t.Errorf("一覧の項目は85のはずですが、%d です", len(got))
 	}
 	// CB-022 は、利用者の操作の筋書きの管理者で違いが出るので match を持つ(TestChangedBehaviors_RefreshTokenRoles で確かめる)
 	for _, id := range []string{
 		"CB-005", "CB-007", "CB-008", "CB-009", "CB-010",
 		"CB-013", "CB-014", "CB-015", "CB-016", "CB-017", "CB-018", "CB-019", "CB-020", "CB-021", "CB-023", "CB-025", "CB-026",
-		"CB-027", "CB-075", "CB-077",
+		"CB-027", "CB-075", "CB-077", "CB-085",
 	} {
 		if m := byID[id].Matches; len(m) != 0 {
 			t.Errorf("%s は記録だけの項目のはずですが、match があります: %+v", id, m)
@@ -342,6 +342,17 @@ func TestLoadChangedBehaviors_CB005HasNoMatch(t *testing.T) {
 	if m := byID["CB-083"].Matches; len(m) != 1 ||
 		m[0] != (Match{Operation: "startOidcAuthorization", Target: TargetHeader, Path: "Content-Type"}) {
 		t.Errorf("CB-083 の match = %+v", m)
+	}
+	// CB-084 は、筋書きが偽の送信の検査で断られる要求を送る操作の、403 の Content-Type の違いだけを許す
+	var wantCSRF Matches
+	for _, op := range []string{
+		"createResume", "restoreResume", "updateUserInfo", "deleteUser",
+		"setEmailAndPassword", "changePassword", "removeAuthProvider", "sendAccountEmailVerification",
+	} {
+		wantCSRF = append(wantCSRF, Match{Operation: op, Target: TargetHeader, Path: "Content-Type", Status: 403})
+	}
+	if m := byID["CB-084"].Matches; !slices.Equal(m, wantCSRF) {
+		t.Errorf("CB-084 の match = %+v", m)
 	}
 	// CB-076 は、断った利用者の情報の変更で Java 版だけが置く画像の違いだけを許す
 	if m := byID["CB-076"].Matches; len(m) != 1 || m[0] != (Match{Operation: "updateUserInfo", Target: TargetS3, Status: 400}) {

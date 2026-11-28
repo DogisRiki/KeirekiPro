@@ -166,7 +166,7 @@ func TestAuthResponses_ContentDisposition(t *testing.T) {
 
 // TestAuthResponses_ErrorBodies は、*auth.Error を、Java 版の AppExceptionHandler と同じ状態の番号と本文と Cookie に
 // 変えることを確かめる(要件1.1、1.4)。本文は {message, errors} か、409 のときだけ {message, errors, kind} の順で書き、
-// Jackson と同じく < > & を逃がさない。操作の相手の利用者が居ない 401 だけ、accessToken と refreshToken を消す Cookie を
+// json.Marshal のとおりに書く。操作の相手の利用者が居ない 401 だけ、accessToken と refreshToken を消す Cookie を
 // この順に書く。*auth.Error でない誤りは変えない。
 func TestAuthResponses_ErrorBodies(t *testing.T) {
 	empty := map[string][]string{}
@@ -207,7 +207,7 @@ func TestAuthResponses_ErrorBodies(t *testing.T) {
 			err: &auth.Error{Status: 400, Message: auth.MessageInvalidInput, Errors: map[string][]string{
 				"password": {"パスワードは8文字以上で入力してください。", "<&>"}, "email": {"メールアドレスは入力必須です。"},
 			}},
-			want: wantResponse{status: 400, contentType: "application/json", body: `{"message":"入力エラーがあります。","errors":{"email":["メールアドレスは入力必須です。"],"password":["パスワードは8文字以上で入力してください。","<&>"]}}`},
+			want: wantResponse{status: 400, contentType: "application/json", body: `{"message":"入力エラーがあります。","errors":{"email":["メールアドレスは入力必須です。"],"password":["パスワードは8文字以上で入力してください。","\u003c\u0026\u003e"]}}`},
 		},
 		{
 			name:   "ログインを続けるための値が無効な 401",
@@ -243,7 +243,7 @@ func TestAuthResponses_ErrorBodies(t *testing.T) {
 			checkResponse(t, c.name+" を "+op+" で書いた", recordResponse(t, visit), c.want)
 		}
 	}
-	for _, err := range []error{errors.New("ほかの誤り"), nil, ErrNotImplemented} {
+	for _, err := range []error{errors.New("ほかの誤り"), nil} {
 		if _, ok := authErrorResponse(err, false); ok {
 			t.Errorf("authErrorResponse(%v) を *auth.Error として扱った", err)
 		}
@@ -716,7 +716,7 @@ func show(p *string) string {
 
 // oidcTestServer は、Google と GitHub の2つの操作だけを受け口に渡す、生成したコードの受け口の束である。
 type oidcTestServer struct {
-	Unimplemented
+	gen.StrictServerInterface
 	h *authHandlers
 }
 
@@ -936,12 +936,17 @@ func TestAuthOIDCHandlers_CallbackFailure302NoBody(t *testing.T) {
 	}
 }
 
+// passThrough は、何もせずに次の段へ渡す段である。ログインの状態を読む段とログインを求める段の代わりに使う。
+func passThrough(next http.Handler) http.Handler { return next }
+
 // TestNew_PassesAuthOptions は、New が、Cookie の Secure と本番の戻り先の URL の基底を認証の受け口に渡し、
 // 要求の Host と Accept を context に入れる中間処理を生成したコードに渡すことを確かめる。
 func TestNew_PassesAuthOptions(t *testing.T) {
 	newServer := func(f *fakeAuth, secure bool, base string) http.Handler {
 		return New(Options{
 			Logger:       slog.New(slog.NewTextHandler(io.Discard, nil)),
+			Identify:     passThrough,
+			Auth:         passThrough,
 			AuthHandlers: f,
 			CookieSecure: secure,
 			APIBaseURL:   base,

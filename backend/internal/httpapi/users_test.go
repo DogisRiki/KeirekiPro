@@ -281,7 +281,7 @@ func optBool(p *bool) string {
 	return strconv.FormatBool(*p)
 }
 
-// fullInfo は、すべての項目に値がある利用者の情報である。名前の < > & は、Java 版の Jackson と同じく逃がさずに書く。
+// fullInfo は、すべての項目に値がある利用者の情報である。名前の < > & は、json.Marshal のとおり \u003c \u003e \u0026 と書く。
 func fullInfo() users.UserInfo {
 	return users.UserInfo{
 		ID:                   handlerUserID,
@@ -298,8 +298,8 @@ func fullInfo() users.UserInfo {
 }
 
 // fullInfoJSON は、fullInfo を Java 版の UserInfoResponse の項目の順で書いた本文である。
-const fullInfoJSON = `{"id":"6f1c2a3b-4d5e-4f60-8a7b-9c0d1e2f3a4b","email":"user@example.com","username":"名前<a&b>",` +
-	`"hasPassword":true,"profileImage":"http://localhost:4566/bucket/profile-image.png?X-Amz-Signature=abc&X-Amz-Expires=600",` +
+const fullInfoJSON = `{"id":"6f1c2a3b-4d5e-4f60-8a7b-9c0d1e2f3a4b","email":"user@example.com","username":"名前\u003ca\u0026b\u003e",` +
+	`"hasPassword":true,"profileImage":"http://localhost:4566/bucket/profile-image.png?X-Amz-Signature=abc\u0026X-Amz-Expires=600",` +
 	`"twoFactorAuthEnabled":true,"authProviders":["github","google"],"roles":["ADMIN","USER"],"emailVerified":true,` +
 	`"pendingEmail":"next@example.com"}`
 
@@ -585,7 +585,7 @@ func checkUserCalls(t *testing.T, name string, f *fakeUsers, want ...string) {
 func TestUserResponses_AllOperationsWrite(t *testing.T) {
 	r := authJSON(http.StatusOK, map[string]string{"a": "<&>"}, "c1=1", "c2=2")
 	want := wantResponse{
-		status: http.StatusOK, cookies: []string{"c1=1", "c2=2"}, contentType: "application/json", body: `{"a":"<&>"}`,
+		status: http.StatusOK, cookies: []string{"c1=1", "c2=2"}, contentType: "application/json", body: `{"a":"\u003c\u0026\u003e"}`,
 	}
 	for name, visit := range map[string]func(http.ResponseWriter) error{
 		"GetUserInfo":                  r.VisitGetUserInfoResponse,

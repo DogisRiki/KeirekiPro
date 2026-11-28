@@ -1,7 +1,6 @@
 package httpapi
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -47,9 +46,9 @@ func authNoBody(status int, cookies ...string) authResponse {
 	return authResponse{status: status, cookies: cookies}
 }
 
-// authJSON は、v を Java 版の Jackson と同じく書いた本文の応答を、Content-Type を application/json にして作る。
+// authJSON は、v を JSON にした本文の応答を、Content-Type を application/json にして作る。
 func authJSON(status int, v any, cookies ...string) authResponse {
-	return authResponse{status: status, cookies: cookies, contentType: "application/json", body: jacksonJSON(v)}
+	return authResponse{status: status, cookies: cookies, contentType: "application/json", body: marshalJSON(v)}
 }
 
 // authText は、200 で、body をそのまま本文にし、Content-Type を text/plain; charset=utf-8 にした応答を作る。
@@ -110,17 +109,11 @@ func authErrorResponse(err error, secure bool) (authResponse, bool) {
 	return authJSON(e.Status, body, cookies...), true
 }
 
-// jacksonJSON は、v を、Java 版の Jackson と同じく < > & を逃がさずに、末尾の改行を付けずに JSON にする。
-// 認証の応答の本文に入る文字列は、決まった文言と項目の名前と、base64url の値だけである。Go と Jackson で書き方の
-// 違う U+2028、U+2029、U+10000 以上の文字は入らないので、ほかの違いは直さない。利用者の情報の答えの名前と
-// メールアドレスには、これらの文字や制御文字が入りうる。そのときは逃がし方だけが違い、JSON として読んだ値は同じになる。
-func jacksonJSON(v any) []byte {
-	var buf bytes.Buffer
-	enc := json.NewEncoder(&buf)
-	enc.SetEscapeHTML(false)
-	// 文字列と文字列の束と文字列への参照と真偽の値だけの値は、JSON にするときに誤りにならない
-	_ = enc.Encode(v)
-	return bytes.TrimSuffix(buf.Bytes(), []byte("\n"))
+// marshalJSON は、v を JSON にする。
+func marshalJSON(v any) []byte {
+	// 応答の本文の型は、JSON にするときに誤りにならない値だけを持つ
+	b, _ := json.Marshal(v)
+	return b
 }
 
 // write は、Set-Cookie を並べた順に書き、Location と Content-Type と Content-Disposition があれば書き、状態の番号と本文を書く。
