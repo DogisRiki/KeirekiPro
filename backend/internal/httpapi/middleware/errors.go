@@ -37,13 +37,9 @@ type messageBody struct {
 
 // WriteMessage は、errors を持たない {message} の形の本文を書く。
 func WriteMessage(w http.ResponseWriter, status int, message string) {
-	writeMessage(w, status, "application/json", message)
-}
-
-func writeMessage(w http.ResponseWriter, status int, contentType, message string) {
 	// 文字列だけの値は、JSON にするときに誤りにならない
 	body, _ := json.Marshal(messageBody{Message: message})
-	write(w, status, contentType, body)
+	write(w, status, "application/json", body)
 }
 
 // write は、Content-Type と status を付けて本文を書く。

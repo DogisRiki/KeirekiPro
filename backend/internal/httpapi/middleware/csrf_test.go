@@ -53,8 +53,8 @@ func assertForbidden(t *testing.T, rec *httptest.ResponseRecorder, passed bool) 
 	if rec.Code != http.StatusForbidden {
 		t.Errorf("ステータス = %d, want 403", rec.Code)
 	}
-	if got := rec.Header().Get("Content-Type"); got != "application/json;charset=UTF-8" {
-		t.Errorf("Content-Type = %q, want application/json;charset=UTF-8", got)
+	if got := rec.Header().Get("Content-Type"); got != "application/json" {
+		t.Errorf("Content-Type = %q, want application/json", got)
 	}
 	if got := rec.Body.String(); got != `{"message":"アクセス権限がありません。"}` {
 		t.Errorf("本文 = %s, want {\"message\":\"アクセス権限がありません。\"}", got)
@@ -166,8 +166,9 @@ func TestCSRF_GetPasses(t *testing.T) {
 func TestCSRF_RunsBeforeAuth(t *testing.T) {
 	authCalled := 0
 	handler := httpapi.New(httpapi.Options{
-		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
-		DB:     nil,
+		Logger:   slog.New(slog.NewTextHandler(io.Discard, nil)),
+		DB:       nil,
+		Identify: func(next http.Handler) http.Handler { return next },
 		Auth: func(http.Handler) http.Handler {
 			return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 				authCalled++

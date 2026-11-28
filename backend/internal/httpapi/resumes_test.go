@@ -106,7 +106,7 @@ func fullResume() resume.Resume {
 
 // fullResumeJSON は、fullResume を Java 版の ResumeInfoResponse の項目の順で書いた本文である。プロジェクトの工程は、
 // 鍵ごとにその工程の値を書く。技術スタックの中の並びは、nil を null、空を [] のまま書く。
-const fullResumeJSON = `{"id":"00000000-0000-4000-8000-000000000301","resumeName":"職務経歴書<&>","date":"2026-11-14",` +
+const fullResumeJSON = `{"id":"00000000-0000-4000-8000-000000000301","resumeName":"職務経歴書\u003c\u0026\u003e","date":"2026-11-14",` +
 	`"lastName":"山田","firstName":"太郎","createdAt":"2026-11-14T10:23:45.34123748","updatedAt":"2026-11-14T10:23:46.5",` +
 	`"careers":[` +
 	`{"id":"00000000-0000-4000-8000-000000000401","companyName":"A社","startDate":"2020-01","endDate":null,"active":true},` +
@@ -125,10 +125,14 @@ const fullResumeJSON = `{"id":"00000000-0000-4000-8000-000000000301","resumeName
 	`"apiDevelopmentTools":null,"designTools":null,"editors":null,"developmentEnvironments":["VS Code"]}}}],` +
 	`"certifications":[{"id":"00000000-0000-4000-8000-000000000601","name":"基本情報技術者試験","date":"2019-10"}],` +
 	`"portfolios":[{"id":"00000000-0000-4000-8000-000000000701","name":"作品","overview":"作品の概要","techStack":null,` +
-	`"link":"https://example.com/a?b=1&c=2"},` +
+	`"link":"https://example.com/a?b=1\u0026c=2"},` +
 	`{"id":"00000000-0000-4000-8000-000000000702","name":"作品2","overview":"","techStack":"Go","link":"https://example.com/b"}],` +
 	`"snsPlatforms":[{"id":"00000000-0000-4000-8000-000000000801","name":"GitHub","link":"https://github.com/example"}],` +
 	`"selfPromotions":[{"id":"00000000-0000-4000-8000-000000000901","title":"強み","content":"改行\nを含む"}]}`
+
+// restoredResumeJSON は、復元の答えの本文である。復元の答えは、対になっていないサロゲートを残すために resume.JavaJSON で書くので、
+// < と > と & を逃がさない。
+var restoredResumeJSON = strings.NewReplacer(`\u003c`, "<", `\u003e`, ">", `\u0026`, "&").Replace(fullResumeJSON)
 
 // fullMaster は、技術スタックのマスタである。Service は、名前の無い小分類も空の並びにして返す。
 func fullMaster() resume.TechStackMaster {
@@ -184,7 +188,7 @@ func listedResumes() []resume.Resume {
 const listedResumesJSON = `{"resumes":[` +
 	`{"id":"00000000-0000-4000-8000-000000000301","resumeName":"一つ目","createdAt":"2026-11-01T09:00:00",` +
 	`"updatedAt":"2026-11-02T09:30:15.1234"},` +
-	`{"id":"00000000-0000-4000-8000-000000000302","resumeName":"二つ目<&>","createdAt":"2026-11-03T00:00:01.000001",` +
+	`{"id":"00000000-0000-4000-8000-000000000302","resumeName":"二つ目\u003c\u0026\u003e","createdAt":"2026-11-03T00:00:01.000001",` +
 	`"updatedAt":"2026-11-03T00:00:01.000001"}]}`
 
 // fakeResumes は、経歴書の処理の代わりである。呼ばれた操作と引数を calls に記録し、errs に操作の名前で決めた誤りを返す。
@@ -485,6 +489,7 @@ func resumeOps() []resumeOp {
 	user := handlerUserID.String()
 	resumeWant := jsonWant(http.StatusOK, fullResumeJSON)
 	createdWant := jsonWant(http.StatusCreated, fullResumeJSON)
+	restoredWant := jsonWant(http.StatusCreated, restoredResumeJSON)
 	noContent := wantResponse{status: http.StatusNoContent}
 	exportWant := wantResponse{status: http.StatusOK, contentType: "application/pdf", body: fakeExportBody}
 	ops := []resumeOp{
@@ -494,7 +499,7 @@ func resumeOps() []resumeOp {
 				return h.ListCertificationNames(ctx, gen.ListCertificationNamesRequestObject{})
 			},
 			calls: []string{"ListCertificationNames()"},
-			want:  jsonWant(http.StatusOK, `{"names":["基本情報技術者試験","<応用&>"]}`),
+			want:  jsonWant(http.StatusOK, `{"names":["基本情報技術者試験","\u003c応用\u0026\u003e"]}`),
 		},
 		{
 			name: "ListSnsPlatformNames",
@@ -502,7 +507,7 @@ func resumeOps() []resumeOp {
 				return h.ListSnsPlatformNames(ctx, gen.ListSnsPlatformNamesRequestObject{})
 			},
 			calls: []string{"ListSnsPlatformNames()"},
-			want:  jsonWant(http.StatusOK, `{"names":["基本情報技術者試験","<応用&>"]}`),
+			want:  jsonWant(http.StatusOK, `{"names":["基本情報技術者試験","\u003c応用\u0026\u003e"]}`),
 		},
 		{
 			name: "ListTechStacks",
@@ -586,7 +591,7 @@ func resumeOps() []resumeOp {
 				return h.RestoreResume(ctx, gen.RestoreResumeRequestObject{Body: bodyOf(`{"version":"1.0"} 余り`)})
 			},
 			calls: []string{"RestoreResume(" + user + `, {"version":"1.0"} 余り)`},
-			want:  createdWant,
+			want:  restoredWant,
 		},
 	}
 	for _, it := range itemOps() {
@@ -874,7 +879,7 @@ func TestResumeHandlers_UnreadableItemID(t *testing.T) {
 // Content-Type と、本文を書くことを確かめる。
 func TestResumeResponses_AllOperationsWrite(t *testing.T) {
 	r := authJSON(http.StatusCreated, map[string]string{"a": "<&>"})
-	want := wantResponse{status: http.StatusCreated, contentType: "application/json", body: `{"a":"<&>"}`}
+	want := wantResponse{status: http.StatusCreated, contentType: "application/json", body: `{"a":"\u003c\u0026\u003e"}`}
 	visits := map[string]func(http.ResponseWriter) error{
 		"ListCertificationNames":   r.VisitListCertificationNamesResponse,
 		"ListSnsPlatformNames":     r.VisitListSnsPlatformNamesResponse,
@@ -919,7 +924,7 @@ func TestResumeResponses_AllOperationsWrite(t *testing.T) {
 const routeCSRF = "resume-route-csrf"
 
 // resumeServer は、認証のまとまりと経歴書の処理 svc をつないだ受け口を、userID の利用者がログインした状態で作る。
-// svc が nil なら ResumeHandlers を渡さない。認証の処理には、つながらないデータベースを渡す。
+// 認証の処理には、つながらないデータベースを渡す。
 func resumeServer(t *testing.T, svc ResumeService, userID uuid.UUID) http.Handler {
 	t.Helper()
 	pool, err := pgxpool.New(t.Context(), "postgres://keirekipro@127.0.0.1:1/keirekipro?connect_timeout=2")
@@ -1058,18 +1063,6 @@ func TestResumeRoutes_Wired(t *testing.T) {
 			}
 			checkResumeCalls(t, rt.name, svc, rt.call)
 		})
-	}
-}
-
-// TestResumeRoutes_Unimplemented は、New に ResumeHandlers を渡さなければ、マスタと経歴書の30の操作の要求に、
-// 今と同じ未実装の答えを返すことを確かめる。
-func TestResumeRoutes_Unimplemented(t *testing.T) {
-	handler := resumeServer(t, nil, handlerUserID)
-	for _, rt := range resumeRoutes() {
-		rec := sendRoute(handler, rt.method, rt.path, &rt.body, rt.accept()...)
-		if rec.Code != http.StatusNotImplemented || rec.Body.String() != `{"message":"未実装です。"}` {
-			t.Errorf("%s の応答 = %d %s, want 501 と未実装の本文", rt.name, rec.Code, rec.Body.String())
-		}
 	}
 }
 
@@ -1560,7 +1553,7 @@ func TestBackupHandlers_RestoreResponse(t *testing.T) {
 		want     string
 		contains []string
 	}{
-		{name: "経歴書", r: fullResume(), want: fullResumeJSON},
+		{name: "経歴書", r: fullResume(), want: restoredResumeJSON},
 		{
 			name: "対になっていないサロゲートを含む経歴書", r: lone, want: string(resume.JavaJSON(newResumeBody(lone))),
 			contains: []string{`"resumeName":"経歴\uD800書<&>"`, `"companyName":"会社\uDC00"`},

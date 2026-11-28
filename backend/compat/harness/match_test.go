@@ -325,14 +325,14 @@ func TestLoadChangedBehaviors_CB005HasNoMatch(t *testing.T) {
 			t.Errorf("%s が一覧にありません", id)
 		}
 	}
-	if len(got) != 83 {
-		t.Errorf("一覧の項目は83のはずですが、%d です", len(got))
+	if len(got) != 85 {
+		t.Errorf("一覧の項目は85のはずですが、%d です", len(got))
 	}
 	// CB-022 は、利用者の操作の筋書きの管理者で違いが出るので match を持つ(TestChangedBehaviors_RefreshTokenRoles で確かめる)
 	for _, id := range []string{
 		"CB-005", "CB-007", "CB-008", "CB-009", "CB-010",
 		"CB-013", "CB-014", "CB-015", "CB-016", "CB-017", "CB-018", "CB-019", "CB-020", "CB-021", "CB-023", "CB-025", "CB-026",
-		"CB-027", "CB-075", "CB-077",
+		"CB-027", "CB-075", "CB-077", "CB-084", "CB-085",
 	} {
 		if m := byID[id].Matches; len(m) != 0 {
 			t.Errorf("%s は記録だけの項目のはずですが、match があります: %+v", id, m)

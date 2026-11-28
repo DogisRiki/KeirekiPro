@@ -2,12 +2,8 @@
 package httpapi
 
 import (
-	"context"
-	"errors"
-	"fmt"
 	"log/slog"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/DogisRiki/KeirekiPro/backend/internal/httpapi/gen"
@@ -15,39 +11,23 @@ import (
 	"github.com/DogisRiki/KeirekiPro/backend/internal/platform/logging"
 )
 
-// ErrNotImplemented は、まだ作っていない操作が返す誤りである。HTTP の受け口は、501 と {"message":"未実装です。"} にする。
-var ErrNotImplemented = errors.New("httpapi: まだ作っていない操作です")
-
-// messageNotImplemented は、まだ作っていない操作への要求に返す文言である。
-const messageNotImplemented = "未実装です。"
-
-// queryErrorAs400Prefix は、問い合わせの値の誤りに 400 で答える経路の先頭である。Java 版は、認証の操作の
-// 問い合わせの誤りに 302 か 500 を返すが、Go 版は 400 にする(design の「httpapi.New の変更」の節)。
-// ほかのまとまりの spec で、問い合わせの誤りに 400 で答える操作を作るときは、その経路をここに足す。
-const queryErrorAs400Prefix = "/api/auth/"
-
 // Options は、HTTP の受け口の設定である。
 type Options struct {
 	// Logger は、要求のログと誤りのログを書く先である。
 	Logger *slog.Logger
 	// DB は、生きているかの確認で SELECT 1 を送る先である。
 	DB HealthDB
-	// Handlers は、仕様書の操作を受け持つ、まとまりのパッケージの処理を束ねた型である。nil なら、すべての操作に 501 を返す。
-	// AuthHandlers があるときは、認証の操作には AuthHandlers が答え、ほかの操作に Handlers が答える。
-	Handlers gen.StrictServerInterface
 	// CORSAllowedOrigins は、CORS の処理が許す送り元である。config の App.CORSAllowedOrigins を渡す。
 	CORSAllowedOrigins []string
-	// Identify は、Cookie accessToken からログインの状態を読む段である。auth.Identify を渡す。nil なら、何もせずに通す。
+	// Identify は、Cookie accessToken からログインの状態を読む段である。auth.Identify を渡す。
 	Identify func(http.Handler) http.Handler
-	// Auth は、ログインを求める段である。auth.RequireLogin を渡す。nil なら、何もせずに通す。
+	// Auth は、ログインを求める段である。auth.RequireLogin を渡す。
 	Auth func(http.Handler) http.Handler
-	// AuthHandlers は、認証の操作の処理である。*auth.Service を渡す。nil なら、認証の操作も Handlers が答える。
+	// AuthHandlers は、認証の13の操作の処理である。*auth.Service を渡す。
 	AuthHandlers AuthService
-	// UserHandlers は、利用者の7つの操作の処理である。*users.Service を渡す。利用者の操作はログインを求めるので、
-	// AuthHandlers があるときだけ使う。nil なら、利用者の操作も Handlers が答える。
+	// UserHandlers は、利用者の7つの操作の処理である。*users.Service を渡す。
 	UserHandlers UserService
-	// ResumeHandlers は、マスタと経歴書の30の操作の処理である。*resume.Service を渡す。マスタと経歴書の操作は
-	// ログインを求めるので、AuthHandlers があるときだけ使う。nil なら、マスタと経歴書の操作も Handlers が答える。
+	// ResumeHandlers は、マスタと経歴書の30の操作の処理である。*resume.Service を渡す。
 	ResumeHandlers ResumeService
 	// CookieSecure は、認証の操作が書く Cookie に Secure を付けるかである。config の App.CookieSecure を渡す。
 	CookieSecure bool
@@ -56,222 +36,58 @@ type Options struct {
 	APIBaseURL string
 }
 
-// routes は、認証の操作の受け口と利用者の操作の受け口とマスタと経歴書の操作の受け口を深さ1に、ほかの操作の答えを
-// 深さ2に埋め込んだ、仕様書の操作の受け口の束である。Go は、同じ名前のメソッドが複数の深さにあるとき、浅い深さの
-// メソッドを使うので、認証の操作には認証の受け口が、利用者の操作には利用者の受け口が、マスタと経歴書の操作には
-// 経歴書の受け口が答える。深さ1の受け口どうしは同じ名前のメソッドを持たないので、深さ1に並べても曖昧にならない。
-// ほかのまとまりの spec で作る受け口も、深さ1に足す。
+// routes は、認証の操作の受け口と利用者の操作の受け口とマスタと経歴書の操作の受け口を束ね、仕様書のすべての操作に
+// 答える。3つの受け口は同じ名前のメソッドを持たない。
 type routes struct {
 	*authHandlers
-	userOperations
-	resumeOperations
-	fallback
+	*userHandlers
+	*resumeHandlers
 }
 
-// userOperations は、利用者の7つの操作のメソッドである。Options の UserHandlers が無いときは、ほかの操作の答えを入れ、
-// 利用者の操作にも、ほかの操作と同じ答え(Options の Handlers か未実装の答え)を返す。
-type userOperations interface {
-	GetUserInfo(ctx context.Context, request gen.GetUserInfoRequestObject) (gen.GetUserInfoResponseObject, error)
-	UpdateUserInfo(
-		ctx context.Context, request gen.UpdateUserInfoRequestObject,
-	) (gen.UpdateUserInfoResponseObject, error)
-	DeleteUser(ctx context.Context, request gen.DeleteUserRequestObject) (gen.DeleteUserResponseObject, error)
-	SendAccountEmailVerification(
-		ctx context.Context, request gen.SendAccountEmailVerificationRequestObject,
-	) (gen.SendAccountEmailVerificationResponseObject, error)
-	SetEmailAndPassword(
-		ctx context.Context, request gen.SetEmailAndPasswordRequestObject,
-	) (gen.SetEmailAndPasswordResponseObject, error)
-	ChangePassword(
-		ctx context.Context, request gen.ChangePasswordRequestObject,
-	) (gen.ChangePasswordResponseObject, error)
-	RemoveAuthProvider(
-		ctx context.Context, request gen.RemoveAuthProviderRequestObject,
-	) (gen.RemoveAuthProviderResponseObject, error)
-}
-
-// resumeOperations は、マスタと経歴書の30の操作のメソッドである。Options の ResumeHandlers が無いときは、ほかの操作の答えを
-// 入れ、マスタと経歴書の操作にも、ほかの操作と同じ答え(Options の Handlers か未実装の答え)を返す。
-type resumeOperations interface {
-	ListCertificationNames(
-		ctx context.Context, request gen.ListCertificationNamesRequestObject,
-	) (gen.ListCertificationNamesResponseObject, error)
-	ListSnsPlatformNames(
-		ctx context.Context, request gen.ListSnsPlatformNamesRequestObject,
-	) (gen.ListSnsPlatformNamesResponseObject, error)
-	ListTechStacks(
-		ctx context.Context, request gen.ListTechStacksRequestObject,
-	) (gen.ListTechStacksResponseObject, error)
-	ListResumes(
-		ctx context.Context, request gen.ListResumesRequestObject,
-	) (gen.ListResumesResponseObject, error)
-	CreateResume(
-		ctx context.Context, request gen.CreateResumeRequestObject,
-	) (gen.CreateResumeResponseObject, error)
-	GetResume(
-		ctx context.Context, request gen.GetResumeRequestObject,
-	) (gen.GetResumeResponseObject, error)
-	DeleteResume(
-		ctx context.Context, request gen.DeleteResumeRequestObject,
-	) (gen.DeleteResumeResponseObject, error)
-	UpdateResumeBasic(
-		ctx context.Context, request gen.UpdateResumeBasicRequestObject,
-	) (gen.UpdateResumeBasicResponseObject, error)
-	ExportResume(
-		ctx context.Context, request gen.ExportResumeRequestObject,
-	) (gen.ExportResumeResponseObject, error)
-	ExportResumeWithSettings(
-		ctx context.Context, request gen.ExportResumeWithSettingsRequestObject,
-	) (gen.ExportResumeWithSettingsResponseObject, error)
-	BackupResume(
-		ctx context.Context, request gen.BackupResumeRequestObject,
-	) (gen.BackupResumeResponseObject, error)
-	RestoreResume(
-		ctx context.Context, request gen.RestoreResumeRequestObject,
-	) (gen.RestoreResumeResponseObject, error)
-	CreateCareer(
-		ctx context.Context, request gen.CreateCareerRequestObject,
-	) (gen.CreateCareerResponseObject, error)
-	UpdateCareer(
-		ctx context.Context, request gen.UpdateCareerRequestObject,
-	) (gen.UpdateCareerResponseObject, error)
-	DeleteCareer(
-		ctx context.Context, request gen.DeleteCareerRequestObject,
-	) (gen.DeleteCareerResponseObject, error)
-	CreateProject(
-		ctx context.Context, request gen.CreateProjectRequestObject,
-	) (gen.CreateProjectResponseObject, error)
-	UpdateProject(
-		ctx context.Context, request gen.UpdateProjectRequestObject,
-	) (gen.UpdateProjectResponseObject, error)
-	DeleteProject(
-		ctx context.Context, request gen.DeleteProjectRequestObject,
-	) (gen.DeleteProjectResponseObject, error)
-	CreateCertification(
-		ctx context.Context, request gen.CreateCertificationRequestObject,
-	) (gen.CreateCertificationResponseObject, error)
-	UpdateCertification(
-		ctx context.Context, request gen.UpdateCertificationRequestObject,
-	) (gen.UpdateCertificationResponseObject, error)
-	DeleteCertification(
-		ctx context.Context, request gen.DeleteCertificationRequestObject,
-	) (gen.DeleteCertificationResponseObject, error)
-	CreatePortfolio(
-		ctx context.Context, request gen.CreatePortfolioRequestObject,
-	) (gen.CreatePortfolioResponseObject, error)
-	UpdatePortfolio(
-		ctx context.Context, request gen.UpdatePortfolioRequestObject,
-	) (gen.UpdatePortfolioResponseObject, error)
-	DeletePortfolio(
-		ctx context.Context, request gen.DeletePortfolioRequestObject,
-	) (gen.DeletePortfolioResponseObject, error)
-	CreateSnsPlatform(
-		ctx context.Context, request gen.CreateSnsPlatformRequestObject,
-	) (gen.CreateSnsPlatformResponseObject, error)
-	UpdateSnsPlatform(
-		ctx context.Context, request gen.UpdateSnsPlatformRequestObject,
-	) (gen.UpdateSnsPlatformResponseObject, error)
-	DeleteSnsPlatform(
-		ctx context.Context, request gen.DeleteSnsPlatformRequestObject,
-	) (gen.DeleteSnsPlatformResponseObject, error)
-	CreateSelfPromotion(
-		ctx context.Context, request gen.CreateSelfPromotionRequestObject,
-	) (gen.CreateSelfPromotionResponseObject, error)
-	UpdateSelfPromotion(
-		ctx context.Context, request gen.UpdateSelfPromotionRequestObject,
-	) (gen.UpdateSelfPromotionResponseObject, error)
-	DeleteSelfPromotion(
-		ctx context.Context, request gen.DeleteSelfPromotionRequestObject,
-	) (gen.DeleteSelfPromotionResponseObject, error)
-}
-
-// fallback は、ほかの操作の答え(Options の Handlers か未実装の答え)を、routes の深さ2に置くための型である。
-type fallback struct {
-	gen.StrictServerInterface
-}
+var _ gen.StrictServerInterface = routes{}
 
 // New は、仕様書の経路と生きているかの確認の経路を登録し、中間処理を、外から、パニックの受け止め、安全のヘッダ、
 // 要求のログ、CORS の処理、ログインの状態の値を読む段、偽の送信の検査、ログインを求める段の順に並べた
 // http.Handler を返す。登録していない経路への要求には 404 を返す。
 func New(opts Options) http.Handler {
 	logger := logging.Named(opts.Logger, "httpapi")
-	handlers := opts.Handlers
-	if handlers == nil {
-		handlers = Unimplemented{}
-	}
-	if opts.AuthHandlers != nil {
-		var userOps userOperations = handlers
-		if opts.UserHandlers != nil {
-			userOps = newUserHandlers(opts.UserHandlers, opts.CookieSecure)
-		}
-		var resumeOps resumeOperations = handlers
-		if opts.ResumeHandlers != nil {
-			resumeOps = newResumeHandlers(opts.ResumeHandlers, opts.CookieSecure)
-		}
-		handlers = routes{
-			authHandlers:     newAuthHandlers(opts.AuthHandlers, logger, opts.CookieSecure, opts.APIBaseURL, time.Now),
-			userOperations:   userOps,
-			resumeOperations: resumeOps,
-			fallback:         fallback{handlers},
-		}
+	handlers := routes{
+		authHandlers:   newAuthHandlers(opts.AuthHandlers, logger, opts.CookieSecure, opts.APIBaseURL, time.Now),
+		userHandlers:   newUserHandlers(opts.UserHandlers, opts.CookieSecure),
+		resumeHandlers: newResumeHandlers(opts.ResumeHandlers, opts.CookieSecure),
 	}
 
 	mux := http.NewServeMux()
 	strictMiddlewares := []gen.StrictMiddlewareFunc{authRequestMiddleware}
 	strict := gen.NewStrictHandlerWithOptions(handlers, strictMiddlewares, gen.StrictHTTPServerOptions{
-		// 要求の本文を JSON として読めないときは、Java 版の HttpMessageNotReadableException と同じ 400 にする
+		// 要求の本文を JSON として読めないときは、400 と入力の誤りの本文にする
 		RequestErrorHandlerFunc: func(w http.ResponseWriter, _ *http.Request, _ error) {
 			middleware.WriteError(w, http.StatusBadRequest, middleware.MessageBadRequest)
 		},
 		ResponseErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
-			if errors.Is(err, ErrNotImplemented) {
-				middleware.WriteMessage(w, http.StatusNotImplemented, messageNotImplemented)
-				return
-			}
 			logger.LogAttrs(r.Context(), slog.LevelError, "unexpected_exception", logging.ErrorAttr(err, nil))
 			middleware.WriteError(w, http.StatusInternalServerError, middleware.MessageUnexpected)
 		},
 	})
 	gen.HandlerWithOptions(strict, gen.StdHTTPServerOptions{
 		BaseRouter:       mux,
-		ErrorHandlerFunc: paramErrorHandler(logger),
+		ErrorHandlerFunc: paramErrorHandler,
 	})
 	health := healthHandler(opts.DB, logger)
 	mux.Handle("GET /actuator/health", health)
 	mux.Handle("GET /healthz", health)
 
-	identify := passThrough(opts.Identify)
-	requireLogin := passThrough(opts.Auth)
 	return middleware.Recover(logger)(
 		middleware.SecurityHeaders(
 			middleware.RequestLog(logger)(
 				middleware.CORS(opts.CORSAllowedOrigins)(
-					identify(
+					opts.Identify(
 						middleware.CSRF(
-							requireLogin(limitUpdateUserInfoBody(middleware.RecordRoute(mux)))))))))
+							opts.Auth(limitUpdateUserInfoBody(middleware.RecordRoute(mux)))))))))
 }
 
-// paramErrorHandler は、経路と問い合わせと Cookie とヘッダの値の形の誤りに答える関数を作る。
-// Java 版は、これらの誤りに 500 を返している。経路が /api/auth/ の下の問い合わせの誤り(provider が無い、code や
-// state が2つある)は、design のとおり 400 と入力の誤りの本文にする。Cookie の値は文字列のまま渡るので、Cookie の
-// 値の形の誤りはここに届かない。ほかの経路は Java 版と同じ 500 にする。誤りの文は値を含むことがあるので、ログには
-// 誤りの型だけを書く。
-func paramErrorHandler(logger *slog.Logger) func(w http.ResponseWriter, r *http.Request, err error) {
-	return func(w http.ResponseWriter, r *http.Request, err error) {
-		if strings.HasPrefix(r.URL.Path, queryErrorAs400Prefix) {
-			middleware.WriteError(w, http.StatusBadRequest, middleware.MessageBadRequest)
-			return
-		}
-		logger.LogAttrs(r.Context(), slog.LevelError, "unexpected_exception",
-			slog.Group("error", slog.String("type", fmt.Sprintf("%T", err))))
-		middleware.WriteError(w, http.StatusInternalServerError, middleware.MessageUnexpected)
-	}
-}
-
-// passThrough は、nil の中間処理を、何もせずに次の処理に渡す中間処理にする。
-func passThrough(m func(http.Handler) http.Handler) func(http.Handler) http.Handler {
-	if m == nil {
-		return func(next http.Handler) http.Handler { return next }
-	}
-	return m
+// paramErrorHandler は、問い合わせの値の形の誤り(provider が無い、code や state が2つある)に、400 と入力の誤りの
+// 本文で答える。経路と Cookie とヘッダの値は文字列のまま渡るので、これらの値の形の誤りはここに届かない。
+func paramErrorHandler(w http.ResponseWriter, _ *http.Request, _ error) {
+	middleware.WriteError(w, http.StatusBadRequest, middleware.MessageBadRequest)
 }

@@ -34,7 +34,7 @@ func CSRF(next http.Handler) http.Handler {
 		}
 		if requiresCSRFCheck(r) && (token == "" || subtle.ConstantTimeCompare([]byte(r.Header.Get(csrfHeaderName)), []byte(token)) != 1) {
 			setTokenCookie(w)
-			writeMessage(w, http.StatusForbidden, "application/json;charset=UTF-8", MessageForbidden)
+			WriteMessage(w, http.StatusForbidden, MessageForbidden)
 			return
 		}
 		if token == "" {

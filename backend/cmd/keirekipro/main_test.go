@@ -745,7 +745,7 @@ func TestRun_MiddlewareOrder(t *testing.T) {
 			res.StatusCode, body, res.Header.Get("X-Frame-Options"))
 	}
 
-	// 入口が、認証の受け口を渡すことを、空のメールアドレスとパスワードのログインが、未実装の答えでなく、認証の受け口の
+	// 入口が、認証の受け口を渡すことを、空のメールアドレスとパスワードのログインが、認証の受け口の
 	// 入力の検査の 400 で断られることで確かめる。このテストのデータベースには表が無いので、表を読む前に断られる要求を送る
 	login, err := http.NewRequestWithContext(t.Context(), http.MethodPost, base+"/api/auth/login",
 		strings.NewReader(`{"email":"","password":""}`))
@@ -853,7 +853,7 @@ func TestSignalContext_SIGTERM(t *testing.T) {
 	}
 }
 
-// 入口が、組み立てた利用者の処理を受け口に渡すことを、ログインした利用者の情報の要求が、未実装の答えでなく、
+// 入口が、組み立てた利用者の処理を受け口に渡すことを、ログインした利用者の情報の要求が、
 // データベースの行から作った利用者の情報の 200 で答えられることで確かめる。画像の署名付きの URL で、設定の画像の
 // 置き場所の名前と AWS の接続先が渡ることと、接続先のホストの名前を localhost に置き換えるのが dev だけであることも確かめる。
 func TestRun_PassesUserHandlers(t *testing.T) {
@@ -926,7 +926,11 @@ func TestRun_PassesUserHandlers(t *testing.T) {
 			if !strings.HasPrefix(got.ProfileImage, wantImage) {
 				t.Errorf("画像の URL = %s, want %s で始まる", got.ProfileImage, wantImage)
 			}
-			rest := strings.Replace(string(body), `"profileImage":"`+got.ProfileImage+`"`, `"profileImage":"URL"`, 1)
+			image, err := json.Marshal(got.ProfileImage)
+			if err != nil {
+				t.Fatalf("画像の URL を JSON にできません: %v", err)
+			}
+			rest := strings.Replace(string(body), `"profileImage":`+string(image), `"profileImage":"URL"`, 1)
 			want := `{"id":"` + userID.String() + `","email":"taro@example.com","username":"山田太郎","hasPassword":false,` +
 				`"profileImage":"URL","twoFactorAuthEnabled":false,"authProviders":[],"roles":[],"emailVerified":false,` +
 				`"pendingEmail":null}`
@@ -937,7 +941,7 @@ func TestRun_PassesUserHandlers(t *testing.T) {
 	}
 }
 
-// 入口が、組み立てた経歴書の処理を受け口に渡すことを、ログインした利用者の経歴書の一覧の要求が、未実装の答えでなく、
+// 入口が、組み立てた経歴書の処理を受け口に渡すことを、ログインした利用者の経歴書の一覧の要求が、
 // 200 と空の並びで答えられることで確かめる。internal/httpapi のテストは httpapi.New に自分で ResumeHandlers を
 // 渡すので、main.go が渡し忘れても通ってしまうためである。
 func TestRun_PassesResumeHandlers(t *testing.T) {

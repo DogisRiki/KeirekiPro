@@ -18,10 +18,10 @@ import (
 
 	"github.com/DogisRiki/KeirekiPro/backend/internal/auth"
 	"github.com/DogisRiki/KeirekiPro/backend/internal/httpapi"
-	"github.com/DogisRiki/KeirekiPro/backend/internal/httpapi/gen"
 	"github.com/DogisRiki/KeirekiPro/backend/internal/platform/authctx"
 	"github.com/DogisRiki/KeirekiPro/backend/internal/platform/config"
 	"github.com/DogisRiki/KeirekiPro/backend/internal/platform/logging"
+	"github.com/DogisRiki/KeirekiPro/backend/internal/resume"
 	"github.com/DogisRiki/KeirekiPro/backend/internal/users"
 )
 
@@ -32,11 +32,18 @@ const (
 	sampleResumeID = "0b8f3c9e-6a1d-4f2e-9c7b-5d4e3f2a1b0c"
 )
 
-// server は、ログを logs に書く HTTP の受け口を作る。
-func server(handlers gen.StrictServerInterface, db httpapi.HealthDB) (http.Handler, *bytes.Buffer) {
+// server は、loginUserID がログインした状態で、マスタと経歴書の処理 resumes をつなぎ、ログを logs に書く HTTP の受け口を
+// 作る。
+func server(resumes httpapi.ResumeService, db httpapi.HealthDB) (http.Handler, *bytes.Buffer) {
 	logs := &bytes.Buffer{}
 	logger := logging.New(logs, logging.Options{Service: logging.Service{Name: "keirekipro"}})
-	return httpapi.New(httpapi.Options{Logger: logger, DB: db, Handlers: handlers}), logs
+	return httpapi.New(httpapi.Options{
+		Logger:         logger,
+		DB:             db,
+		Identify:       loginAs,
+		Auth:           auth.RequireLogin(),
+		ResumeHandlers: resumes,
+	}), logs
 }
 
 // send は、偽の送信の検査に通る Cookie とヘッダを付けて、要求を1つ送る。
@@ -92,25 +99,30 @@ func assertBody(t *testing.T, rec *httptest.ResponseRecorder, status int, conten
 	}
 }
 
-// まだ作っていない操作に 501 を返し、要求のログに経路の型とステータスを書き、Cookie を書かないことを確かめる。
-func TestUnimplementedReturns501(t *testing.T) {
-	for _, tc := range []struct{ method, path, route, body string }{
-		{http.MethodGet, "/api/resumes", "/api/resumes", ""},
-		{http.MethodGet, "/api/resumes/" + sampleResumeID, "/api/resumes/{resumeId}", ""},
-		{http.MethodPost, "/api/auth/login", "/api/auth/login", `{"email":"a@example.com","password":"x"}`},
-		{http.MethodDelete, "/api/users/me", "/api/users/me", ""},
+// 要求のログに経路の型とステータスを書き、Cookie と要求の本文を書かないことを確かめる。
+func TestRequestLog_RouteAndStatus(t *testing.T) {
+	for _, tc := range []struct {
+		method, path, route, body string
+		status                    int
+	}{
+		{http.MethodGet, "/api/resumes", "/api/resumes", "", http.StatusInternalServerError},
+		{http.MethodGet, "/api/resumes/" + sampleResumeID, "/api/resumes/{resumeId}", "", http.StatusInternalServerError},
+		{http.MethodPost, "/api/auth/login", "/api/auth/login", `{"email":"a@example.com","password":1}`, http.StatusBadRequest},
 	} {
 		t.Run(tc.method+" "+tc.path, func(t *testing.T) {
-			handler, logs := server(nil, nil)
+			handler, logs := server(panicking{}, nil)
 			rec := send(handler, tc.method, tc.path, tc.body)
-			assertBody(t, rec, http.StatusNotImplemented, "application/json", `{"message":"未実装です。"}`)
+			if rec.Code != tc.status {
+				t.Errorf("ステータス = %d, want %d", rec.Code, tc.status)
+			}
 
 			line := requestLog(t, logs)
 			httpFields, _ := line["http"].(map[string]any)
 			request, _ := httpFields["request"].(map[string]any)
 			response, _ := httpFields["response"].(map[string]any)
-			if request["method"] != tc.method || httpFields["route"] != tc.route || response["status_code"] != float64(501) {
-				t.Errorf("要求のログ = %v, want %s %s 501", line, tc.method, tc.route)
+			if request["method"] != tc.method || httpFields["route"] != tc.route ||
+				response["status_code"] != float64(tc.status) {
+				t.Errorf("要求のログ = %v, want %s %s %d", line, tc.method, tc.route, tc.status)
 			}
 			if strings.Contains(logs.String(), sampleCSRF) || strings.Contains(logs.String(), "password") {
 				t.Errorf("ログに Cookie か要求の本文を書いています: %s", logs.String())
@@ -134,17 +146,18 @@ func TestBadJSONReturns400MessageErrors(t *testing.T) {
 	}
 }
 
-// panicking は、経歴書の一覧の操作でパニックを起こし、経歴書を作る操作で誤りを返す。
+// panicking は、経歴書の一覧の読み取りでパニックを起こし、経歴書の読み取りで誤りを返す、マスタと経歴書の処理である。
+// ほかの処理は持たない。
 type panicking struct {
-	httpapi.Unimplemented
+	httpapi.ResumeService
 }
 
-func (panicking) ListResumes(context.Context, gen.ListResumesRequestObject) (gen.ListResumesResponseObject, error) {
+func (panicking) ListResumes(context.Context, uuid.UUID) ([]resume.Resume, error) {
 	panic("想定外の状態")
 }
 
-func (panicking) GetResume(context.Context, gen.GetResumeRequestObject) (gen.GetResumeResponseObject, error) {
-	return nil, errors.New("データベースにつなげません")
+func (panicking) GetResume(context.Context, uuid.UUID, string) (resume.Resume, error) {
+	return resume.Resume{}, errors.New("データベースにつなげません")
 }
 
 // パニックと想定外の誤りに、Java 版と同じ 500 と本文を返し、スタックをログに書くことを確かめる。
@@ -207,6 +220,8 @@ func TestCORS_RunsBeforeCSRF(t *testing.T) {
 	handler := httpapi.New(httpapi.Options{
 		Logger:             logging.New(&bytes.Buffer{}, logging.Options{Service: logging.Service{Name: "keirekipro"}}),
 		CORSAllowedOrigins: []string{"http://localhost:5173", "http://localhost:8082"},
+		Identify:           loginAs,
+		Auth:               auth.RequireLogin(),
 	})
 	req := httptest.NewRequest(http.MethodPost, "http://localhost:8081/api/resumes", strings.NewReader("{}"))
 	req.Header.Set("Origin", "http://localhost:8082")
@@ -252,9 +267,8 @@ func authServer(t *testing.T, change func(*httpapi.Options)) (http.Handler, *byt
 	return httpapi.New(opts), logs
 }
 
-// ログインの要る操作に、ログインの状態を持たない要求が届いたら、未実装の答えより先に、Java 版と同じ 401 と
-// 空の本文で断ることを確かめる。
-func TestNew_RequireLoginBeforeUnimplemented(t *testing.T) {
+// ログインの要る操作に、ログインの状態を持たない要求が届いたら、処理を呼ぶ前に、401 と空の本文で断ることを確かめる。
+func TestNew_RequireLogin(t *testing.T) {
 	handler, _ := authServer(t, nil)
 	for _, tc := range []struct{ method, path string }{
 		{http.MethodGet, "/api/resumes"},
@@ -286,33 +300,7 @@ func TestNew_IdentifyBeforeCSRF(t *testing.T) {
 	}
 }
 
-// 認証の受け口が、同じ名前の未実装の答えより先に使われ、ほかの操作は Handlers の答えのままであることを確かめる。
-func TestNew_AuthHandlersShadowUnimplemented(t *testing.T) {
-	handler, _ := authServer(t, func(o *httpapi.Options) { o.Auth = nil })
-	rec := send(handler, http.MethodPost, "/api/auth/login", `{"email":"","password":""}`)
-	if rec.Code != http.StatusBadRequest || !strings.Contains(rec.Body.String(), `"message":"入力エラーがあります。"`) ||
-		!strings.Contains(rec.Body.String(), `"email":[`) {
-		t.Errorf("ログインの応答 = %d %s, want 認証の受け口の検査の 400", rec.Code, rec.Body.String())
-	}
-	rec = send(handler, http.MethodGet, "/api/resumes", "")
-	assertBody(t, rec, http.StatusNotImplemented, "application/json", `{"message":"未実装です。"}`)
-
-	t.Run("Handlers を渡せば、認証の操作でない操作は Handlers が答える", func(t *testing.T) {
-		handler, _ := authServer(t, func(o *httpapi.Options) {
-			o.Auth = nil
-			o.Handlers = panicking{}
-		})
-		rec := send(handler, http.MethodGet, "/api/resumes/"+sampleResumeID, "")
-		assertBody(t, rec, http.StatusInternalServerError, "application/json", javaUnexpected)
-		rec = send(handler, http.MethodPost, "/api/auth/login", `{"email":"","password":""}`)
-		if rec.Code != http.StatusBadRequest {
-			t.Errorf("ログインの応答 = %d, want 認証の受け口の 400", rec.Code)
-		}
-	})
-}
-
-// 経路が /api/auth/ の下の問い合わせの誤りに 400 と Java 版の入力の誤りの本文を返すことを確かめる。
-// ほかの経路の値の誤りが 500 のままであることは、server_internal_test.go の TestParamErrorHandler で確かめる。
+// 問い合わせの値の形の誤りに、400 と入力の誤りの本文を返し、想定外の誤りとしてログに書かないことを確かめる。
 func TestNew_AuthQueryError400(t *testing.T) {
 	handler, logs := authServer(t, nil)
 	for _, path := range []string{
@@ -350,8 +338,8 @@ func assertSecurityHeaders(t *testing.T, name string, rec *httptest.ResponseReco
 // 偽の送信の検査の 403、CORS の処理の 403、パニックの 500、生きているかの確認の応答にも、安全のヘッダが付くことを確かめる。
 func TestNew_SecurityHeadersOnAllResponses(t *testing.T) {
 	handler, _ := authServer(t, func(o *httpapi.Options) {
-		o.Handlers = panicking{}
-		o.Auth = nil
+		o.Identify = loginAs
+		o.ResumeHandlers = panicking{}
 		o.CORSAllowedOrigins = []string{"http://localhost:5173"}
 	})
 
@@ -465,14 +453,11 @@ func loginAs(next http.Handler) http.Handler {
 }
 
 // userServer は、認証のまとまりと、利用者の処理 svc をつないだ HTTP の受け口を、loginUserID がログインした状態で作る。
-// svc が nil なら、UserHandlers を渡さない。
 func userServer(t *testing.T, svc *wiredUsers) http.Handler {
 	t.Helper()
 	handler, _ := authServer(t, func(o *httpapi.Options) {
 		o.Identify = loginAs
-		if svc != nil {
-			o.UserHandlers = svc
-		}
+		o.UserHandlers = svc
 	})
 	return handler
 }
@@ -548,9 +533,8 @@ func userOperations() []userOperation {
 	}
 }
 
-// 利用者の7つの操作が、未実装の答えでなく利用者の受け口に届き、ほかのまとまりの操作は未実装の答えのまま、
-// 認証の操作は認証の受け口のままであることを確かめる。
-func TestNew_UserOperationsNotUnimplemented(t *testing.T) {
+// 利用者の7つの操作が利用者の受け口に届き、認証の操作は認証の受け口のままであることを確かめる。
+func TestNew_UserOperations(t *testing.T) {
 	for _, op := range userOperations() {
 		t.Run(op.name, func(t *testing.T) {
 			svc := &wiredUsers{}
@@ -565,9 +549,7 @@ func TestNew_UserOperationsNotUnimplemented(t *testing.T) {
 	}
 
 	handler := userServer(t, &wiredUsers{})
-	rec := send(handler, http.MethodGet, "/api/resumes", "")
-	assertBody(t, rec, http.StatusNotImplemented, "application/json", `{"message":"未実装です。"}`)
-	rec = send(handler, http.MethodPost, "/api/auth/login", `{"email":"","password":""}`)
+	rec := send(handler, http.MethodPost, "/api/auth/login", `{"email":"","password":""}`)
 	if rec.Code != http.StatusBadRequest || !strings.Contains(rec.Body.String(), `"email":[`) {
 		t.Errorf("ログインの応答 = %d %s, want 認証の受け口の検査の 400", rec.Code, rec.Body.String())
 	}
@@ -586,32 +568,6 @@ func TestNew_UserOperationsNotUnimplemented(t *testing.T) {
 			}
 		}
 	})
-
-	t.Run("UserHandlers を渡さなければ、利用者の操作は未実装の答えのまま", func(t *testing.T) {
-		handler := userServer(t, nil)
-		for _, op := range userOperations() {
-			rec := op.send(handler)
-			if rec.Code != http.StatusNotImplemented || rec.Body.String() != `{"message":"未実装です。"}` {
-				t.Errorf("%s の応答 = %d %s, want 501 と未実装の本文", op.name, rec.Code, rec.Body.String())
-			}
-		}
-
-		handler, _ = authServer(t, func(o *httpapi.Options) {
-			o.Identify = loginAs
-			o.Handlers = failingUserInfo{}
-		})
-		rec := send(handler, http.MethodGet, "/api/users/me", "")
-		assertBody(t, rec, http.StatusInternalServerError, "application/json", javaUnexpected)
-	})
-}
-
-// failingUserInfo は、利用者の情報の読み取りにだけ想定外の誤りを返し、ほかの操作には未実装の答えを返す Handlers である。
-type failingUserInfo struct {
-	httpapi.Unimplemented
-}
-
-func (failingUserInfo) GetUserInfo(context.Context, gen.GetUserInfoRequestObject) (gen.GetUserInfoResponseObject, error) {
-	return nil, errors.New("利用者の情報を読めません")
 }
 
 // 名前と画像と2段階認証の設定の変更の操作に multipart でない本文が届いたら、New が組み立てた受け口が、
