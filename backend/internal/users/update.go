@@ -74,7 +74,7 @@ func (s *Service) UpdateUserInfo(ctx context.Context, in UpdateInput) error {
 			// 今の名前と同じなら、updated_at も変えない。
 			if !u.Row.Username.Valid || u.Row.Username.String != name {
 				u.Row.Username = pgtype.Text{String: name, Valid: true}
-				u.Row.UpdatedAt = s.javaNow()
+				u.Row.UpdatedAt = s.dbNow()
 			}
 		}
 
@@ -89,7 +89,7 @@ func (s *Service) UpdateUserInfo(ctx context.Context, in UpdateInput) error {
 			}
 			// 設定が変わらなくても updated_at を今の時刻にする。
 			u.Row.TwoFactorAuthEnabled = enabled
-			u.Row.UpdatedAt = s.javaNow()
+			u.Row.UpdatedAt = s.dbNow()
 		}
 
 		if image != nil {
@@ -98,7 +98,7 @@ func (s *Service) UpdateUserInfo(ctx context.Context, in UpdateInput) error {
 				return err
 			}
 			u.Row.ProfileImage = pgtype.Text{String: imageKey, Valid: true}
-			u.Row.UpdatedAt = s.javaNow()
+			u.Row.UpdatedAt = s.dbNow()
 		}
 
 		return auth.SaveUser(ctx, q, u)

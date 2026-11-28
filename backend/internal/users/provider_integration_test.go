@@ -20,13 +20,13 @@ var oldStamp = pgtype.Timestamp{Time: time.Date(2026, 1, 2, 3, 4, 5, 678901000, 
 // testNow は、利用者の操作のテストの今の時刻である。データベースの TIMESTAMP(6) で丸められないよう、マイクロ秒までにする。
 var testNow = time.Date(2026, 11, 13, 1, 2, 3, 456789000, time.UTC)
 
-// testJavaZone は、Java 版のコンテナの時間帯(Asia/Tokyo)である。テストは、処理の側の値に頼らずに期待の値を作る。
-var testJavaZone = time.FixedZone("Asia/Tokyo", 9*3600)
+// testJapanZone は日本の時間帯である。テストは、処理の側の値に頼らずに期待の値を作る。
+var testJapanZone = time.FixedZone("Asia/Tokyo", 9*3600)
 
-// javaWallClock は、Java 版が時刻 t を TIMESTAMP の列に書いた値を、pgx で読んだときの値である。
-// Java 版は Asia/Tokyo の時刻の見た目で書き、pgx は時間帯の無い列を UTC の時刻として読む。
-func javaWallClock(t time.Time) pgtype.Timestamp {
-	w := t.In(testJavaZone)
+// dbWallClock は、時刻 t を表の日時の列に書いた値を、pgx で読んだときの値である。
+// 列には日本の時刻の見た目で書き、pgx は時間帯の無い列を UTC の時刻として読む。
+func dbWallClock(t time.Time) pgtype.Timestamp {
+	w := t.In(testJapanZone)
 	return pgtype.Timestamp{
 		Time:  time.Date(w.Year(), w.Month(), w.Day(), w.Hour(), w.Minute(), w.Second(), w.Nanosecond(), time.UTC),
 		Valid: true,
@@ -229,7 +229,7 @@ func TestRemoveAuthProvider_Success(t *testing.T) {
 		}
 		// updated_at だけが今の時刻になり、ほかの列と役割は変わらない
 		want := before
-		want.Row.UpdatedAt = javaWallClock(testNow)
+		want.Row.UpdatedAt = dbWallClock(testNow)
 		want.Providers = after.Providers
 		if !reflect.DeepEqual(after, want) {
 			t.Errorf("解除したあとの行\n 得た: %+v\n 期待: %+v", after, want)
@@ -252,8 +252,8 @@ func TestRemoveAuthProvider_Success(t *testing.T) {
 		if !reflect.DeepEqual(after.Providers, wantProviders) {
 			t.Errorf("残った連携\n 得た: %+v\n 期待: %+v", after.Providers, wantProviders)
 		}
-		if after.Row.UpdatedAt != javaWallClock(testNow) {
-			t.Errorf("updated_at = %v、期待 = %v", after.Row.UpdatedAt, javaWallClock(testNow))
+		if after.Row.UpdatedAt != dbWallClock(testNow) {
+			t.Errorf("updated_at = %v、期待 = %v", after.Row.UpdatedAt, dbWallClock(testNow))
 		}
 	})
 }

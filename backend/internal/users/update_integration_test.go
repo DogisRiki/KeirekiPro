@@ -99,8 +99,8 @@ func TestUpdateUserInfo_AdminCannotDisable2FA(t *testing.T) {
 			t.Error("2段階認証の設定 = 使わない、期待 = 使う")
 		}
 		// Java 版の changeTwoFactorAuthEnabled は、値が変わらなくても updated_at を今の時刻にする。
-		if after.Row.UpdatedAt != javaWallClock(testNow) {
-			t.Errorf("updated_at = %v、期待 = %v", after.Row.UpdatedAt, javaWallClock(testNow))
+		if after.Row.UpdatedAt != dbWallClock(testNow) {
+			t.Errorf("updated_at = %v、期待 = %v", after.Row.UpdatedAt, dbWallClock(testNow))
 		}
 	})
 }
@@ -133,8 +133,8 @@ func TestUpdateUserInfo_Enable2FARequiresEmailAndPassword(t *testing.T) {
 			t.Fatalf("UpdateUserInfo: %v", err)
 		}
 		after := loadUser(t, id)
-		if !after.Row.TwoFactorAuthEnabled || after.Row.UpdatedAt != javaWallClock(testNow) {
-			t.Errorf("2段階認証 = %v updated_at = %v、期待 = 使う %v", after.Row.TwoFactorAuthEnabled, after.Row.UpdatedAt, javaWallClock(testNow))
+		if !after.Row.TwoFactorAuthEnabled || after.Row.UpdatedAt != dbWallClock(testNow) {
+			t.Errorf("2段階認証 = %v updated_at = %v、期待 = 使う %v", after.Row.TwoFactorAuthEnabled, after.Row.UpdatedAt, dbWallClock(testNow))
 		}
 	})
 
@@ -144,8 +144,8 @@ func TestUpdateUserInfo_Enable2FARequiresEmailAndPassword(t *testing.T) {
 			t.Fatalf("UpdateUserInfo: %v", err)
 		}
 		after := loadUser(t, id)
-		if after.Row.TwoFactorAuthEnabled || after.Row.UpdatedAt != javaWallClock(testNow) {
-			t.Errorf("2段階認証 = %v updated_at = %v、期待 = 使わない %v", after.Row.TwoFactorAuthEnabled, after.Row.UpdatedAt, javaWallClock(testNow))
+		if after.Row.TwoFactorAuthEnabled || after.Row.UpdatedAt != dbWallClock(testNow) {
+			t.Errorf("2段階認証 = %v updated_at = %v、期待 = 使わない %v", after.Row.TwoFactorAuthEnabled, after.Row.UpdatedAt, dbWallClock(testNow))
 		}
 	})
 }
@@ -182,8 +182,8 @@ func TestUpdateUserInfo_ReplaceImage(t *testing.T) {
 			if after.Row.ProfileImage != someText(key) {
 				t.Errorf("画像の名前 = %v、期待 = %q", after.Row.ProfileImage, key)
 			}
-			if after.Row.UpdatedAt != javaWallClock(testNow) {
-				t.Errorf("updated_at = %v、期待 = %v", after.Row.UpdatedAt, javaWallClock(testNow))
+			if after.Row.UpdatedAt != dbWallClock(testNow) {
+				t.Errorf("updated_at = %v、期待 = %v", after.Row.UpdatedAt, dbWallClock(testNow))
 			}
 			// 名前は送っていないので変えない。
 			if after.Row.Username != someText("山田太郎") {
@@ -263,8 +263,8 @@ func TestUpdateUserInfo_Username(t *testing.T) {
 			t.Fatalf("UpdateUserInfo: %v", err)
 		}
 		after := loadUser(t, id)
-		if after.Row.Username != someText("佐藤 花子") || after.Row.UpdatedAt != javaWallClock(testNow) {
-			t.Errorf("名前 = %v updated_at = %v、期待 = \"佐藤 花子\" %v", after.Row.Username, after.Row.UpdatedAt, javaWallClock(testNow))
+		if after.Row.Username != someText("佐藤 花子") || after.Row.UpdatedAt != dbWallClock(testNow) {
+			t.Errorf("名前 = %v updated_at = %v、期待 = \"佐藤 花子\" %v", after.Row.Username, after.Row.UpdatedAt, dbWallClock(testNow))
 		}
 	})
 
@@ -285,8 +285,8 @@ func TestUpdateUserInfo_Username(t *testing.T) {
 			t.Fatalf("UpdateUserInfo: %v", err)
 		}
 		after := loadUser(t, id)
-		if after.Row.Username != someText("山田太郎") || after.Row.UpdatedAt != javaWallClock(testNow) {
-			t.Errorf("名前 = %v updated_at = %v、期待 = 山田太郎 %v", after.Row.Username, after.Row.UpdatedAt, javaWallClock(testNow))
+		if after.Row.Username != someText("山田太郎") || after.Row.UpdatedAt != dbWallClock(testNow) {
+			t.Errorf("名前 = %v updated_at = %v、期待 = 山田太郎 %v", after.Row.Username, after.Row.UpdatedAt, dbWallClock(testNow))
 		}
 	})
 

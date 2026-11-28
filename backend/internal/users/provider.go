@@ -12,13 +12,12 @@ import (
 	"github.com/DogisRiki/KeirekiPro/backend/internal/platform/database/sqlcgen"
 )
 
-// javaZone は、Java 版のコンテナの時間帯(Asia/Tokyo)である。Java 版は updated_at を、LocalDateTime.now() で、
-// この時間帯の時刻の見た目で書く。認証の spec の javaZone と同じ値である。
-var javaZone = time.FixedZone("Asia/Tokyo", 9*3600)
+// japanZone は日本の時間帯である。表の日時の列は時差を持たないので、日本の時刻の見た目で書く。
+var japanZone = time.FixedZone("Asia/Tokyo", 9*3600)
 
-// javaNow は、Java 版が LocalDateTime.now() で updated_at に書く値と同じ見た目の、今の時刻を返す。
-func (s *Service) javaNow() pgtype.Timestamp {
-	return pgtype.Timestamp{Time: s.deps.Now().In(javaZone), Valid: true}
+// dbNow は、今の時刻を、表の日時の列に書く日本の時刻の見た目で返す。
+func (s *Service) dbNow() pgtype.Timestamp {
+	return pgtype.Timestamp{Time: s.deps.Now().In(japanZone), Valid: true}
 }
 
 // RemoveAuthProvider は、Java 版の RemoveAuthProviderUseCase と User.removeAuthProvider と同じく、利用者 userID の、
@@ -54,7 +53,7 @@ func (s *Service) RemoveAuthProvider(ctx context.Context, userID uuid.UUID, prov
 		}
 
 		u.Providers = slices.Delete(u.Providers, index, index+1)
-		u.Row.UpdatedAt = s.javaNow()
+		u.Row.UpdatedAt = s.dbNow()
 		return auth.SaveUser(ctx, q, u)
 	})
 }

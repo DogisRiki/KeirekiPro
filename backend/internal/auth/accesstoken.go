@@ -18,9 +18,14 @@ import (
 // 署名か有効な時間か項目が合わないとき、または世代の番号がデータベースの今の番号と違うときに返す。
 var ErrInvalidToken = errors.New("auth: ログインの状態の値を受け付けない")
 
-// javaZone は、Java 版のコンテナの時間帯(Asia/Tokyo)である。Java 版は updated_at を、この時間帯の時刻の見た目で書く。
+// japanZone は日本の時間帯である。表の日時の列は時差を持たないので、日本の時刻の見た目で書く。
 // 日本は夏時間を持たないので、時間帯のデータを読まずに、9時間の固定のずれで表す。
-var javaZone = time.FixedZone("Asia/Tokyo", 9*3600)
+var japanZone = time.FixedZone("Asia/Tokyo", 9*3600)
+
+// dbNow は、今の時刻を、表の日時の列に書く日本の時刻の見た目で返す。
+func (s *Service) dbNow() pgtype.Timestamp {
+	return pgtype.Timestamp{Time: s.deps.Now().In(japanZone), Valid: true}
+}
 
 // Principal は、受け付けたログインの状態の値が表す利用者である。
 type Principal struct {
@@ -102,7 +107,7 @@ func (s *Service) VerifyAccessToken(ctx context.Context, token string) (Principa
 func (s *Service) BumpTokenVersion(ctx context.Context, q *sqlcgen.Queries, userID uuid.UUID) error {
 	err := q.IncrementTokenVersion(ctx, sqlcgen.IncrementTokenVersionParams{
 		UserID:    pgtype.UUID{Bytes: userID, Valid: true},
-		UpdatedAt: pgtype.Timestamp{Time: s.deps.Now().In(javaZone), Valid: true},
+		UpdatedAt: s.dbNow(),
 	})
 	if err != nil {
 		return fmt.Errorf("auth: 世代の番号を上げられない: %w", err)
