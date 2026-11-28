@@ -204,33 +204,33 @@
   group: 1
   変えた動き: ログインの開始の要求の、受けられない Accept
   java: Accept が image/* や application/*+xml のとき、Accept が ASCII でない文字を含むとき、Q=abc や Q=2 のような正しくない大文字の Q を含むときに、誤りの画面の都合で 401 を返す
-  go: 406 を返す
-  画面に影響が無い理由: 画面は Accept を付けないか、application/json, text/plain, */* を付けて送るので、画面の動きは変わらない。所有者が 2026-11-12 に受け入れた
+  go: Accept によらず、200 と、Content-Type が text/plain; charset=utf-8 の答えを返す
+  画面に影響が無い理由: 画面は Accept を付けないか、application/json, text/plain, */* を付けて送るので、画面の動きは変わらない。Spring の型の選び方を写すのをやめた(Issue #969)
   # match を書かない。比べる検査はこの Accept を送らない。
 
 - id: CB-016
   group: 1
   変えた動き: ログインの開始の要求の、Java が知らない charset を持つ Accept
   java: Accept の charset が、名前の形は正しいが Java が知らない名前のとき、406 を返す
-  go: その Accept を受け入れて答える
-  画面に影響が無い理由: 画面は Accept に charset を付けないので、画面の動きは変わらない。所有者が 2026-11-12 に受け入れた
+  go: Accept によらず、200 と、Content-Type が text/plain; charset=utf-8 の答えを返す
+  画面に影響が無い理由: 画面は Accept に charset を付けないので、画面の動きは変わらない。Spring の型の選び方を写すのをやめた(Issue #969)
   # match を書かない。比べる検査はこの Accept を送らない。
 
 - id: CB-017
   group: 1
   変えた動き: ログインの開始の要求の、受けられる型の候補が50を超える Accept
   java: Accept の型の候補が50を超えるとき(*/* と a/b1 から a/b49 までの50個)、内部の誤りで 500 と「予期せぬエラーが発生しました。」を返す
-  go: その Accept を受け入れて 200 で答える
-  画面に影響が無い理由: 画面は Accept の型の候補を3つまでしか付けないので、画面の動きは変わらない。所有者が 2026-11-12 に受け入れた
+  go: Accept によらず、200 と、Content-Type が text/plain; charset=utf-8 の答えを返す
+  画面に影響が無い理由: 画面は Accept の型の候補を3つまでしか付けないので、画面の動きは変わらない。Spring の型の選び方を写すのをやめた(Issue #969)
   # match を書かない。比べる検査はこの Accept を送らない。
 
 - id: CB-018
   group: 1
-  変えた動き: ログインの開始の要求の、port が数字でない Host
-  java: Host の port が 8o や +80 のように数字でないとき、Tomcat が 400 を返す
-  go: Host をそのまま使うか、port を落とした Host を使って答える
-  画面に影響が無い理由: ブラウザは Host に数字の port だけを付け、本番では ALB が Host を受けるので、画面の動きは変わらない。所有者が 2026-11-12 に受け入れた
-  # match を書かない。比べる検査はこの Host を送らない。
+  変えた動き: 開発の環境の、Google と GitHub のログインの戻り先の URL の Host
+  java: Tomcat が Host の port を数として読み直し、port が 80 なら書かず、08080 は 8080 に、空の port は 0 にする。port が 8o や +80 のように数字でないときは 400 を返す
+  go: 要求の Host をそのまま使う
+  画面に影響が無い理由: ブラウザは、port が 80 なら Host に port を書かず、ほかの port は数字で書く。本番では戻り先の URL を設定 App.APIBaseURL から作るので、画面の動きは変わらない。Tomcat の Host の直し方を写すのをやめた(Issue #969)
+  # match を書かない。比べる検査は port の無い Host を送るので、この違いは出ない。Go 版の答えは internal/httpapi/auth_test.go が確かめる。
 
 - id: CB-019
   group: 1
@@ -984,3 +984,15 @@
     - operation: backupResume
       target: header
       path: Content-Disposition
+
+- id: CB-083
+  group: 1
+  変えた動き: ログインの開始の答えの Content-Type
+  java: Spring が Accept で型を選ぶ。Accept が無いときは text/plain;charset=UTF-8、画面の axios の既定の Accept(application/json, text/plain, */*)のときは application/json を返す
+  go: Accept によらず、text/plain; charset=utf-8 を返す。本文は、どちらの版も引用符を付けないログインの開始の URL である
+  画面に影響が無い理由: 画面は、答えの本文を Content-Type によらず文字のまま読み、その URL に移るので、画面の動きは変わらない。Spring の型の選び方を写すのをやめた(Issue #969)
+  # match は、ログインの開始の答えの Content-Type の違いだけを許す。Go 版の答えは internal/httpapi/auth_test.go が確かめる。
+  match:
+    operation: startOidcAuthorization
+    target: header
+    path: Content-Type
