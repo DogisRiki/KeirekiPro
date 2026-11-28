@@ -38,7 +38,7 @@ type Deps struct {
 	// Bucket は、画像の置き場所の名前である(設定 App.S3Bucket の値)。
 	Bucket string
 	// RewritePresignHost は、署名付きの URL の中の AWS の接続先のホストの名前を localhost に置き換えるかどうかである。
-	// 設定 Env が dev のときに true にする。Java 版の LocalstackPresignedUrlTransformer にあたる。
+	// 設定 Env が dev のときに true にする。画面を開くブラウザは、コンテナの中の接続先のホストの名前を引けないためである。
 	RewritePresignHost bool
 	// AWSEndpoint は、dev と test で AWS の代わりにつなぐ先の URL である。空のときは、ホストの名前を置き換えない。
 	AWSEndpoint string

@@ -1069,3 +1069,24 @@
   go: Access-Control-Expose-Headers を付けない。Access-Control-Allow-Headers は、求められたヘッダの値をそのまま返す
   画面に影響が無い理由: ブラウザは、Access-Control-Expose-Headers をプリフライトでない要求の答えからだけ読み、Access-Control-Allow-Headers の名前の間の空白を読み飛ばす(Fetch Standard)ので、画面の JavaScript が読めるヘッダと、送れるヘッダは変わらない。プリフライトでない要求の答えには、今までどおり Access-Control-Expose-Headers を付ける。Spring の書き方を写すのをやめた(Issue #969)
   # match を書かない。比べる検査は Access-Control- で始まるヘッダを比べない。Go 版の答えは internal/httpapi/middleware/cors_test.go が確かめる。
+
+- id: CB-089
+  group: 1
+  変えた動き: 利用者の情報の答えの、画像の署名付きの URL の形
+  java: 問い合わせの項目を X-Amz-Algorithm、X-Amz-Date、X-Amz-SignedHeaders、X-Amz-Credential、X-Amz-Expires、X-Amz-Signature の順に並べる
+  go: AWS の SDK の署名付きの URL の部品が作る形にする。問い合わせの項目は X-Amz-Algorithm、X-Amz-Credential、X-Amz-Date、X-Amz-Expires、X-Amz-SignedHeaders、x-id=GetObject、X-Amz-Signature の順に並ぶ。使える時間(600秒)と、URL のパスと、署名の決まり(AWS 署名バージョン4)は変えない
+  画面に影響が無い理由: 画面は、URL をそのまま画像の読み込みに使い、中身を読まない。S3 は、問い合わせの項目の順によらず署名を確かめ、x-id を署名の対象に含めて受け付けるので、画像を読めることは変わらない。Java 版の SDK の項目の順に並べ直すのをやめた(Issue #969)
+  # match は、利用者の情報を返す3つの操作の、200 の答えの画像の URL の違いだけを許す。Go 版の URL の形は internal/users/objectstore_test.go が確かめ、URL で画像を読めることは internal/users/objectstore_integration_test.go が確かめる。
+  match:
+    - operation: getUserInfo
+      target: body
+      path: $.profileImage
+      status: 200
+    - operation: updateUserInfo
+      target: body
+      path: $.profileImage
+      status: 200
+    - operation: setEmailAndPassword
+      target: body
+      path: $.profileImage
+      status: 200
