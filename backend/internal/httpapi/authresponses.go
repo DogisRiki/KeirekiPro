@@ -8,6 +8,7 @@ import (
 
 	"github.com/DogisRiki/KeirekiPro/backend/internal/auth"
 	"github.com/DogisRiki/KeirekiPro/backend/internal/httpapi/gen"
+	"github.com/DogisRiki/KeirekiPro/backend/internal/httpapi/middleware"
 )
 
 // authResponse は、認証の操作の応答である。生成した応答の型は Set-Cookie を1つしか書けないので、Java 版と同じく
@@ -54,6 +55,11 @@ func authJSON(status int, v any, cookies ...string) authResponse {
 // authText は、200 で、body をそのまま本文にした応答を作る。
 func authText(contentType, body string) authResponse {
 	return authResponse{status: http.StatusOK, contentType: contentType, body: []byte(body)}
+}
+
+// badRequest は、400 と「入力エラーがあります。」の本文の応答を作る。
+func badRequest() authResponse {
+	return authJSON(http.StatusBadRequest, authErrorBody{Message: middleware.MessageBadRequest, Errors: map[string][]string{}})
 }
 
 // authRedirect は、location に移る 302 の応答を、本文を書かずに作る。
