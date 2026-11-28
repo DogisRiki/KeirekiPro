@@ -121,7 +121,7 @@ func TestUpdateUserInfo_ImageKey(t *testing.T) {
 		{"jpeg", "/profile/image/11111111-1111-4111-8111-000000000002.jpeg"},
 		// Java 版の ProfileImageKeys.fileName と同じく、拡張子が無ければ . も付けない。
 		{"", "/profile/image/11111111-1111-4111-8111-000000000002"},
-		// Java 版は String.isBlank で確かめるので、空白だけの拡張子も無いものとして扱う。
+		// 空白だけの拡張子も無いものとして扱う。
 		{" \t", "/profile/image/11111111-1111-4111-8111-000000000002"},
 	}
 	for _, tt := range tests {

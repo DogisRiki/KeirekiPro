@@ -260,8 +260,8 @@ func TestTwoFactor_Check(t *testing.T) {
 	})
 	t.Run("途中の記録の値が空白だけ", func(t *testing.T) {
 		s, client, _ := newTwoFactorService(t, nil)
-		// Java の isBlank が空白とする U+3000 と、空白としない U+00A0 を確かめる
-		for _, token := range []string{"", " \t\n", "　"} {
+		// 空白だけかは unicode.IsSpace で決めるので、改行しない空白だけの値も空白だけとする(変えた動きの一覧の CB-118)
+		for _, token := range []string{"", " \t\n", "　", "\u00a0"} {
 			if err := client.Set(ctx, "2fa:challenge:"+token, jsonQuoted(t, `{"userId":null,"attempts":0}`), time.Minute).Err(); err != nil {
 				t.Fatal(err)
 			}
@@ -271,13 +271,14 @@ func TestTwoFactor_Check(t *testing.T) {
 				t.Errorf("値 %q で途中の記録を読んだ", token)
 			}
 		}
-		if err := client.Set(ctx, "2fa:challenge: ", jsonQuoted(t, `{"userId":null,"attempts":0}`), time.Minute).Err(); err != nil {
+		// 情報の区切りの制御の字は空白でないので、途中の記録を読み、確認のコードが無いことで断る
+		if err := client.Set(ctx, "2fa:challenge:\u001c", jsonQuoted(t, `{"userId":null,"attempts":0}`), time.Minute).Err(); err != nil {
 			t.Fatal(err)
 		}
 		if err := client.Del(ctx, "2fa:null").Err(); err != nil {
 			t.Fatal(err)
 		}
-		_, err := s.checkTwoFactor(ctx, " ", "000000")
+		_, err := s.checkTwoFactor(ctx, "\u001c", "000000")
 		wantBusinessError(t, err, MessageInvalidTwoFactorCode)
 	})
 	t.Run("途中の記録が無い", func(t *testing.T) {

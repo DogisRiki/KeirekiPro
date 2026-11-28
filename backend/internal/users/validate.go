@@ -39,7 +39,7 @@ func ValidateSetEmailAndPassword(email *string, password string, confirmPassword
 	return f.Result()
 }
 
-// checkPhrase は、パスワードの項目 field を、@NotBlank、@Size(min = 8)、@MaxUtf8Bytes(72)、@Pattern の順に検査する。
+// checkPhrase は、パスワードの項目 field を、空白だけでないこと、8文字以上であること、72バイト以下であること、形の順に検査する。
 // 8文字より短いことと72バイトを超えることは同時には起きないので、長さの文言が2つ並ぶことは無い。
 func checkPhrase(f auth.FieldErrors, field, value, required, length, pattern string) {
 	f.Check(field, auth.NotBlank(value), required)

@@ -128,30 +128,9 @@ func ValidateResetPassword(password, confirmPassword string) *Error {
 	return f.result()
 }
 
-// notBlank は、Hibernate Validator の @NotBlank と同じく、s が Java の Character.isWhitespace に当たらない文字を
-// 1つ以上含むかを返す。
+// notBlank は、s が空白(unicode.IsSpace)でない字を1つ以上含むかを返す。
 func notBlank(s string) bool {
-	for _, r := range s {
-		if !isJavaWhitespace(r) {
-			return true
-		}
-	}
-	return false
-}
-
-// isJavaWhitespace は、Java 21 の Character.isWhitespace と同じく、r が空白の文字かを返す。
-// Unicode の空白の区切り(Zs)と行と段落の区切り(Zl と Zp)のうち、改行させない空白(U+00A0 U+2007 U+202F)を除いたものと、
-// U+0009 から U+000D と、U+001C から U+001F である。
-func isJavaWhitespace(r rune) bool {
-	switch {
-	case r >= 0x09 && r <= 0x0D, r >= 0x1C && r <= 0x20:
-		return true
-	case r == 0x1680, r >= 0x2000 && r <= 0x2006, r >= 0x2008 && r <= 0x200A:
-		return true
-	case r == 0x2028, r == 0x2029, r == 0x205F, r == 0x3000:
-		return true
-	}
-	return false
+	return strings.TrimSpace(s) != ""
 }
 
 // utf16Len は、Java の String.length() と同じく、s の UTF-16 の単位の数を返す。

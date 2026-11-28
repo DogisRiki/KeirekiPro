@@ -34,7 +34,9 @@ func TestValidate_Boundaries(t *testing.T) {
 		{"ログイン: 空", ValidateLogin("", ""), fields{"email": {msgEmailRequired}, "password": {msgPhraseRequired}}},
 		{"ログイン: 半角の空白とタブだけ", ValidateLogin(" \t", "\n\r"), fields{"email": {msgEmailRequired}, "password": {msgPhraseRequired}}},
 		{"ログイン: 全角の空白と行の区切りだけ", ValidateLogin(ch(0x3000), ch(0x2028)+ch(0x1680)), fields{"email": {msgEmailRequired}, "password": {msgPhraseRequired}}},
-		{"ログイン: 改行させない空白は空白でない", ValidateLogin(ch(0x00A0), ch(0x2007)+ch(0x202F)), nil},
+		// 空白だけかは unicode.IsSpace で決める(変えた動きの一覧の CB-118)。
+		{"ログイン: 改行させない空白と次の行の字だけ", ValidateLogin(ch(0x00A0), ch(0x2007)+ch(0x202F)+ch(0x85)), fields{"email": {msgEmailRequired}, "password": {msgPhraseRequired}}},
+		{"ログイン: 情報の区切りの制御の字は空白でない", ValidateLogin(ch(0x1C), ch(0x1F)), nil},
 		{"ログイン: メールアドレスの形は検査しない", ValidateLogin("bad", "x"), nil},
 		{"確認のメールの送り直し(ログインの画面): 空", ValidateResendEmailVerificationForLogin("", " "), fields{"email": {msgEmailRequired}, "password": {msgPhraseRequired}}},
 		{"確認のメールの送り直し(ログインの画面): 正しい値", ValidateResendEmailVerificationForLogin("user@example.com", "x"), nil},
@@ -139,22 +141,28 @@ func TestValidate_Boundaries(t *testing.T) {
 	}
 }
 
-// TestValidate_JavaWhitespace は、空白の判定が Java 21 の Character.isWhitespace と同じかを確かめる。
-// 期待の一覧は、Java 21 で Character.isWhitespace が真になるすべてのコードポイントである。
-func TestValidate_JavaWhitespace(t *testing.T) {
+// TestValidate_NotBlank は、空白だけかの判定が、unicode.IsSpace が空白とする字の一覧と同じかを、すべての字で確かめる。
+// 字 r が一覧にあれば、r だけの値と r を2つ並べた値を空白だけとする。
+func TestValidate_NotBlank(t *testing.T) {
 	want := map[rune]bool{}
-	for _, r := range []rune{0x1680, 0x2028, 0x2029, 0x205F, 0x3000} {
+	for _, r := range []rune{0x20, 0x85, 0xA0, 0x1680, 0x2028, 0x2029, 0x202F, 0x205F, 0x3000} {
 		want[r] = true
 	}
-	for _, span := range [][2]rune{{0x09, 0x0D}, {0x1C, 0x20}, {0x2000, 0x2006}, {0x2008, 0x200A}} {
+	for _, span := range [][2]rune{{0x09, 0x0D}, {0x2000, 0x200A}} {
 		for r := span[0]; r <= span[1]; r++ {
 			want[r] = true
 		}
 	}
 	for r := rune(0); r <= 0x10FFFF; r++ {
-		if got := isJavaWhitespace(r); got != want[r] {
-			t.Errorf("isJavaWhitespace(U+%04X) = %v", r, got)
+		if r >= 0xD800 && r <= 0xDFFF {
+			continue
 		}
+		if got := notBlank(ch(r) + ch(r)); got == want[r] {
+			t.Errorf("notBlank(U+%04X を2つ) = %v、空白の一覧にある = %v", r, got, want[r])
+		}
+	}
+	if notBlank("") {
+		t.Error(`notBlank("") = true`)
 	}
 }
 
