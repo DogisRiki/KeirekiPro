@@ -2,37 +2,37 @@ package resume
 
 import (
 	"errors"
-	"math/big"
 	"reflect"
+	"strconv"
 	"testing"
 
 	"github.com/DogisRiki/KeirekiPro/backend/internal/auth"
 )
 
-// settingsInput は、テストの PDF の設定の値を作る。フォントは NotoSansJP、色は16進数の d9d9d9 にし、タイトル、日付、氏名、見出しの文字の大きさに、10進数の文字列の title、date、fullName、sectionHeading を入れる。
+// settingsInput は、テストの PDF の設定の値を作る。フォントは NotoSansJP、色は16進数の d9d9d9 にし、タイトル、日付、氏名、見出しの文字の大きさに、10進数の字の title、date、fullName、sectionHeading を入れる。
 func settingsInput(t *testing.T, title, date, fullName, sectionHeading string) exportPDFSettingsInput {
 	t.Helper()
 	font, hex := "NotoSansJP", "d9d9d9"
 	return exportPDFSettingsInput{
 		FontFamily: &font,
 		FontSizes: &exportFontSizesInput{
-			Title:          rat(t, title),
-			Date:           rat(t, date),
-			FullName:       rat(t, fullName),
-			SectionHeading: rat(t, sectionHeading),
+			Title:          num(t, title),
+			Date:           num(t, date),
+			FullName:       num(t, fullName),
+			SectionHeading: num(t, sectionHeading),
 		},
 		TableHeaderColor: &exportColorInput{Hex: &hex},
 	}
 }
 
-// rat は、10進数の文字列 s を big.Rat にする。
-func rat(t *testing.T, s string) *big.Rat {
+// num は、10進数の字 s を float64 にする。
+func num(t *testing.T, s string) *float64 {
 	t.Helper()
-	r, ok := new(big.Rat).SetString(s)
-	if !ok {
+	f, err := strconv.ParseFloat(s, 64)
+	if err != nil {
 		t.Fatalf("数にできない: %q", s)
 	}
-	return r
+	return &f
 }
 
 // checkSettingsError は、直し方の誤り err が、文言 want の業務の 400 の誤りであることを確かめる。
@@ -78,6 +78,8 @@ func TestExportSettings_RoundSizes(t *testing.T) {
 		{name: "0.5 刻みの値はそのまま", sizes: [4]string{"16", "10", "10", "11.5"}, want: [4]float64{16, 10, 10, 11.5}},
 		{name: "6 と 72 は直せる", sizes: [4]string{"6", "72", "6.0", "72.0"}, want: [4]float64{6, 72, 6, 72}},
 		{name: "71.9 は 72 に丸まる", sizes: [4]string{"71.9", "6.1", "6.3", "6.8"}, want: [4]float64{72, 6, 6.5, 7}},
+		// 次の4つは、float64 では 7.2999…、70.7999…、6.2999…、6.7999… になり、小数の部分を10倍して切り捨てると位を誤る
+		{name: "float64 で少し小さくなる値", sizes: [4]string{"7.3", "70.8", "6.3", "6.8"}, want: [4]float64{7.5, 71, 6.5, 7}},
 		{name: "タイトルが6より小さい", sizes: [4]string{"5.99", "10", "10", "10"}, err: "フォントサイズが不正です。"},
 		{name: "日付が72より大きい", sizes: [4]string{"10", "72.01", "10", "10"}, err: "フォントサイズが不正です。"},
 		{name: "氏名が負の値", sizes: [4]string{"10", "10", "-10", "10"}, err: "フォントサイズが不正です。"},

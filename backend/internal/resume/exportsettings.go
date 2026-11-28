@@ -2,8 +2,9 @@ package resume
 
 import (
 	"fmt"
-	"math/big"
+	"math"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/DogisRiki/KeirekiPro/backend/internal/auth"
@@ -33,30 +34,30 @@ type pdfSettings struct {
 // exportPDFSettingsInput は、設定を付けた出力の本文の、直す前の PDF の設定の値である。
 // 本文に無い欄は nil にする。本文の読み手は、断る条件で確かめたあとに、この値を normalizePDFSettings に渡す。
 type exportPDFSettingsInput struct {
-	FontFamily       *string
-	FontSizes        *exportFontSizesInput
-	TableHeaderColor *exportColorInput
+	FontFamily       *string               `json:"fontFamily"`
+	FontSizes        *exportFontSizesInput `json:"fontSizes"`
+	TableHeaderColor *exportColorInput     `json:"tableHeaderColor"`
 }
 
-// exportFontSizesInput は、直す前の4つの文字の大きさである。Java 版の BigDecimal と同じく、10進数の値を誤差無しに持つ。
+// exportFontSizesInput は、直す前の4つの文字の大きさである。
 type exportFontSizesInput struct {
-	Title          *big.Rat
-	Date           *big.Rat
-	FullName       *big.Rat
-	SectionHeading *big.Rat
+	Title          *float64 `json:"title"`
+	Date           *float64 `json:"date"`
+	FullName       *float64 `json:"fullName"`
+	SectionHeading *float64 `json:"sectionHeading"`
 }
 
 // exportColorInput は、直す前の表の見出しの色である。16進数の6桁(# を付けない)か、赤と緑と青の値の、どちらか一方を持つ。
 type exportColorInput struct {
-	Hex *string
-	RGB *exportRGBInput
+	Hex *string         `json:"hex"`
+	RGB *exportRGBInput `json:"rgb"`
 }
 
-// exportRGBInput は、直す前の赤と緑と青の値である。
+// exportRGBInput は、直す前の赤と緑と青の値である。本文の鍵は r、g、b である。
 type exportRGBInput struct {
-	Red   *int
-	Green *int
-	Blue  *int
+	Red   *int `json:"r"`
+	Green *int `json:"g"`
+	Blue  *int `json:"b"`
 }
 
 // 次の2つは、PDF のひな形の CSS に入れるフォントの名前である。Java 版の ResumePdfExportSettings が選ぶ2つの値と同じである。
@@ -65,11 +66,13 @@ const (
 	cssFontSerifJP = "Noto Serif JP"
 )
 
-var (
-	minFontSize = big.NewRat(6, 1)
-	maxFontSize = big.NewRat(72, 1)
-	cssColor    = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)
+// 次の2つは、文字の大きさの下限と上限である。どちらも含む。
+const (
+	minFontSize = 6.0
+	maxFontSize = 72.0
 )
+
+var cssColor = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)
 
 // defaultPDFSettings は、設定を付けない出力の既定の設定を返す(ResumePdfExportSettings.defaults)。
 func defaultPDFSettings() pdfSettings {
@@ -96,7 +99,7 @@ func normalizePDFSettings(in exportPDFSettingsInput) (pdfSettings, error) {
 		sizes = *in.FontSizes
 	}
 	for _, f := range []struct {
-		in  *big.Rat
+		in  *float64
 		out *float64
 	}{
 		{sizes.Title, &s.TitleFontSize},
@@ -133,16 +136,18 @@ func toCSSFontFamily(font *string) (string, bool) {
 // normalizeFontSize は、文字の大きさを、整数の部分と10分の1の位で丸める。10分の1の位が2以下なら整数の部分、
 // 7以下なら整数の部分に 0.5 を足した値、それより大きければ整数の部分に1を足した値にする。
 // 6より小さいか72より大きい値は、ok を false にする。
-func normalizeFontSize(v *big.Rat) (float64, bool) {
-	if v == nil || v.Cmp(minFontSize) < 0 || v.Cmp(maxFontSize) > 0 {
+// 10分の1の位は、値を最も短い10進数の書き方(strconv.FormatFloat の精度 -1)にした字の、小数点のあとの1字目で決める。
+// 6.3 のような値は float64 では 6.2999… になり、掛け算で求めると位が変わるためである。画面は文字の大きさを JavaScript の
+// JSON.stringify で最も短い書き方で送るので、画面が送った字の10分の1の位で丸めることになる。
+func normalizeFontSize(v *float64) (float64, bool) {
+	if v == nil || *v < minFontSize || *v > maxFontSize {
 		return 0, false
 	}
-	// 6 以上の値なので、整数の割り算の切り捨てが、小数点以下の切り捨てになる
-	floor := new(big.Int).Quo(v.Num(), v.Denom())
-	frac := new(big.Rat).Sub(v, new(big.Rat).SetInt(floor))
-	scaled := frac.Mul(frac, big.NewRat(10, 1))
-	tenths := new(big.Int).Quo(scaled.Num(), scaled.Denom()).Int64()
-	base := float64(floor.Int64())
+	base := math.Floor(*v)
+	tenths := 0
+	if _, frac, found := strings.Cut(strconv.FormatFloat(*v, 'f', -1, 64), "."); found {
+		tenths = int(frac[0] - '0')
+	}
 	switch {
 	case tenths <= 2:
 		return base, true
