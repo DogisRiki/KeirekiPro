@@ -355,7 +355,7 @@ func TestNew_SecurityHeadersOnAllResponses(t *testing.T) {
 	cors.Header.Set("Origin", "http://evil.example.com")
 	rec = httptest.NewRecorder()
 	handler.ServeHTTP(rec, cors)
-	if rec.Code != http.StatusForbidden || rec.Body.String() != "Invalid CORS request" {
+	if rec.Code != http.StatusForbidden || rec.Body.String() != `{"message":"アクセス権限がありません。"}` {
 		t.Errorf("CORS の処理の応答 = %d %s, want 403", rec.Code, rec.Body.String())
 	}
 	assertSecurityHeaders(t, "CORS の処理の 403", rec)

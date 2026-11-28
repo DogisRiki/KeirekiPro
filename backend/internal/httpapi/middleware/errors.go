@@ -13,7 +13,7 @@ const (
 	MessageBadRequest = "入力エラーがあります。"
 	// MessageUnexpected は、想定外の誤りのときの文言である。
 	MessageUnexpected = "予期せぬエラーが発生しました。"
-	// MessageForbidden は、偽の送信の検査に通らないときの文言である。
+	// MessageForbidden は、偽の送信の検査と CORS の検査に通らないときの文言である。
 	MessageForbidden = "アクセス権限がありません。"
 )
 

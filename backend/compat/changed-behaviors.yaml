@@ -1045,3 +1045,27 @@
   go: encoding/json の json.Marshal が、< を <、> を >、& を & と書く。経歴書の復元の答えとバックアップのファイルは、対になっていないサロゲートを残すために今までの書き手で書くので、字のまま書く
   画面に影響が無い理由: 画面は、答えの本文を JSON として読むので、どちらの書き方でも同じ文字になり、画面の動きは変わらない。Jackson の書き方を写すのをやめた(Issue #969)
   # match を書かない。比べる検査は JSON の本文を解析した値で比べる。Go 版の答えは internal/httpapi の auth_test.go、users_test.go、resumes_test.go が確かめる。
+
+- id: CB-086
+  group: 1
+  変えた動き: CORS の検査で断るときの 403 の答え
+  java: Content-Type を付けずに、本文 Invalid CORS request を返す
+  go: application/json の {"message":"アクセス権限がありません。"} を返す。偽の送信の検査で断るときと同じ書き手で書く
+  画面に影響が無い理由: 本番の画面は API と同じ送り元から要求を送るので、CORS の検査は動かない。開発環境で許さない送り元から送った要求の答えは、ブラウザが画面に読ませないので、画面の動きは変わらない。Spring の書き方を写すのをやめた(Issue #969)
+  # match を書かない。比べる検査は許さない送り元からの要求を送らない。Go 版の答えは internal/httpapi/middleware/cors_test.go が確かめる。
+
+- id: CB-087
+  group: 1
+  変えた動き: CORS の検査がすべての応答に付ける Vary の書き方
+  java: Origin と Access-Control-Request-Method と Access-Control-Request-Headers を、値ごとに別の行で付ける
+  go: 3つの値を、コンマでつないだ1行で付ける
+  画面に影響が無い理由: HTTP では、同じ名前のヘッダの複数の行と、値をコンマでつないだ1行は同じ意味になる(RFC 9110 の 5.3)ので、ブラウザの動きは変わらない。Spring の書き方を写すのをやめた(Issue #969)
+  # match を書かない。比べる検査は Vary を比べない。Go 版の答えは internal/httpapi/middleware/cors_test.go が確かめる。
+
+- id: CB-088
+  group: 1
+  変えた動き: 許す送り元からのプリフライトの答えのヘッダ
+  java: Access-Control-Expose-Headers を付ける。Access-Control-Allow-Headers は、求められたヘッダの名前を「, 」でつなぎ直して返す
+  go: Access-Control-Expose-Headers を付けない。Access-Control-Allow-Headers は、求められたヘッダの値をそのまま返す
+  画面に影響が無い理由: ブラウザは、Access-Control-Expose-Headers をプリフライトでない要求の答えからだけ読み、Access-Control-Allow-Headers の名前の間の空白を読み飛ばす(Fetch Standard)ので、画面の JavaScript が読めるヘッダと、送れるヘッダは変わらない。プリフライトでない要求の答えには、今までどおり Access-Control-Expose-Headers を付ける。Spring の書き方を写すのをやめた(Issue #969)
+  # match を書かない。比べる検査は Access-Control- で始まるヘッダを比べない。Go 版の答えは internal/httpapi/middleware/cors_test.go が確かめる。
