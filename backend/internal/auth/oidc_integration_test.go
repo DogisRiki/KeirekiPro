@@ -80,8 +80,8 @@ func oidcKeys(state string) []string {
 	return []string{"oidc:state:" + state, "oidc:provider:" + state, "oidc:code_verifier:" + state}
 }
 
-// TestStartOIDC_URL は、ログインの開始の URL が、接続先のあとに、client_id、code_challenge、code_challenge_method、
-// redirect_uri、response_type、scope、state を名前の順に並べ、scope の空白を「+」に、redirect_uri と scope の
+// TestStartOIDC_URL は、ログインの開始の URL が、接続先のあとに、client_id、response_type、scope、redirect_uri、
+// state、code_challenge、code_challenge_method をこの順に並べ、scope の空白を「+」に、redirect_uri と scope の
 // 「:」と「/」を「%3A」と「%2F」にすることを確かめる。code_challenge は code_verifier の SHA-256 の base64url である。
 // provider の大文字と小文字は区別しない(要件1.3)。
 func TestStartOIDC_URL(t *testing.T) {
@@ -101,9 +101,9 @@ func TestStartOIDC_URL(t *testing.T) {
 			if err != nil {
 				t.Fatalf("StartOIDC: %v", err)
 			}
-			want := c.prefix + "&code_challenge=" + rfc7636Challenge + "&code_challenge_method=S256" +
-				"&redirect_uri=http%3A%2F%2Flocalhost%3A8080%2Fapi%2Fauth%2Foidc%2Fcallback&response_type=code" +
-				"&scope=" + c.scope + "&state=" + state
+			want := c.prefix + "&response_type=code&scope=" + c.scope +
+				"&redirect_uri=http%3A%2F%2Flocalhost%3A8080%2Fapi%2Fauth%2Foidc%2Fcallback&state=" + state +
+				"&code_challenge=" + rfc7636Challenge + "&code_challenge_method=S256"
 			if got != want {
 				t.Errorf("URL =\n%s\nwant\n%s", got, want)
 			}

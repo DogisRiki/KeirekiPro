@@ -1359,7 +1359,7 @@
   group: 1
   変えた動き: Google と GitHub のログインの開始の URL の、問い合わせの部分の書き方
   java: 'Spring の UriComponentsBuilder で、client_id、response_type、scope、redirect_uri、state、code_challenge、code_challenge_method をこの順に並べ、空白を「%20」にし、「:」と「/」をそのまま残す'
-  go: 'Go の url.Values の Encode で、項目を名前の順(client_id、code_challenge、code_challenge_method、redirect_uri、response_type、scope、state)に並べ、空白を「+」に、「:」と「/」を「%3A」と「%2F」にする'
+  go: '項目を同じ順に並べ、値を Go の url.QueryEscape で書く。空白を「+」に、「:」と「/」を「%3A」と「%2F」にする'
   画面に影響が無い理由: 'Google と GitHub は、どちらの書き方の URL も同じ項目と値として読むので、利用者が移るログインの画面と、ログインのあとに戻る先は変わらない。Spring の書き方を写すのをやめた(Issue #969)'
   # match は、ログインの開始の、200 の答えの本文(開始の URL)の違いだけを許す。Go 版の答えは internal/auth/oidc_integration_test.go が確かめる。
   match:
