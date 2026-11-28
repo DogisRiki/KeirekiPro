@@ -184,7 +184,7 @@ func buildBackup(r Resume, now time.Time) (Export, error) {
 	if !backupYearsInRange(r) {
 		return Export{}, errBackupDate
 	}
-	f := bkFile{Version: backupVersion, ExportedAt: javaInstant(now), Resume: newBkResume(r)}
+	f := bkFile{Version: backupVersion, ExportedAt: now.UTC().Format(time.RFC3339Nano), Resume: newBkResume(r)}
 	body, err := backupJSON(f)
 	if err != nil {
 		return Export{}, err
@@ -298,21 +298,4 @@ func backupEndDate(v *YearMonth) *string {
 	}
 	s := backupYearMonth(*v)
 	return &s
-}
-
-// javaInstant は、時刻を、Java の Instant.toString と同じ形の世界標準時で書く。秒は必ず書き、秒の小数は、
-// 0 なら書かず、0 でなければ 3、6、9 桁のうち値を表せる最も短い桁数で書き、最後に Z を付ける。
-func javaInstant(t time.Time) string {
-	t = t.UTC()
-	s := t.Format("2006-01-02T15:04:05")
-	switch ns := t.Nanosecond(); {
-	case ns == 0:
-	case ns%1_000_000 == 0:
-		s += fmt.Sprintf(".%03d", ns/1_000_000)
-	case ns%1_000 == 0:
-		s += fmt.Sprintf(".%06d", ns/1_000)
-	default:
-		s += fmt.Sprintf(".%09d", ns)
-	}
-	return s + "Z"
 }
