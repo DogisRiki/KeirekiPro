@@ -217,8 +217,7 @@ func New(opts Options) http.Handler {
 	}
 
 	mux := http.NewServeMux()
-	// 本文を読む中間処理 updateUserInfoMiddleware は、名前と画像と2段階認証の設定の変更の操作のときだけ働く
-	strictMiddlewares := []gen.StrictMiddlewareFunc{authRequestMiddleware, updateUserInfoMiddleware}
+	strictMiddlewares := []gen.StrictMiddlewareFunc{authRequestMiddleware}
 	strict := gen.NewStrictHandlerWithOptions(handlers, strictMiddlewares, gen.StrictHTTPServerOptions{
 		// 要求の本文を JSON として読めないときは、Java 版の HttpMessageNotReadableException と同じ 400 にする
 		RequestErrorHandlerFunc: func(w http.ResponseWriter, _ *http.Request, _ error) {
@@ -249,7 +248,7 @@ func New(opts Options) http.Handler {
 				middleware.CORS(opts.CORSAllowedOrigins)(
 					identify(
 						middleware.CSRF(
-							requireLogin(middleware.RecordRoute(mux))))))))
+							requireLogin(limitUpdateUserInfoBody(middleware.RecordRoute(mux)))))))))
 }
 
 // paramErrorHandler は、経路と問い合わせと Cookie とヘッダの値の形の誤りに答える関数を作る。
