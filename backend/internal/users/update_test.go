@@ -1,45 +1,13 @@
 package users
 
 import (
-	"encoding/json"
-	"io/fs"
-	"os"
 	"slices"
+	"strings"
 	"testing"
 	"unicode/utf8"
 
 	"github.com/google/uuid"
 )
-
-// usernameCase は、小タスク1.2 で Java 版に送った名前の要求と、Java 版の答えの1通りである。
-type usernameCase struct {
-	Name   string `json:"name"`
-	Input  string `json:"input"`
-	Answer struct {
-		Status int    `json:"status"`
-		Body   string `json:"body"`
-	} `json:"answer"`
-	StoredUsername *string `json:"storedUsername"`
-}
-
-// readUsernameCases は、testdata/username/cases.json の27通りを読む。
-func readUsernameCases(t *testing.T) []usernameCase {
-	t.Helper()
-	b, err := fs.ReadFile(os.DirFS("testdata/username"), "cases.json")
-	if err != nil {
-		t.Fatalf("名前の見本を読めません: %v", err)
-	}
-	var file struct {
-		Cases []usernameCase `json:"cases"`
-	}
-	if err := json.Unmarshal(b, &file); err != nil {
-		t.Fatalf("名前の見本の JSON を読めません: %v", err)
-	}
-	if len(file.Cases) != 27 {
-		t.Fatalf("名前の見本の数 = %d、期待 = 27", len(file.Cases))
-	}
-	return file.Cases
-}
 
 // javaStripRunes は、research.md の試作の記録の P6 に書いた、Java の String.strip() が名前の前後から取り除く字である。
 var javaStripRunes = func() []rune {
@@ -63,37 +31,58 @@ var javaStripRunes = func() []rune {
 // javaKeptRunes は、P6 に書いた、空白に見えるが Java の String.strip() が取り除かない字である。
 var javaKeptRunes = []rune{0x00A0, 0x2007, 0x202F, 0x0085, 0x200B}
 
-func TestUpdateUserInfo_UsernameMatchesJava(t *testing.T) {
-	for _, c := range readUsernameCases(t) {
-		t.Run(c.Name, func(t *testing.T) {
-			got, message := normalizeUsername(c.Input)
-			switch c.Answer.Status {
-			case 200:
-				if message != "" || c.StoredUsername == nil || got != *c.StoredUsername {
-					t.Errorf("名前 %+q の答え = %+q 文言 %q、Java 版の保存した名前 = %+q", c.Input, got, message, deref(c.StoredUsername))
-				}
-			case 400:
-				var body struct {
-					Errors map[string][]string `json:"errors"`
-				}
-				if err := json.Unmarshal([]byte(c.Answer.Body), &body); err != nil {
-					t.Fatalf("Java 版の答えの本文を読めません: %v", err)
-				}
-				want := body.Errors["username"]
-				if len(body.Errors) != 1 || len(want) != 1 {
-					t.Fatalf("Java 版の答えの誤り = %v、期待 = 項目 username の文言1つ", body.Errors)
-				}
-				if message != want[0] {
-					t.Errorf("名前 %+q の文言 = %q、Java 版の文言 = %q", c.Input, message, want[0])
-				}
-			case 500:
-				// Java 版が 500 で答えた1通りは、NUL を含む名前である。名前の検査は通り、PostgreSQL が NUL を断った。
-				// Go 版も名前の検査を通し、同じ名前をデータベースに渡す。この名前の前後には取り除く字が無い。
-				if message != "" || got != c.Input {
-					t.Errorf("名前 %+q の答え = %+q 文言 %q、期待 = 検査を通して同じ名前", c.Input, got, message)
-				}
-			default:
-				t.Fatalf("Java 版の答えの状態の番号 = %d", c.Answer.Status)
+func TestNormalizeUsername(t *testing.T) {
+	const (
+		required = "ユーザー名は必ず指定してください。"
+		tooLong  = "ユーザー名は50文字以内で入力してください。"
+	)
+	a50 := strings.Repeat("a", 50)
+	hira50 := strings.Repeat("あ", 50)
+	emoji25 := strings.Repeat("\U0001F600", 25)
+	tests := []struct {
+		name    string
+		input   string
+		want    string // 検査を通ったときに保存する名前
+		message string // 検査で断るときの文言。通るときは空
+	}{
+		{"普通の名前", "山田太郎", "山田太郎", ""},
+		{"空", "", "", required},
+		{"半角の空白だけ", "   ", "", required},
+		{"前後に半角の空白", "  山田  ", "山田", ""},
+		{"前にタブ、後ろに改行", "\t山田\n", "山田", ""},
+		{"前後に全角の空白", "\u3000山田\u3000", "山田", ""},
+		{"全角の空白だけ", "\u3000", "", required},
+		{"前後にノーブレークスペース", "\u00a0山田\u00a0", "\u00a0山田\u00a0", ""},
+		{"前に数字幅の空白", "\u2007山田", "\u2007山田", ""},
+		{"前にゼロ幅の空白", "\u200b山田", "\u200b山田", ""},
+		{"前に NEL", "\u0085山田", "\u0085山田", ""},
+		{"前後に行と段落の区切り", "\u2028山田\u2029", "山田", ""},
+		{"前後に情報の区切りの制御文字", "\u001c山田\u001f", "山田", ""},
+		{"前後に数式の空白とオガムの空白", "\u205f山田\u1680", "山田", ""},
+		{"前にモンゴル語の母音の区切り", "\u180e山田", "\u180e山田", ""},
+		{"前に BOM", "\ufeff山田", "\ufeff山田", ""},
+		{"間に空白", "山田 太郎", "山田 太郎", ""},
+		{"ASCII の50文字", a50, a50, ""},
+		{"ASCII の51文字", a50 + "a", "", tooLong},
+		{"ひらがなの50文字", hira50, hira50, ""},
+		{"ひらがなの51文字", hira50 + "あ", "", tooLong},
+		// 長さは UTF-16 の単位で数えるので、絵文字は1字で2つに数える。
+		{"絵文字の25字", emoji25, emoji25, ""},
+		{"絵文字の25字と1文字", emoji25 + "a", "", tooLong},
+		{"前後の空白を除くと50文字", "  " + a50 + "  ", a50, ""},
+		// NUL を含む名前は、名前の検査を通す。保存するときに PostgreSQL が断る。
+		{"NUL を含む", "a\x00b", "a\x00b", ""},
+		{"山かっこを含む", "<script>", "<script>", ""},
+		{"全角の英字", "Ｔｅｓｔ", "Ｔｅｓｔ", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, message := normalizeUsername(tt.input)
+			if message != tt.message {
+				t.Errorf("名前 %+q の文言 = %q、期待 = %q", tt.input, message, tt.message)
+			}
+			if tt.message == "" && got != tt.want {
+				t.Errorf("名前 %+q の答え = %+q、期待 = %+q", tt.input, got, tt.want)
 			}
 		})
 	}
@@ -136,12 +125,4 @@ func TestUpdateUserInfo_ImageKey(t *testing.T) {
 			t.Errorf("profileImageKey(%q) = %q、期待 = %q", tt.ext, got, tt.want)
 		}
 	}
-}
-
-// deref は、nil のポインタを空の文字列として読む。
-func deref(p *string) string {
-	if p == nil {
-		return ""
-	}
-	return *p
 }

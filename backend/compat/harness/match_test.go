@@ -325,8 +325,8 @@ func TestLoadChangedBehaviors_CB005HasNoMatch(t *testing.T) {
 			t.Errorf("%s が一覧にありません", id)
 		}
 	}
-	if len(got) != 88 {
-		t.Errorf("一覧の項目は88のはずですが、%d です", len(got))
+	if len(got) != 89 {
+		t.Errorf("一覧の項目は89のはずですが、%d です", len(got))
 	}
 	// CB-022 は、利用者の操作の筋書きの管理者で違いが出るので match を持つ(TestChangedBehaviors_RefreshTokenRoles で確かめる)
 	for _, id := range []string{
@@ -353,6 +353,14 @@ func TestLoadChangedBehaviors_CB005HasNoMatch(t *testing.T) {
 	}
 	if m := byID["CB-084"].Matches; !slices.Equal(m, wantCSRF) {
 		t.Errorf("CB-084 の match = %+v", m)
+	}
+	// CB-089 は、利用者の情報を返す3つの操作の、200 の答えの画像の URL の違いだけを許す
+	var wantPresign Matches
+	for _, op := range []string{"getUserInfo", "updateUserInfo", "setEmailAndPassword"} {
+		wantPresign = append(wantPresign, Match{Operation: op, Target: TargetBody, Path: "$.profileImage", Status: 200})
+	}
+	if m := byID["CB-089"].Matches; !slices.Equal(m, wantPresign) {
+		t.Errorf("CB-089 の match = %+v", m)
 	}
 	// CB-076 は、断った利用者の情報の変更で Java 版だけが置く画像の違いだけを許す
 	if m := byID["CB-076"].Matches; len(m) != 1 || m[0] != (Match{Operation: "updateUserInfo", Target: TargetS3, Status: 400}) {
