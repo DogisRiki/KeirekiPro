@@ -5,10 +5,9 @@
 #   - 4つの文字の大きさを既定から 0.5 違う値にした本文(export/half-step-sizes.json)
 #   - 0.5 刻みでない文字の大きさと、大文字の16進数の色の本文(export/odd-values.json)
 #   - 赤と緑と青の値で書いた色の本文(export/rgb-color.json)
-# 画面が送らない次の2つの本文も送り、Java 版と同じに断ることを確かめる。2つの本文の Go 版の答えは、
-# internal/resume の exportbody_test.go が、Java 版の正解のファイルと同じであることを確かめている。
-#   - 文字の大きさの欄に真偽を入れた本文(export/bool-number.json)
-#   - 16進数の色の欄に指数の付いた数を入れた本文(export/exp-string.json)
+# 画面が送らない、文字の大きさの欄に真偽を入れた本文(export/bool-number.json)も送り、Java 版と同じに断ることを確かめる。
+# Java 版と答えが違う、画面が送らない本文は、変えた動きの一覧の CB-102 から CB-108 に載せ、Go 版の答えは
+# internal/resume の exportbody_test.go が確かめる。
 name: export-settings
 group: 4
 fixtures: [users/basic.sql, resumes/fonts.sql]
@@ -83,12 +82,4 @@ steps:
       csrf: true
       headers: {Accept: 'application/pdf, application/json'}
       json_file: export/bool-number.json
-    expect: {status: 400, content_type: application/json}
-  - name: exp-string
-    request:
-      method: POST
-      path: /api/resumes/00000000-0000-4000-8000-000000000401/export
-      csrf: true
-      headers: {Accept: 'application/pdf, application/json'}
-      json_file: export/exp-string.json
     expect: {status: 400, content_type: application/json}
