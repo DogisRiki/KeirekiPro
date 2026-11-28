@@ -3,10 +3,15 @@
 # check-spec-backing.sh の自動テスト(guardrails CI から実行)
 #
 # 一時ディレクトリに spec のフィクスチャを作り、終了コードを検証する。
-#   0 = 緑(specの裏付けあり) / 1 = 赤(裏付けなし)
+#   0 = 緑(specの裏付けか所有者の承認あり) / 1 = 赤(どちらもなし)
 # 併せて、Summaryへ出す報告の内容も検証する。
+# 所有者の承認は、変数 APPROVED の値を OWNER_APPROVED としてスクリプトに渡す。
 # =====================================================================
 set -uo pipefail
+
+# 呼んだ側の環境の値で判定が変わらないよう、承認の値はテストの中で決める
+unset OWNER_APPROVED
+APPROVED=false
 
 SCRIPT="$(cd "$(dirname "$0")/.." && pwd)/check-spec-backing.sh"
 # 一時領域の確保に失敗したまま進むと rm -rf が意図しない絶対パスを対象にするため、
@@ -65,7 +70,7 @@ check() {
     local want="$1" name="$2" body="$3" mutate="$4" got
     seed
     "$mutate"
-    GITHUB_STEP_SUMMARY=/dev/null PR_BODY="$body" bash "$SCRIPT" >/dev/null 2>&1
+    GITHUB_STEP_SUMMARY=/dev/null PR_BODY="$body" OWNER_APPROVED="$APPROVED" bash "$SCRIPT" >/dev/null 2>&1
     got=$?
     if [ "$got" = "$want" ]; then
         printf 'ok   %s\n' "$name"
@@ -82,7 +87,7 @@ check_summary() {
     "$mutate"
     summary="$WORK/summary.md"
     : >"$summary"
-    GITHUB_STEP_SUMMARY="$summary" PR_BODY="$body" bash "$SCRIPT" >/dev/null 2>&1
+    GITHUB_STEP_SUMMARY="$summary" PR_BODY="$body" OWNER_APPROVED="$APPROVED" bash "$SCRIPT" >/dev/null 2>&1
     if grep -q "$want" "$summary"; then
         printf 'ok   %s\n' "$name"
     else
@@ -169,6 +174,22 @@ check 1 "spec.json に approvals が無い" "$BODY_OK" m_no_approvals_key
 
 check_summary "プレースホルダ" "プレースホルダ残存がSummaryに出る" "$BODY_OK" m_placeholder_tasks
 check_summary "3段階承認" "未承認がSummaryに出る" "$BODY_OK" m_tasks_unapproved
+check_summary "最新のコミットを承認" "spec の無い PR の止め方がSummaryに出る" "$BODY_NONE" m_valid
+
+# 所有者の承認(#975)。Spec の行が無い PR だけを、承認で通す
+check 1 "承認が false なら、Spec行が無いPRは通らない" "$BODY_NONE" m_valid
+APPROVED=true
+check 0 "所有者の承認があれば、Spec行が無いPRは通る" "$BODY_NONE" m_valid
+check 1 "所有者の承認があっても、Spec行のディレクトリが無ければ通らない" "$BODY_MISSING" m_valid
+check 1 "所有者の承認があっても、パス区切りや .. を含むSpec指定は通らない" "$BODY_TRAVERSAL" m_valid
+check 1 "所有者の承認があっても、Spec行のspecが未承認なら通らない" "$BODY_OK" m_tasks_unapproved
+check 0 "所有者の承認があり、Spec行のspecが承認済みなら通る" "$BODY_OK" m_valid
+# true のほかの値は承認とみなさない
+APPROVED=TRUE
+check 1 "承認の値が true でなければ通らない(TRUE)" "$BODY_NONE" m_valid
+APPROVED=""
+check 1 "承認の値が空なら通らない" "$BODY_NONE" m_valid
+APPROVED=false
 
 if [ "$FAILED" -ne 0 ]; then
     echo "::error::check-spec-backing.sh のテストが失敗しました。"

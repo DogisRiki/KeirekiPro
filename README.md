@@ -114,7 +114,7 @@ claude-auto-fix-target.yamlは、Claude CodeのCLIをdownloads.claude.aiから�
 | 品質の検査 | container-scan.yaml | pull_request | paths-filterによる変更検知。backendのJava版とGo版の本番用のイメージをそれぞれarm64で組み立ててTrivyで検査し、修正版が公開されているCRITICALとHIGHの脆弱性を検出する。検出した脆弱性は抑制の状態と判定をあわせて全件を実行結果に表示する。判定スクリプトの単体テストも同じワークフローで実行する |
 | 品質の検査 | codeql.yaml | pull_request / push (main) / 週次 (schedule) / 手動 | CodeQLでソースコードの脆弱性を診断し、結果をGitHubのコードスキャンに送る。診断する言語は、`.github/codeql/languages.tsv`と照らして実行のたびに見つける。プルリクエストでは、言語ごとの診断がすべて成功し、そのプルリクエストが持ち込んだ重さが中以上の警告が無いときだけ、`codeql-complete`が緑になる。所有者が却下した警告は数えない。診断の対象からファイルやクエリを外す設定は置かない。mainへのpushと週1回の実行で、mainに残った警告を見つける |
 | 品質の検査 | codeql-recheck.yaml | codeql.yamlが赤で終わったとき (workflow_run) / 10分ごと (schedule) / 手動 | 所有者がCodeQLの警告を却下したあとに、赤のままの`codeql-complete`を動かし直す。GitHub Actionsは警告の却下で起動できないため、`codeql-complete`が赤か動いている途中のプルリクエストがあるあいだ、10分ごとに確かめ、所有者が却下し、却下の時刻が判定の終わった時刻よりあとの警告があるプルリクエストだけを動かし直す。GitHubの定期実行は混んでいると数時間遅れるので、codeql.yamlが赤で終わったときに動き始め、確かめたあとに実行の中で10分待ってから、次の実行を自分で起動する。10分ごとの定期実行は、起動を取りこぼしたときの予備である。プルリクエストのコードは取り出さない |
-| ずるの検査 | guardrails.yaml | pull_request / pull_request_review | テスト無効化や検査回避にあたる変更の検知、差分サイズの検査(上限超過時はspecの実在・必須ファイル・承認状態を検証)、ワークフローの静的検証(actionlint)とアクション参照のSHA固定の検査、CIの道具の版を決まった書き場所に書いているかの検査、リリースゲートのテスト、backend-testの判定のスクリプトのテスト、本番に出すbackendの版を決めるスクリプトのテスト、Node.jsとTerraformとTrivyの署名とCodex CLIの来歴を確かめて入れるスクリプトのテスト、DBマイグレーションのラベル付け、シークレットスキャン、品質レポート(未使用コード・重複)の生成、Gradle本体が公式のものかの検証、どの会話の始めにも読み込まれる文書の量の検査 |
+| ずるの検査 | guardrails.yaml | pull_request / pull_request_review | テスト無効化や検査回避にあたる変更の検知、差分サイズの検査(上限超過時は、specのあるPRではspecの実在・必須ファイル・承認状態を検証し、specの無いPRでは所有者の承認を待つ)、ワークフローの静的検証(actionlint)とアクション参照のSHA固定の検査、CIの道具の版を決まった書き場所に書いているかの検査、リリースゲートのテスト、backend-testの判定のスクリプトのテスト、本番に出すbackendの版を決めるスクリプトのテスト、Node.jsとTerraformとTrivyの署名とCodex CLIの来歴を確かめて入れるスクリプトのテスト、DBマイグレーションのラベル付け、シークレットスキャン、品質レポート(未使用コード・重複)の生成、Gradle本体が公式のものかの検証、どの会話の始めにも読み込まれる文書の量の検査 |
 | 人間の関門 | dependency-gate.yaml | pull_request / pull_request_review | `.npmrc`・`.pnpmfile.cjs`・`pnpm-workspace.yaml`・`*.gradle` の変更と、backendのGo版の品質チェックとコード生成の設定(`backend/Makefile`・`.golangci.yml`・`.testcoverage.yml`・`.gremlins.yaml`・`api/oapi-codegen.yaml`・`sqlc.yaml`)の変更と、開発環境のNode.jsとTerraformのイメージの版の変更を検知し、リポジトリ所有者が承認するまでマージを保留。ライブラリのバージョンを上げるだけの変更と、イメージの版を変えずに中身(digest)だけを変える変更は対象外 |
 | 人間の関門 | pre-merge-check.yaml | pull_request / pull_request_review | pre-merge-checkラベルの付いたPRを、所有者がローカル確認して承認するまでマージ保留 |
 | 人間の関門 | rerun-approval-gated-checks.yaml | pull_request_review (approved) | PRの最新のコミットで、承認前に失敗したままか取り消されたゲートチェックを再実行し、承認結果を反映させる |
@@ -407,7 +407,7 @@ flowchart LR
 | 観点に1つでも当たる | cc-sddによるspec駆動開発。AIに頼まれて人間が仕様づくりのコマンドを打ち、要件定義・設計・タスク分解の各ドキュメントを承認したうえで、Claude Codeが自律的に実装する |
 | どの観点にも当たらない | AIが判断と理由を知らせて止まる。人間が判断を読み、よければ「進めて」と返事をし、おかしいと思ったらどう進めるかを返事に書く。AIは「進めて」の返事を受けてからIssueをもとに実装する。AIが決められないことがあれば、推奨を付けた問いを1回出し、答えを待つ。答えはAIがIssueの本文の「決めた方式」に書き足し、そのあと実装する |
 | 1つの仕様書に収まらない | AIが分け方を示して止まる。人間が了承すると、AIが部分ごとのIssueを元のIssueに紐づけて起票し、部分ごとに進める |
-| 200行の検査 | 仕様書の無いプルリクエストのコード差分が200行を超えると、CIが止める。これは着手時の判断をすり抜けた変更を止める最後の網であり、着手時の判断の基準ではない |
+| 200行の検査 | 仕様書の無いプルリクエストのコード差分が200行を超えると、人間がそのプルリクエストの最新のコミットを承認するまでCIが止める。承認のあとにコミットが足されたら、承認し直すまで止める。これは仕様書の無い大きな変更を人間に見せるためのもので、着手時の判断の基準ではない |
 | 定常メンテナンス | 定期実行の仕組みが、品質チェック・依存パッケージの更新・プルリクエストの監視などを自動で行う |
 
 ### 品質を担保する仕組み

@@ -176,13 +176,13 @@ if selected issue_state_other_user; then
     expect_rc1 "本文とコメントの一覧が配列でなければ失敗する" issue_state npm lodash@4.17.21 <<<'{"body": "x"}'
 fi
 
-RED_JSON='["dependency-review","escape-hatch","frontend-test","dependency-gate","pre-merge-check","dependency-cooldown","gitleaks"]'
+RED_JSON='["dependency-review","escape-hatch","frontend-test","dependency-gate","pre-merge-check","dependency-cooldown","size-check","gitleaks"]'
 
 if selected fixable_real; then
-    expect_eq "dependency-review と approval_gated の4つの検査を除き、ほかの赤の検査を残す" \
+    expect_eq "dependency-review と approval_gated の5つの検査を除き、ほかの赤の検査を残す" \
         '["frontend-test","gitleaks"]' "$(fixable_red_checks "$DIR/../audit/required-checks.json" "$RED_JSON")"
-    expect_eq "期待一覧の approval_gated の検査は escape-hatch と dependency-gate と pre-merge-check と dependency-cooldown の4つ" \
-        '["dependency-cooldown","dependency-gate","escape-hatch","pre-merge-check"]' \
+    expect_eq "期待一覧の approval_gated の検査は escape-hatch と size-check と dependency-gate と pre-merge-check と dependency-cooldown の5つ" \
+        '["dependency-cooldown","dependency-gate","escape-hatch","pre-merge-check","size-check"]' \
         "$(jq -c '[.checks[] | select(.approval_gated == true) | .context] | sort' "$DIR/../audit/required-checks.json")"
     expect_eq "除く検査だけなら空の配列を出す" '[]' \
         "$(fixable_red_checks "$DIR/../audit/required-checks.json" '["dependency-review","escape-hatch"]')"
