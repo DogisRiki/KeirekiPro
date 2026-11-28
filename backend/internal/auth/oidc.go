@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/base64"
+	"net/url"
 	"strings"
 	"time"
 
@@ -38,7 +39,7 @@ func (s *Service) oidcProvider(name string) (config.Provider, bool) {
 // StartOIDC は、Java 版の StartOidcAuthorizationUseCase と同じく、Google か GitHub のログインの開始の URL を返す。
 // code_verifier と state を、この順に32バイトの乱数の base64url で作り、ログインの開始の記録を10分置いてから、
 // 接続先のあとに client_id、response_type、scope、redirect_uri、state、code_challenge、code_challenge_method を
-// この順に並べた URL を作る。問い合わせの部分は、Spring の UriComponentsBuilder と同じ規則でエスケープする。
+// 付けた URL を作る。問い合わせの部分は、url.Values の Encode で書く(項目は名前の順に並び、空白は「+」になる)。
 //
 // Google と GitHub のほかの provider は、記録を置かずに 400 の「入力エラーがあります。」で断る。
 // Java 版は、記録を置いたあとに URL を作るところで例外にし、500 で答えて記録を残す。この違いは変えた動きの一覧に載せる。
@@ -58,16 +59,16 @@ func (s *Service) StartOIDC(ctx context.Context, provider, redirectURI string) (
 	if err := s.storeOIDCSession(ctx, state, provider, verifier); err != nil {
 		return "", err
 	}
-	query := springQuery([]queryParam{
-		{"client_id", p.ClientID},
-		{"response_type", "code"},
-		{"scope", p.Scopes},
-		{"redirect_uri", redirectURI},
-		{"state", state},
-		{"code_challenge", codeChallenge(verifier)},
-		{"code_challenge_method", "S256"},
-	})
-	return p.AuthURL + "?" + query, nil
+	query := url.Values{
+		"client_id":             {p.ClientID},
+		"response_type":         {"code"},
+		"scope":                 {p.Scopes},
+		"redirect_uri":          {redirectURI},
+		"state":                 {state},
+		"code_challenge":        {codeChallenge(verifier)},
+		"code_challenge_method": {"S256"},
+	}
+	return p.AuthURL + "?" + query.Encode(), nil
 }
 
 // storeOIDCSession は、Java 版の RedisOidcAuthorizationSessionStore の store と同じ順で、
