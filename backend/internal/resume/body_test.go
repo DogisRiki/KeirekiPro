@@ -2,44 +2,14 @@ package resume
 
 import (
 	"bytes"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
 	"reflect"
 	"strings"
 	"testing"
 	"unicode/utf8"
 )
-
-// bodyCase は、testdata/body.json と testdata/utf8.json の1つの本文と、Java 版の答えである。
-type bodyCase struct {
-	Name     string `json:"name"`
-	Endpoint string `json:"endpoint"`
-	Body     string `json:"body"`
-	// BodyBase64 は、UTF-8 として誤ったバイトを含む本文のバイトを base64 にしたものである(utf8.json)。
-	BodyBase64 string `json:"bodyBase64"`
-	Status     int    `json:"status"`
-	Response   struct {
-		Message string              `json:"message"`
-		Errors  map[string][]string `json:"errors"`
-	} `json:"response"`
-	// DB は、status が 201 のときに、Java 版がデータベースに書いた行である。表の名前ごとに、列の名前と値を持つ。
-	DB map[string]map[string]any `json:"db"`
-}
-
-func (c bodyCase) bytes(t *testing.T) []byte {
-	t.Helper()
-	if c.BodyBase64 == "" {
-		return []byte(c.Body)
-	}
-	b, err := base64.StdEncoding.DecodeString(c.BodyBase64)
-	if err != nil {
-		t.Fatalf("本文 %s の base64 が読めない: %v", c.Name, err)
-	}
-	return b
-}
 
 // 経路ごとの、要求の本文を送る先である。
 const (
@@ -48,44 +18,7 @@ const (
 	endpointCreateProject = "POST /api/resumes/{resumeId}/projects"
 )
 
-// bodyState は、1つの本文を読んだ結果の種類である。
-type bodyState int
-
-const (
-	// bodyRead は、本文を読めたことである。
-	bodyRead bodyState = iota
-	// bodyUnreadable は、本文を読めないことである。Java 版は 400 と空の errors で断る。
-	bodyUnreadable
-	// bodyFailed は、Java 版が 500 で答えたことである。
-	bodyFailed
-)
-
-// bodyResult は、1つの本文の答えである。Java 版の答えと Go 版の答えを、この形にそろえて比べる。
-type bodyResult struct {
-	state bodyState
-	// view は、読めた本文の欄の値を、JSON の鍵ごとに持つ。Go 版は、すべての欄の値を持つ。
-	// Java 版は、201 で答えたときに、データベースに書いた行から分かる欄の値を持つ。
-	view map[string]any
-	// errors は、Java 版が入力の検査で断ったときの、欄ごとの文言である。
-	errors map[string][]string
-}
-
-func (r bodyResult) String() string {
-	switch r.state {
-	case bodyUnreadable:
-		return "読めない"
-	case bodyFailed:
-		return "500 で答えた"
-	}
-	if r.errors != nil {
-		b, _ := json.Marshal(r.errors)
-		return "読めて入力の検査で断った " + string(b)
-	}
-	b, _ := json.Marshal(r.view)
-	return "読めた " + string(b)
-}
-
-// requestView は、要求の型の値の欄を、JSON の鍵ごとに、Java 版のデータベースの行の値と同じ形の値にする。
+// requestView は、要求の型の値の欄を、JSON の鍵ごとの値にする。
 // 値の無い欄は nil にする。年月はその月の1日の日付の文字列にする。
 func requestView(t *testing.T, v any) map[string]any {
 	t.Helper()
@@ -138,8 +71,8 @@ func requestView(t *testing.T, v any) map[string]any {
 	return out
 }
 
-// decodeFor は、経路の要求の型で、本文を decodeBody で読む。
-func decodeFor(t *testing.T, endpoint string, body []byte) bodyResult {
+// decodeFor は、経路の要求の型で、本文を decodeBody で読み、欄の値を requestView の形で返す。読めない本文では nil を返す。
+func decodeFor(t *testing.T, endpoint string, body []byte) map[string]any {
 	t.Helper()
 	var v any
 	var err error
@@ -157,9 +90,20 @@ func decodeFor(t *testing.T, endpoint string, body []byte) bodyResult {
 		if !errors.Is(err, errUnreadableBody) {
 			t.Fatalf("decodeBody の誤り %v が errUnreadableBody を包んでいない", err)
 		}
-		return bodyResult{state: bodyUnreadable}
+		return nil
 	}
-	return bodyResult{state: bodyRead, view: requestView(t, v)}
+	return requestView(t, v)
+}
+
+// presentFields は、requestView の形の値のうち、値のある欄だけを残す。
+func presentFields(view map[string]any) map[string]any {
+	out := map[string]any{}
+	for k, v := range view {
+		if v != nil {
+			out[k] = v
+		}
+	}
+	return out
 }
 
 // requestTypeOf は、経路の要求の型である。
@@ -175,139 +119,6 @@ func requestTypeOf(t *testing.T, endpoint string) reflect.Type {
 	}
 	t.Fatalf("経路 %s の要求の型が無い", endpoint)
 	return nil
-}
-
-// snakeToCamel は、データベースの列の名前を、要求の本文の鍵の名前に直す。例: company_name は companyName になる。
-func snakeToCamel(s string) string {
-	parts := strings.Split(s, "_")
-	for i := 1; i < len(parts); i++ {
-		parts[i] = strings.ToUpper(parts[i][:1]) + parts[i][1:]
-	}
-	return strings.Join(parts, "")
-}
-
-// javaView は、Java 版がデータベースに書いた行を、要求の本文の鍵ごとの値にする。
-// techColumns は、技術スタックの表の列の名前と、要求の本文の鍵の名前の対応である。
-func javaView(t *testing.T, c bodyCase, techColumns map[string]string) map[string]any {
-	t.Helper()
-	out := map[string]any{}
-	for table, row := range c.DB {
-		for column, value := range row {
-			var key string
-			switch table {
-			case "resumes":
-				// 経歴書の姓と名は、経歴書の作成の要求に無い
-				if column != "name" {
-					continue
-				}
-				key = "resumeName"
-			case "careers", "projects":
-				key = snakeToCamel(column)
-			case "project_tech_stacks":
-				var ok bool
-				if key, ok = techColumns[column]; !ok {
-					t.Fatalf("本文 %s の技術スタックの列 %s の鍵が分からない", c.Name, column)
-				}
-			default:
-				t.Fatalf("本文 %s の表 %s は、控えの形に無い", c.Name, table)
-			}
-			out[key] = value
-		}
-	}
-	return out
-}
-
-// javaResult は、Java 版の答えを、bodyResult に直す。
-func javaResult(t *testing.T, c bodyCase, techColumns map[string]string) bodyResult {
-	t.Helper()
-	switch {
-	case c.Status == 201:
-		return bodyResult{state: bodyRead, view: javaView(t, c, techColumns)}
-	case c.Status == 500:
-		return bodyResult{state: bodyFailed}
-	case c.Status != 400 || c.Response.Message != MessageInvalidInput:
-		t.Fatalf("本文 %s の Java 版の答え %d %q は、控えの形に無い", c.Name, c.Status, c.Response.Message)
-	case len(c.Response.Errors) == 0:
-		return bodyResult{state: bodyUnreadable}
-	}
-	return bodyResult{state: bodyRead, errors: c.Response.Errors}
-}
-
-func isBlank(v any) bool {
-	s, ok := v.(string)
-	return v == nil || ok && strings.TrimSpace(s) == ""
-}
-
-// javaErrorRules は、Java 版が入力の検査で断った文言ごとに、Java 版が本文から読んだ値の条件である。
-// Go 版が読んだ値がこの条件に合えば、Go 版は Java 版と同じ値を読んだとみなす。key は文言の欄の鍵である。
-var javaErrorRules = map[string]func(view map[string]any, key string) bool{
-	MessageResumeNameRequired:   func(v map[string]any, k string) bool { return isBlank(v[k]) },
-	MessageCompanyNameRequired:  func(v map[string]any, k string) bool { return isBlank(v[k]) },
-	MessageCareerActiveRequired: func(v map[string]any, k string) bool { return v[k] == nil },
-	MessageNotNull:              func(v map[string]any, k string) bool { return v[k] == nil },
-	MessageEndDateRequired: func(v map[string]any, _ string) bool {
-		return v["isActive"] == false && v["endDate"] == nil
-	},
-	MessageEndDateWhileOngoing: func(v map[string]any, _ string) bool {
-		return v["isActive"] == true && v["endDate"] != nil
-	},
-	MessageEndDateBeforeStart: func(v map[string]any, _ string) bool {
-		end, ok1 := v["endDate"].(string)
-		start, ok2 := v["startDate"].(string)
-		return ok1 && ok2 && end < start
-	},
-}
-
-// sameBody は、Go 版の答えが Java 版の答えと同じかを返す。
-func sameBody(t *testing.T, name string, goRes, javaRes bodyResult) bool {
-	t.Helper()
-	if goRes.state != javaRes.state {
-		return false
-	}
-	if goRes.state != bodyRead {
-		return true
-	}
-	for key, msgs := range javaRes.errors {
-		for _, msg := range msgs {
-			rule, ok := javaErrorRules[msg]
-			if !ok {
-				t.Fatalf("本文 %s の Java 版の文言 %q は、控えの形に無い", name, msg)
-			}
-			if !rule(goRes.view, key) {
-				return false
-			}
-		}
-	}
-	for key, want := range javaRes.view {
-		got, ok := goRes.view[key]
-		if !ok {
-			t.Fatalf("本文 %s の Java 版の欄 %s が、Go 版の要求の型に無い", name, key)
-		}
-		if !reflect.DeepEqual(got, want) {
-			return false
-		}
-	}
-	return true
-}
-
-// checkBodyAgainstJava は、1つの本文の Go 版の答えを、Java 版の答えとテストの中の表と照らす。
-// screen は、画面が送る書き方の本文かどうかである。
-func checkBodyAgainstJava(t *testing.T, name string, goRes, javaRes bodyResult, diffs map[string]string, screen bool) {
-	t.Helper()
-	id, inTable := diffs[name]
-	if sameBody(t, name, goRes, javaRes) {
-		if inTable {
-			t.Errorf("本文 %s: Go 版の答えは Java 版と同じ %s なのに、表に %s がある", name, goRes, id)
-		}
-		return
-	}
-	if !inTable {
-		t.Errorf("本文 %s: Go 版の答え %s が Java 版の答え %s と違うのに、表に無い", name, goRes, javaRes)
-		return
-	}
-	if screen {
-		t.Errorf("本文 %s は画面が送る書き方なのに、Go 版の答え %s が Java 版の答え %s と違う", name, goRes, javaRes)
-	}
 }
 
 // screenValue は、要求の型の欄の型ごとに、画面がその欄に送る書き方の値かを返す。
@@ -376,399 +187,387 @@ func screenBody(body []byte, rt reflect.Type) bool {
 	return true
 }
 
-// loadBodyJSON は、testdata/body.json の本文を読む。
-func loadBodyJSON(t *testing.T) []bodyCase {
-	t.Helper()
-	b, err := os.ReadFile("testdata/body.json")
-	return parseBodyCases(t, "testdata/body.json", b, err)
-}
-
-// loadUTF8JSON は、testdata/utf8.json の本文を読む。
-func loadUTF8JSON(t *testing.T) []bodyCase {
-	t.Helper()
-	b, err := os.ReadFile("testdata/utf8.json")
-	return parseBodyCases(t, "testdata/utf8.json", b, err)
-}
-
-// parseBodyCases は、正解のファイル file を読んだ結果から、本文を取り出す。
-func parseBodyCases(t *testing.T, file string, b []byte, err error) []bodyCase {
-	t.Helper()
-	if err != nil {
-		t.Fatal(err)
-	}
-	var data struct {
-		Cases []bodyCase `json:"cases"`
-	}
-	if err := json.Unmarshal(b, &data); err != nil {
-		t.Fatal(err)
-	}
-	if len(data.Cases) == 0 {
-		t.Fatalf("%s に本文が無い", file)
-	}
-	return data.Cases
-}
-
 // techStackColumnCount は、技術スタックの小分類の数である。
 const techStackColumnCount = 35
 
-// loadTechColumns は、技術スタックの表の列の名前と、要求の本文の鍵の名前の対応を、body.json の本文
-// project-tech-all-lists から作る。この本文は、技術スタックの35の鍵のそれぞれに、鍵の名前を1つだけ入れた並びを送った。
-func loadTechColumns(t *testing.T, cases []bodyCase) map[string]string {
-	t.Helper()
-	for _, c := range cases {
-		if c.Name != "project-tech-all-lists" {
+// projectBase は、プロジェクトの本文の、工程の systemTest と maintenance より前の欄である。
+const projectBase = `{"companyName":"A社","startDate":"2020-01","endDate":null,"isActive":true,"name":"案件","overview":"概要",` +
+	`"teamComp":"5名","role":"開発","achievement":"成果","requirements":true,"basicDesign":true,"detailedDesign":false,` +
+	`"implementation":true,"integrationTest":false`
+
+// projectWant は、projectBase の欄を読んだ値に、extra の欄を重ねた答えを JSON で返す。extra の null の欄は、値の無い欄にする。
+func projectWant(extra string) string {
+	want := map[string]any{
+		"companyName": "A社", "startDate": "2020-01-01", "isActive": true, "name": "案件", "overview": "概要",
+		"teamComp": "5名", "role": "開発", "achievement": "成果", "requirements": true, "basicDesign": true,
+		"detailedDesign": false, "implementation": true, "integrationTest": false,
+	}
+	var over map[string]any
+	if err := json.Unmarshal([]byte(extra), &over); err != nil {
+		panic(fmt.Sprintf("projectWant の %s が JSON でない: %v", extra, err))
+	}
+	for k, v := range over {
+		if v == nil {
+			delete(want, k)
 			continue
 		}
-		out := map[string]string{}
-		for column, value := range c.DB["project_tech_stacks"] {
-			list, ok := value.([]any)
-			if !ok || len(list) != 1 {
-				t.Fatalf("本文 %s の技術スタックの列 %s の値 %v が、鍵の名前1つの並びでない", c.Name, column, value)
-			}
-			out[column], _ = list[0].(string)
-		}
-		if len(out) != techStackColumnCount {
-			t.Fatalf("技術スタックの列が %d 個で、%d 個でない", len(out), techStackColumnCount)
-		}
-		return out
+		want[k] = v
 	}
-	t.Fatal("body.json に本文 project-tech-all-lists が無い")
-	return nil
+	b, err := json.Marshal(want)
+	if err != nil {
+		panic(err)
+	}
+	return string(b)
 }
 
-// bodyDiffs は、body.json の本文のうち、Go 版の答えが Java 版と違う本文と、違いを載せた一覧の番号である。
-// Java 版は、文字列の欄の数と真偽を文字列として読み、真偽の欄の文字列と整数を真偽として読み、鍵の大文字と小文字を区別する(CB-054)。
-var bodyDiffs = map[string]string{
-	"career-companyName-string-int":              "CB-054",
-	"career-companyName-string-decimal":          "CB-054",
-	"career-companyName-string-negative-zero":    "CB-054",
-	"career-companyName-string-exp":              "CB-054",
-	"career-companyName-string-exp-upper":        "CB-054",
-	"career-companyName-string-big-int":          "CB-054",
-	"career-companyName-string-negative-decimal": "CB-054",
-	"career-companyName-string-true":             "CB-054",
-	"career-companyName-string-false":            "CB-054",
-	"career-isActive-str-true":                   "CB-054",
-	"career-isActive-str-True":                   "CB-054",
-	"career-isActive-str-TRUE":                   "CB-054",
-	"career-isActive-str-false":                  "CB-054",
-	"career-isActive-str-False":                  "CB-054",
-	"career-isActive-str-FALSE":                  "CB-054",
-	"career-isActive-str-spaced-true":            "CB-054",
-	"career-isActive-str-tab-true":               "CB-054",
-	"career-isActive-str-empty":                  "CB-054",
-	"career-isActive-str-blank":                  "CB-054",
-	"career-isActive-str-null":                   "CB-054",
-	"career-isActive-str-spaced-null":            "CB-054",
-	"career-isActive-int-0":                      "CB-054",
-	"career-isActive-int-neg0":                   "CB-054",
-	"career-isActive-int-1":                      "CB-054",
-	"career-isActive-int-2":                      "CB-054",
-	"career-isActive-int-neg1":                   "CB-054",
-	"career-isActive-int-big":                    "CB-054",
-	"career-key-case-CompanyName":                "CB-054",
-	"career-key-case-isactive":                   "CB-054",
-	"project-phases-str-TRUE-int-0":              "CB-054",
-	"project-phases-str-empty":                   "CB-054",
-	"project-tech-frontendLanguages-mixed":       "CB-054",
-	"resume-resumeName-int":                      "CB-054",
-	"resume-resumeName-decimal":                  "CB-054",
-	"resume-resumeName-true":                     "CB-054",
-	"resume-key-case-ResumeName":                 "CB-054",
+// bodyTests は、要求の本文と、decodeBody が読んだ値のある欄である。読めない本文の want は "" である。
+// cb は、Java 版と答えが違い、変えた動きの一覧に載せた番号である。
+// Go 版は、encoding/json の読み方のとおりに、鍵の名前の大文字と小文字を区別せずに読み、文字列の欄の数と真偽を断り(CB-054)、
+// 同じ鍵が2つあれば後ろの値を読み、知らない鍵を読み飛ばす。
+var bodyTests = []struct {
+	name, cb, endpoint, body, want string
+}{
+	{"career-companyName-string-int", "CB-054", endpointCreateCareer, `{"companyName":1,"startDate":"2020-01","endDate":null,"isActive":true}`, ""},
+	{"career-companyName-string-decimal", "CB-054", endpointCreateCareer, `{"companyName":1.50,"startDate":"2020-01","endDate":null,"isActive":true}`, ""},
+	{"career-companyName-string-negative-zero", "CB-054", endpointCreateCareer, `{"companyName":-0,"startDate":"2020-01","endDate":null,"isActive":true}`, ""},
+	{"career-companyName-string-exp", "CB-054", endpointCreateCareer, `{"companyName":1e3,"startDate":"2020-01","endDate":null,"isActive":true}`, ""},
+	{"career-companyName-string-exp-upper", "CB-054", endpointCreateCareer, `{"companyName":1E+3,"startDate":"2020-01","endDate":null,"isActive":true}`, ""},
+	{"career-companyName-string-big-int", "CB-054", endpointCreateCareer, `{"companyName":12345678901234567890,"startDate":"2020-01","endDate":null,"isActive":true}`, ""},
+	{"career-companyName-string-negative-decimal", "CB-054", endpointCreateCareer, `{"companyName":-1.0,"startDate":"2020-01","endDate":null,"isActive":true}`, ""},
+	{"career-companyName-string-true", "CB-054", endpointCreateCareer, `{"companyName":true,"startDate":"2020-01","endDate":null,"isActive":true}`, ""},
+	{"career-companyName-string-false", "CB-054", endpointCreateCareer, `{"companyName":false,"startDate":"2020-01","endDate":null,"isActive":true}`, ""},
+	{"career-companyName-string-null", "", endpointCreateCareer, `{"companyName":null,"startDate":"2020-01","endDate":null,"isActive":true}`, `{"isActive":true,"startDate":"2020-01-01"}`},
+	{"career-companyName-string-empty-array", "", endpointCreateCareer, `{"companyName":[],"startDate":"2020-01","endDate":null,"isActive":true}`, ""},
+	{"career-companyName-string-array", "", endpointCreateCareer, `{"companyName":["a"],"startDate":"2020-01","endDate":null,"isActive":true}`, ""},
+	{"career-companyName-string-object", "", endpointCreateCareer, `{"companyName":{},"startDate":"2020-01","endDate":null,"isActive":true}`, ""},
+	{"career-companyName-string-spaces-kept", "", endpointCreateCareer, `{"companyName":"  前後の空白  ","startDate":"2020-01","endDate":null,"isActive":true}`, `{"companyName":"  前後の空白  ","isActive":true,"startDate":"2020-01-01"}`},
+	{"career-companyName-string-ideographic-spaces", "", endpointCreateCareer, "{\"companyName\":\"\u3000全角\u3000\",\"startDate\":\"2020-01\",\"endDate\":null,\"isActive\":true}", "{\"companyName\":\"\u3000全角\u3000\",\"isActive\":true,\"startDate\":\"2020-01-01\"}"},
+	{"career-companyName-string-escapes", "", endpointCreateCareer, `{"companyName":"a\"b\\c\/dé😀","startDate":"2020-01","endDate":null,"isActive":true}`, `{"companyName":"a\"b\\c/dé😀","isActive":true,"startDate":"2020-01-01"}`},
+	{"career-companyName-absent", "", endpointCreateCareer, `{"startDate":"2020-01","endDate":null,"isActive":true}`, `{"isActive":true,"startDate":"2020-01-01"}`},
+	{"career-isActive-true", "", endpointCreateCareer, `{"companyName":"A社","startDate":"2020-01","endDate":null,"isActive":true}`, `{"companyName":"A社","isActive":true,"startDate":"2020-01-01"}`},
+	{"career-isActive-false", "", endpointCreateCareer, `{"companyName":"A社","startDate":"2020-01","endDate":null,"isActive":false}`, `{"companyName":"A社","isActive":false,"startDate":"2020-01-01"}`},
+	{"career-isActive-str-true", "CB-054", endpointCreateCareer, `{"companyName":"A社","startDate":"2020-01","endDate":null,"isActive":"true"}`, ""},
+	{"career-isActive-str-True", "CB-054", endpointCreateCareer, `{"companyName":"A社","startDate":"2020-01","endDate":null,"isActive":"True"}`, ""},
+	{"career-isActive-str-TRUE", "CB-054", endpointCreateCareer, `{"companyName":"A社","startDate":"2020-01","endDate":null,"isActive":"TRUE"}`, ""},
+	{"career-isActive-str-false", "CB-054", endpointCreateCareer, `{"companyName":"A社","startDate":"2020-01","endDate":null,"isActive":"false"}`, ""},
+	{"career-isActive-str-False", "CB-054", endpointCreateCareer, `{"companyName":"A社","startDate":"2020-01","endDate":null,"isActive":"False"}`, ""},
+	{"career-isActive-str-FALSE", "CB-054", endpointCreateCareer, `{"companyName":"A社","startDate":"2020-01","endDate":null,"isActive":"FALSE"}`, ""},
+	{"career-isActive-str-spaced-true", "CB-054", endpointCreateCareer, `{"companyName":"A社","startDate":"2020-01","endDate":null,"isActive":" true "}`, ""},
+	{"career-isActive-str-tab-true", "CB-054", endpointCreateCareer, `{"companyName":"A社","startDate":"2020-01","endDate":null,"isActive":"\ttrue\n"}`, ""},
+	{"career-isActive-str-ideographic-true", "", endpointCreateCareer, "{\"companyName\":\"A社\",\"startDate\":\"2020-01\",\"endDate\":null,\"isActive\":\"\u3000true\"}", ""},
+	{"career-isActive-str-empty", "CB-054", endpointCreateCareer, `{"companyName":"A社","startDate":"2020-01","endDate":null,"isActive":""}`, ""},
+	{"career-isActive-str-blank", "CB-054", endpointCreateCareer, `{"companyName":"A社","startDate":"2020-01","endDate":null,"isActive":"  "}`, ""},
+	{"career-isActive-str-null", "CB-054", endpointCreateCareer, `{"companyName":"A社","startDate":"2020-01","endDate":null,"isActive":"null"}`, ""},
+	{"career-isActive-str-spaced-null", "CB-054", endpointCreateCareer, `{"companyName":"A社","startDate":"2020-01","endDate":null,"isActive":" null "}`, ""},
+	{"career-isActive-str-NULL", "", endpointCreateCareer, `{"companyName":"A社","startDate":"2020-01","endDate":null,"isActive":"NULL"}`, ""},
+	{"career-isActive-str-tRuE", "", endpointCreateCareer, `{"companyName":"A社","startDate":"2020-01","endDate":null,"isActive":"tRuE"}`, ""},
+	{"career-isActive-str-yes", "", endpointCreateCareer, `{"companyName":"A社","startDate":"2020-01","endDate":null,"isActive":"yes"}`, ""},
+	{"career-isActive-str-1", "", endpointCreateCareer, `{"companyName":"A社","startDate":"2020-01","endDate":null,"isActive":"1"}`, ""},
+	{"career-isActive-str-0", "", endpointCreateCareer, `{"companyName":"A社","startDate":"2020-01","endDate":null,"isActive":"0"}`, ""},
+	{"career-isActive-str-t", "", endpointCreateCareer, `{"companyName":"A社","startDate":"2020-01","endDate":null,"isActive":"t"}`, ""},
+	{"career-isActive-int-0", "CB-054", endpointCreateCareer, `{"companyName":"A社","startDate":"2020-01","endDate":null,"isActive":0}`, ""},
+	{"career-isActive-int-neg0", "CB-054", endpointCreateCareer, `{"companyName":"A社","startDate":"2020-01","endDate":null,"isActive":-0}`, ""},
+	{"career-isActive-int-1", "CB-054", endpointCreateCareer, `{"companyName":"A社","startDate":"2020-01","endDate":null,"isActive":1}`, ""},
+	{"career-isActive-int-2", "CB-054", endpointCreateCareer, `{"companyName":"A社","startDate":"2020-01","endDate":null,"isActive":2}`, ""},
+	{"career-isActive-int-neg1", "CB-054", endpointCreateCareer, `{"companyName":"A社","startDate":"2020-01","endDate":null,"isActive":-1}`, ""},
+	{"career-isActive-int-big", "CB-054", endpointCreateCareer, `{"companyName":"A社","startDate":"2020-01","endDate":null,"isActive":12345678901234567890}`, ""},
+	{"career-isActive-dec-1.0", "", endpointCreateCareer, `{"companyName":"A社","startDate":"2020-01","endDate":null,"isActive":1.0}`, ""},
+	{"career-isActive-dec-0.0", "", endpointCreateCareer, `{"companyName":"A社","startDate":"2020-01","endDate":null,"isActive":0.0}`, ""},
+	{"career-isActive-exp-1e2", "", endpointCreateCareer, `{"companyName":"A社","startDate":"2020-01","endDate":null,"isActive":1e2}`, ""},
+	{"career-isActive-array", "", endpointCreateCareer, `{"companyName":"A社","startDate":"2020-01","endDate":null,"isActive":[]}`, ""},
+	{"career-isActive-array-true", "", endpointCreateCareer, `{"companyName":"A社","startDate":"2020-01","endDate":null,"isActive":[true]}`, ""},
+	{"career-isActive-object", "", endpointCreateCareer, `{"companyName":"A社","startDate":"2020-01","endDate":null,"isActive":{}}`, ""},
+	{"career-isActive-null", "", endpointCreateCareer, `{"companyName":"A社","startDate":"2020-01","endDate":null,"isActive":null}`, `{"companyName":"A社","startDate":"2020-01-01"}`},
+	{"career-isActive-absent", "", endpointCreateCareer, `{"companyName":"A社","startDate":"2020-01","endDate":null}`, `{"companyName":"A社","startDate":"2020-01-01"}`},
+	{"career-key-case-CompanyName", "CB-054", endpointCreateCareer, `{"CompanyName":"A社","startDate":"2020-01","endDate":null,"isActive":true}`, `{"companyName":"A社","isActive":true,"startDate":"2020-01-01"}`},
+	{"career-key-case-isactive", "CB-054", endpointCreateCareer, `{"companyName":"A社","startDate":"2020-01","endDate":null,"isactive":true}`, `{"companyName":"A社","isActive":true,"startDate":"2020-01-01"}`},
+	{"career-key-unknown", "", endpointCreateCareer, `{"companyName":"A社","foo":{"x":[1,2]},"startDate":"2020-01","endDate":null,"isActive":true}`, `{"companyName":"A社","isActive":true,"startDate":"2020-01-01"}`},
+	{"career-key-active-ignored", "", endpointCreateCareer, `{"companyName":"A社","startDate":"2020-01","endDate":null,"isActive":true,"active":false}`, `{"companyName":"A社","isActive":true,"startDate":"2020-01-01"}`},
+	{"career-key-active-only", "", endpointCreateCareer, `{"companyName":"A社","startDate":"2020-01","endDate":null,"active":true}`, `{"companyName":"A社","startDate":"2020-01-01"}`},
+	{"career-key-duplicate-string", "", endpointCreateCareer, `{"companyName":"前","companyName":"後","startDate":"2020-01","endDate":null,"isActive":true}`, `{"companyName":"後","isActive":true,"startDate":"2020-01-01"}`},
+	{"career-key-duplicate-bool", "", endpointCreateCareer, `{"companyName":"A社","startDate":"2020-01","endDate":"2023-12","isActive":true,"isActive":false}`, `{"companyName":"A社","endDate":"2023-12-01","isActive":false,"startDate":"2020-01-01"}`},
+	{"career-key-duplicate-invalid-then-valid", "", endpointCreateCareer, `{"companyName":[],"companyName":"後","startDate":"2020-01","endDate":null,"isActive":true}`, ""},
+	{"career-period-active-with-end", "", endpointCreateCareer, `{"companyName":"A社","startDate":"2020-01","endDate":"2023-12","isActive":true}`, `{"companyName":"A社","endDate":"2023-12-01","isActive":true,"startDate":"2020-01-01"}`},
+	{"career-period-inactive-no-end", "", endpointCreateCareer, `{"companyName":"A社","startDate":"2020-01","endDate":null,"isActive":false}`, `{"companyName":"A社","isActive":false,"startDate":"2020-01-01"}`},
+	{"career-period-end-before-start", "", endpointCreateCareer, `{"companyName":"A社","startDate":"2020-01","endDate":"2019-12","isActive":false}`, `{"companyName":"A社","endDate":"2019-12-01","isActive":false,"startDate":"2020-01-01"}`},
+	{"project-phases-systemTest-true-maintenance-false", "", endpointCreateProject, projectBase + `,"systemTest":true,"maintenance":false,"frontendLanguages":["Go"]}`, projectWant(`{"frontendLanguages":["Go"],"maintenance":false,"systemTest":true}`)},
+	{"project-phases-systemTest-false-maintenance-true", "", endpointCreateProject, projectBase + `,"systemTest":false,"maintenance":true}`, projectWant(`{"maintenance":true,"systemTest":false}`)},
+	{"project-phases-systemTest-absent", "", endpointCreateProject, projectBase + `,"maintenance":false}`, projectWant(`{"maintenance":false}`)},
+	{"project-phases-systemTest-null", "", endpointCreateProject, projectBase + `,"systemTest":null,"maintenance":false}`, projectWant(`{"maintenance":false}`)},
+	{"project-phases-two-null", "", endpointCreateProject, projectBase + `,"systemTest":null,"maintenance":null}`, projectWant(`{}`)},
+	{"project-phases-str-TRUE-int-0", "CB-054", endpointCreateProject, `{"companyName":"A社","startDate":"2020-01","endDate":null,"isActive":true,"name":"案件","overview":"概要","teamComp":"5名","role":"開発","achievement":"成果","requirements":"TRUE","basicDesign":0,"detailedDesign":false,"implementation":true,"integrationTest":false,"systemTest":true,"maintenance":false}`, ""},
+	{"project-phases-decimal", "", endpointCreateProject, `{"companyName":"A社","startDate":"2020-01","endDate":null,"isActive":true,"name":"案件","overview":"概要","teamComp":"5名","role":"開発","achievement":"成果","requirements":1.0,"basicDesign":true,"detailedDesign":false,"implementation":true,"integrationTest":false,"systemTest":true,"maintenance":false}`, ""},
+	{"project-phases-str-empty", "CB-054", endpointCreateProject, `{"companyName":"A社","startDate":"2020-01","endDate":null,"isActive":true,"name":"案件","overview":"概要","teamComp":"5名","role":"開発","achievement":"成果","requirements":"","basicDesign":true,"detailedDesign":false,"implementation":true,"integrationTest":false,"systemTest":true,"maintenance":false}`, ""},
+	{"project-tech-frontendLanguages-mixed", "CB-054", endpointCreateProject, projectBase + `,"systemTest":true,"maintenance":false,"frontendLanguages":["Go",1,1.50,-0,true,false,null,"a,b","\"q\"","\\","{x}"," sp ","","NULL","null"]}`, ""},
+	{"project-tech-frontendLanguages-null", "", endpointCreateProject, projectBase + `,"systemTest":true,"maintenance":false,"frontendLanguages":null}`, projectWant(`{"maintenance":false,"systemTest":true}`)},
+	{"project-tech-frontendLanguages-empty", "", endpointCreateProject, projectBase + `,"systemTest":true,"maintenance":false,"frontendLanguages":[]}`, projectWant(`{"frontendLanguages":[],"maintenance":false,"systemTest":true}`)},
+	{"project-tech-frontendLanguages-string", "", endpointCreateProject, projectBase + `,"systemTest":true,"maintenance":false,"frontendLanguages":"Go"}`, ""},
+	{"project-tech-frontendLanguages-object", "", endpointCreateProject, projectBase + `,"systemTest":true,"maintenance":false,"frontendLanguages":{}}`, ""},
+	{"project-tech-frontendLanguages-number", "", endpointCreateProject, projectBase + `,"systemTest":true,"maintenance":false,"frontendLanguages":1}`, ""},
+	{"project-tech-frontendLanguages-bool", "", endpointCreateProject, projectBase + `,"systemTest":true,"maintenance":false,"frontendLanguages":true}`, ""},
+	{"project-tech-frontendLanguages-nested-array", "", endpointCreateProject, projectBase + `,"systemTest":true,"maintenance":false,"frontendLanguages":[[]]}`, ""},
+	{"project-tech-frontendLanguages-nested-object", "", endpointCreateProject, projectBase + `,"systemTest":true,"maintenance":false,"frontendLanguages":[{}]}`, ""},
+	{"project-tech-absent", "", endpointCreateProject, projectBase + `,"systemTest":true,"maintenance":false}`, projectWant(`{"maintenance":false,"systemTest":true}`)},
+	{"resume-resumeName-int", "CB-054", endpointCreateResume, `{"resumeName":1}`, ""},
+	{"resume-resumeName-decimal", "CB-054", endpointCreateResume, `{"resumeName":1.50}`, ""},
+	{"resume-resumeName-true", "CB-054", endpointCreateResume, `{"resumeName":true}`, ""},
+	{"resume-resumeName-null", "", endpointCreateResume, `{"resumeName":null}`, `{}`},
+	{"resume-resumeName-array", "", endpointCreateResume, `{"resumeName":[]}`, ""},
+	{"resume-resumeName-object", "", endpointCreateResume, `{"resumeName":{}}`, ""},
+	{"resume-resumeName-spaces", "", endpointCreateResume, `{"resumeName":"  前後  "}`, `{"resumeName":"  前後  "}`},
+	{"resume-resumeName-absent", "", endpointCreateResume, `{}`, `{}`},
+	{"resume-key-case-ResumeName", "CB-054", endpointCreateResume, `{"ResumeName":"大文字"}`, `{"resumeName":"大文字"}`},
+	{"resume-key-unknown", "", endpointCreateResume, `{"resumeName":"知らない鍵","foo":1}`, `{"resumeName":"知らない鍵"}`},
+	{"resume-key-duplicate", "", endpointCreateResume, `{"resumeName":"前","resumeName":"後"}`, `{"resumeName":"後"}`},
 }
 
-// TestDecodeBody_MatchesJava は、Java 版に送って testdata/body.json に控えたすべての本文で、
-// 画面が送る書き方の本文から Java 版と同じ値を読み、Java 版と違う答えになる本文が、テストの中の表と合うことを確かめる。
-func TestDecodeBody_MatchesJava(t *testing.T) {
-	cases := loadBodyJSON(t)
-	techColumns := loadTechColumns(t, cases)
-	seen := map[string]bool{}
+// TestDecodeBody は、表の本文を decodeBody で読んだ答えが表の答えと同じになることと、
+// Java 版と答えが違う本文が、画面が送る書き方でないことを確かめる。
+func TestDecodeBody(t *testing.T) {
 	screens := 0
-	for _, c := range cases {
-		seen[c.Name] = true
-		body := c.bytes(t)
-		screen := screenBody(body, requestTypeOf(t, c.Endpoint))
-		if screen {
-			screens++
-		}
-		checkBodyAgainstJava(t, c.Name, decodeFor(t, c.Endpoint, body), javaResult(t, c, techColumns), bodyDiffs, screen)
+	for _, tt := range bodyTests {
+		t.Run(tt.name, func(t *testing.T) {
+			view := decodeFor(t, tt.endpoint, []byte(tt.body))
+			switch {
+			case view == nil && tt.want != "":
+				t.Errorf("本文 %s を読めなかった。want %s", tt.body, tt.want)
+			case view != nil && tt.want == "":
+				t.Errorf("本文 %s を読んだ %v。want 読めない", tt.body, presentFields(view))
+			case view != nil:
+				var want map[string]any
+				if err := json.Unmarshal([]byte(tt.want), &want); err != nil {
+					t.Fatalf("表の答え %s が JSON でない: %v", tt.want, err)
+				}
+				// 読んだ値を JSON にしてから読み直し、表の答えと同じ型の値にして比べる
+				b, err := json.Marshal(presentFields(view))
+				if err != nil {
+					t.Fatal(err)
+				}
+				var got map[string]any
+				if err := json.Unmarshal(b, &got); err != nil {
+					t.Fatal(err)
+				}
+				if !reflect.DeepEqual(got, want) {
+					t.Errorf("本文 %s の読んだ値\n got  %s\n want %s", tt.body, b, tt.want)
+				}
+			}
+			screen := screenBody([]byte(tt.body), requestTypeOf(t, tt.endpoint))
+			if screen {
+				screens++
+			}
+			if tt.cb != "" && screen {
+				t.Errorf("本文 %s は画面が送る書き方なのに、%s がある", tt.body, tt.cb)
+			}
+		})
 	}
+	// 画面が送る書き方の本文が無いと、上の screenBody の検査が何も確かめないことになる
 	if screens == 0 {
-		t.Error("正解のファイルに、画面が送る書き方の本文が無い")
-	}
-	for name := range bodyDiffs {
-		if !seen[name] {
-			t.Errorf("表の本文 %s が、正解のファイルに無い", name)
-		}
+		t.Error("表に、画面が送る書き方の本文が無い")
 	}
 }
 
-// resumeIDCase は、testdata/ids.json の、経歴書の作成の resumeId の1つの書き方と、Java 版の答えである。
-type resumeIDCase struct {
-	// Input は、resumeId に入れた JSON の値の書き方である。<absent> は鍵を入れなかった要求である。
-	Input  string `json:"input"`
-	Result struct {
-		Status int    `json:"status"`
-		ReadID string `json:"readId"`
-		Body   struct {
-			Message string              `json:"message"`
-			Errors  map[string][]string `json:"errors"`
-		} `json:"body"`
-	} `json:"result"`
+// utf8Tests は、UTF-8 として誤ったバイトの並びと、正しい並びと、decodeBody がその並びを読んだ文字列である。
+// Go 版は、encoding/json の読み方のとおりに、誤ったバイトを、UTF-8 として読めない区切りごとに U+FFFD に置き換えて読む。
+// Java 版は、誤ったバイトの一部を断り、一部を対になっていないサロゲートとして受けた(CB-055)。
+var utf8Tests = []struct {
+	name string
+	b    []byte
+	repl string
+	cb   string
+}{
+	{"ff", []byte{0xff}, "�", "CB-055"},
+	{"fe", []byte{0xfe}, "�", "CB-055"},
+	{"c3-28", []byte{0xc3, 0x28}, "�(", "CB-055"},
+	{"a0-a1", []byte{0xa0, 0xa1}, "��", "CB-055"},
+	{"e2-28-a1", []byte{0xe2, 0x28, 0xa1}, "�(�", "CB-055"},
+	{"e2-82-28", []byte{0xe2, 0x82, 0x28}, "��(", "CB-055"},
+	{"f0-28-8c-bc", []byte{0xf0, 0x28, 0x8c, 0xbc}, "�(��", "CB-055"},
+	{"overlong-c0-af", []byte{0xc0, 0xaf}, strings.Repeat("�", 2), "CB-055"},
+	{"surrogate-ed-a0-80", []byte{0xed, 0xa0, 0x80}, strings.Repeat("�", 3), "CB-055"},
+	{"above-max-f4-90-80-80", []byte{0xf4, 0x90, 0x80, 0x80}, strings.Repeat("�", 4), "CB-055"},
+	{"lone-continuation-80", []byte{0x80}, "�", "CB-055"},
+	{"truncated-e3-81", []byte{0xe3, 0x81}, strings.Repeat("�", 2), "CB-055"},
+	{"overlong-c1-bf", []byte{0xc1, 0xbf}, strings.Repeat("�", 2), "CB-055"},
+	{"overlong-c0-80", []byte{0xc0, 0x80}, strings.Repeat("�", 2), "CB-055"},
+	{"overlong3-e0-80-af", []byte{0xe0, 0x80, 0xaf}, strings.Repeat("�", 3), "CB-055"},
+	{"overlong4-f0-80-80-af", []byte{0xf0, 0x80, 0x80, 0xaf}, strings.Repeat("�", 4), "CB-055"},
+	{"low-surrogate-ed-bf-bf", []byte{0xed, 0xbf, 0xbf}, strings.Repeat("�", 3), "CB-055"},
+	{"f5-80-80-80", []byte{0xf5, 0x80, 0x80, 0x80}, strings.Repeat("�", 4), "CB-055"},
+	{"f7-bf-bf-bf", []byte{0xf7, 0xbf, 0xbf, 0xbf}, strings.Repeat("�", 4), "CB-055"},
+	{"f8-88-80-80-80", []byte{0xf8, 0x88, 0x80, 0x80, 0x80}, strings.Repeat("�", 5), "CB-055"},
+	// UTF-8 として正しい並びは、そのまま読む
+	{"max-f4-8f-bf-bf", []byte{0xf4, 0x8f, 0xbf, 0xbf}, "\U0010FFFF", ""},
+	{"emoji-f0-9f-98-80", []byte{0xf0, 0x9f, 0x98, 0x80}, "😀", ""},
+	{"ef-bf-bf", []byte{0xef, 0xbf, 0xbf}, "￿", ""},
+	{"e0-a0-80", []byte{0xe0, 0xa0, 0x80}, "ࠀ", ""},
+}
+
+// utf8Body は、本文の書き方 format の %s を、バイトの並び b に置き換えた本文である。
+func utf8Body(format string, b []byte) []byte {
+	before, after, _ := strings.Cut(format, "%s")
+	return append(append([]byte(before), b...), after...)
+}
+
+// TestDecodeBody_InvalidUTF8 は、職歴の会社名とプロジェクトの技術スタックに、表のバイトの並びを入れた本文を、
+// decodeBody が、表の文字列に置き換えて読むことと、Java 版と答えが違う本文が、画面が送る書き方でないことを確かめる。
+func TestDecodeBody_InvalidUTF8(t *testing.T) {
+	careerTail := `","startDate":"2020-01","endDate":null,"isActive":true}`
+	forms := []struct {
+		name, endpoint, format string
+		// value は、読んだ値から、バイトの並びを入れた欄の値を取り出す。
+		value func(view map[string]any) any
+		want  func(repl string) any
+	}{
+		{
+			"会社名の途中", endpointCreateCareer, `{"companyName":"前%s後` + careerTail,
+			func(view map[string]any) any { return view["companyName"] },
+			func(repl string) any { return "前" + repl + "後" },
+		},
+		{
+			"会社名の終わり", endpointCreateCareer, `{"companyName":"前%s` + careerTail,
+			func(view map[string]any) any { return view["companyName"] },
+			func(repl string) any { return "前" + repl },
+		},
+		{
+			"技術スタック", endpointCreateProject,
+			projectBase + `,"systemTest":true,"maintenance":false,"frontendLanguages":["前%s後"]}`,
+			func(view map[string]any) any { return view["frontendLanguages"] },
+			func(repl string) any { return []any{"前" + repl + "後"} },
+		},
+	}
+	for _, tt := range utf8Tests {
+		for _, f := range forms {
+			t.Run(tt.name+"/"+f.name, func(t *testing.T) {
+				body := utf8Body(f.format, tt.b)
+				view := decodeFor(t, f.endpoint, body)
+				if view == nil {
+					t.Fatalf("本文 %q を読めなかった", body)
+				}
+				if got, want := f.value(view), f.want(tt.repl); !reflect.DeepEqual(got, want) {
+					t.Errorf("本文 %q: 読んだ値 %q, want %q", body, got, want)
+				}
+				if tt.cb != "" && screenBody(body, requestTypeOf(t, f.endpoint)) {
+					t.Errorf("本文 %q は画面が送る書き方なのに、%s がある", body, tt.cb)
+				}
+			})
+		}
+		// 誤った並びだけに番号を付け、正しい並びには付けない
+		if (tt.cb != "") == utf8.Valid(tt.b) {
+			t.Errorf("並び %s: UTF-8 として正しいかと、番号 %q が合わない", tt.name, tt.cb)
+		}
+	}
 }
 
 const (
 	// resumeIDAbsent は、resumeId の鍵を入れなかった要求の書き方である。
 	resumeIDAbsent = "<absent>"
-	// resumeIDNoCopy は、Java 版が写さずに経歴書を作ったことを表す readId である。
+	// resumeIDNoCopy は、写さずに経歴書を作ることを表す答えである。
 	resumeIDNoCopy = "<no copy>"
+	// resumeIDUnreadable は、本文を読めないことを表す答えである。
+	resumeIDUnreadable = "読めない"
 )
 
-// resumeIDDiffs は、経歴書の作成の resumeId の書き方のうち、Go 版の答えが Java 版と違う書き方と、違いを載せた一覧の番号である。
-// Java 版は、前後の空白を除いて読み、空白だけの値を写さない作成にし、16バイトを base64 で書いた値も読む。
-// Go 版は、uuid.Parse で読む(CB-052)。
-var resumeIDDiffs = map[string]string{
-	`"1b4e28ba-2fa1-11d2-883f-0016d3cca427 "`: "CB-052",
-	`"  "`:                                            "CB-052",
-	`"G04oui+hEdKIPwAW08ykJw=="`:                      "CB-052",
-	`"G04oui+hEdKIPwAW08ykJw"`:                        "CB-052",
-	`"+/v7+/v7+/v7+/v7+/v7+w=="`:                      "CB-052",
-	`"-_v7-_v7-_v7-_v7-_v7-w=="`:                      "CB-052",
-	`" G04oui+hEdKIPwAW08ykJw=="`:                     "CB-052",
-	`"1b4e28ba2fa111d2883f0016d3cca427"`:              "CB-052",
-	`"{1b4e28ba-2fa1-11d2-883f-0016d3cca427}"`:        "CB-052",
-	`"urn:uuid:1b4e28ba-2fa1-11d2-883f-0016d3cca427"`: "CB-052",
+// resumeIDTests は、経歴書の作成の resumeId の書き方と、写す元の経歴書の ID である。
+// Go 版は、文字列を uuid.Parse で読み、空の文字列と null と鍵の無い要求を、写さない作成にする。
+// Java 版は、前後の空白を除いて読み、空白だけの値を写さない作成にし、16バイトを base64 で書いた値も読んだ(CB-052)。
+var resumeIDTests = []struct {
+	cb, input, want string
+}{
+	{"", `"1b4e28ba-2fa1-11d2-883f-0016d3cca427"`, "1b4e28ba-2fa1-11d2-883f-0016d3cca427"},
+	{"", `"1B4E28BA-2FA1-11D2-883F-0016D3CCA427"`, "1b4e28ba-2fa1-11d2-883f-0016d3cca427"},
+	{"", `"1B4E28ba-2FA1-11d2-883F-0016D3CCA427"`, "1b4e28ba-2fa1-11d2-883f-0016d3cca427"},
+	// uuid.Parse は、38字の形の最初と最後の1字を確かめずに外すので、前後に1つずつ空白を付けた値も読む
+	{"", `" 1b4e28ba-2fa1-11d2-883f-0016d3cca427 "`, "1b4e28ba-2fa1-11d2-883f-0016d3cca427"},
+	{"CB-052", `"1b4e28ba-2fa1-11d2-883f-0016d3cca427 "`, resumeIDUnreadable},
+	{"", `""`, resumeIDNoCopy},
+	{"CB-052", `"  "`, resumeIDUnreadable},
+	{"", `null`, resumeIDNoCopy},
+	{"", `"null"`, resumeIDUnreadable},
+	{"", `"1-2-3-4-5"`, resumeIDUnreadable},
+	{"CB-052", `"G04oui+hEdKIPwAW08ykJw=="`, resumeIDUnreadable},
+	{"CB-052", `"G04oui+hEdKIPwAW08ykJw"`, resumeIDUnreadable},
+	{"CB-052", `"+/v7+/v7+/v7+/v7+/v7+w=="`, resumeIDUnreadable},
+	{"CB-052", `"-_v7-_v7-_v7-_v7-_v7-w=="`, resumeIDUnreadable},
+	{"CB-052", `" G04oui+hEdKIPwAW08ykJw=="`, resumeIDUnreadable},
+	{"CB-052", `"1b4e28ba2fa111d2883f0016d3cca427"`, "1b4e28ba-2fa1-11d2-883f-0016d3cca427"},
+	{"CB-052", `"{1b4e28ba-2fa1-11d2-883f-0016d3cca427}"`, "1b4e28ba-2fa1-11d2-883f-0016d3cca427"},
+	{"", `"1b4e28ba-2fa1-11d2-883f-0016d3cca42g"`, resumeIDUnreadable},
+	{"", `"1b4e28ba-2fa1-11d2-883f-0016d3cca4270"`, resumeIDUnreadable},
+	{"", `"1b4e28ba-2fa1-11d2-883f-0016d3cca42"`, resumeIDUnreadable},
+	{"", `"1b4e28ba2-fa1-11d2-883f-0016d3cca427"`, resumeIDUnreadable},
+	{"CB-052", `"urn:uuid:1b4e28ba-2fa1-11d2-883f-0016d3cca427"`, "1b4e28ba-2fa1-11d2-883f-0016d3cca427"},
+	{"", `"ffffffff-ffff-ffff-ffff-ffffffffffff"`, "ffffffff-ffff-ffff-ffff-ffffffffffff"},
+	{"", `"FFFFFFFF-FFFF-FFFF-FFFF-FFFFFFFFFFFF"`, "ffffffff-ffff-ffff-ffff-ffffffffffff"},
+	{"", `"1b4e28ba_2fa1_11d2_883f_0016d3cca427"`, resumeIDUnreadable},
+	{"", `123`, resumeIDUnreadable},
+	{"", `true`, resumeIDUnreadable},
+	{"", `[]`, resumeIDUnreadable},
+	{"", `{}`, resumeIDUnreadable},
+	{"", resumeIDAbsent, resumeIDNoCopy},
 }
 
-// resumeIDResult は、resumeId の1つの書き方の答えである。
-type resumeIDResult struct {
-	state bodyState
-	// id は、写す元の経歴書の ID である。写さない作成のときは resumeIDNoCopy にする。
-	id string
-}
-
-func (r resumeIDResult) String() string {
-	if r.state == bodyUnreadable {
-		return "読めない"
-	}
-	return "読めた " + r.id
-}
-
-// TestDecodeBody_ResumeID は、Java 版に送って testdata/ids.json の resumeIds に控えた、経歴書の作成の resumeId の
-// すべての書き方で、Java 版と違う答えになる書き方が、テストの中の表と合うことを確かめる。
+// TestDecodeBody_ResumeID は、経歴書の作成の resumeId の書き方ごとに、decodeBody が読んだ写す元の ID が表と同じになることと、
+// Java 版と答えが違う書き方が、画面が送る書き方でないことを確かめる。
 func TestDecodeBody_ResumeID(t *testing.T) {
-	b, err := os.ReadFile("testdata/ids.json")
-	if err != nil {
-		t.Fatal(err)
-	}
-	var data struct {
-		ResumeIDs []resumeIDCase `json:"resumeIds"`
-	}
-	if err := json.Unmarshal(b, &data); err != nil {
-		t.Fatal(err)
-	}
-	if len(data.ResumeIDs) == 0 {
-		t.Fatal("控えの resumeId の書き方が無い")
-	}
-	seen := map[string]bool{}
-	for _, c := range data.ResumeIDs {
-		seen[c.Input] = true
-
-		var javaRes resumeIDResult
-		switch {
-		case c.Result.Status == 201 && c.Result.ReadID != "":
-			javaRes = resumeIDResult{state: bodyRead, id: c.Result.ReadID}
-		case c.Result.Status == 400 && c.Result.Body.Message == MessageInvalidInput && len(c.Result.Body.Errors) == 0:
-			javaRes = resumeIDResult{state: bodyUnreadable}
-		default:
-			t.Fatalf("書き方 %s の Java 版の答え %d は、控えの形に無い", c.Input, c.Result.Status)
-		}
-
+	for _, tt := range resumeIDTests {
 		body := `{"resumeName":"写し"}`
-		if c.Input != resumeIDAbsent {
-			body = `{"resumeName":"写し","resumeId":` + c.Input + `}`
+		if tt.input != resumeIDAbsent {
+			body = `{"resumeName":"写し","resumeId":` + tt.input + `}`
 		}
-		var goRes resumeIDResult
+		got := ""
 		req, err := decodeBody[createResumeRequest]([]byte(body))
 		switch {
 		case err != nil:
 			if !errors.Is(err, errUnreadableBody) {
-				t.Fatalf("書き方 %s: decodeBody の誤り %v が errUnreadableBody を包んでいない", c.Input, err)
+				t.Fatalf("書き方 %s: decodeBody の誤り %v が errUnreadableBody を包んでいない", tt.input, err)
 			}
-			goRes = resumeIDResult{state: bodyUnreadable}
+			got = resumeIDUnreadable
 		case !req.ResumeID.Present:
-			goRes = resumeIDResult{state: bodyRead, id: resumeIDNoCopy}
+			got = resumeIDNoCopy
 		default:
-			goRes = resumeIDResult{state: bodyRead, id: req.ResumeID.Value.String()}
+			got = req.ResumeID.Value.String()
 		}
-
-		// 画面は、resumeId に、Java 版が答えに入れた小文字の形の ID か、空の文字列か null を入れるか、鍵を入れない
-		screen := c.Input == resumeIDAbsent ||
-			screenValue(reflect.TypeFor[jsonResumeID](), json.RawMessage(c.Input))
-		id, inTable := resumeIDDiffs[c.Input]
-		switch {
-		case goRes == javaRes && inTable:
-			t.Errorf("書き方 %s: Go 版の答えは Java 版と同じ %s なのに、表に %s がある", c.Input, goRes, id)
-		case goRes != javaRes && !inTable:
-			t.Errorf("書き方 %s: Go 版の答え %s が Java 版の答え %s と違うのに、表に無い", c.Input, goRes, javaRes)
-		case goRes != javaRes && screen:
-			t.Errorf("書き方 %s は画面が送る書き方なのに、Go 版の答え %s が Java 版の答え %s と違う", c.Input, goRes, javaRes)
+		if got != tt.want {
+			t.Errorf("書き方 %s: 答え %s, want %s", tt.input, got, tt.want)
 		}
-	}
-	for input := range resumeIDDiffs {
-		if !seen[input] {
-			t.Errorf("表の書き方 %s が、正解のファイルに無い", input)
-		}
-	}
-}
-
-// utf8Diffs は、testdata/utf8.json の本文のうち、Go 版の答えが Java 版と違う本文と、違いを載せた一覧の番号である。
-// Java 版は、UTF-8 として誤ったバイトの一部を断り、一部を対になっていないサロゲートとして受ける。Go 版は、誤ったバイトを
-// 1バイトずつ U+FFFD に置き換えて読む(CB-055)。
-var utf8Diffs = map[string]string{
-	"career-companyName-ff":                            "CB-055",
-	"career-companyName-end-ff":                        "CB-055",
-	"project-frontendLanguages-ff":                     "CB-055",
-	"career-companyName-fe":                            "CB-055",
-	"career-companyName-end-fe":                        "CB-055",
-	"project-frontendLanguages-fe":                     "CB-055",
-	"career-companyName-c3-28":                         "CB-055",
-	"career-companyName-end-c3-28":                     "CB-055",
-	"project-frontendLanguages-c3-28":                  "CB-055",
-	"career-companyName-a0-a1":                         "CB-055",
-	"career-companyName-end-a0-a1":                     "CB-055",
-	"project-frontendLanguages-a0-a1":                  "CB-055",
-	"career-companyName-e2-28-a1":                      "CB-055",
-	"career-companyName-end-e2-28-a1":                  "CB-055",
-	"project-frontendLanguages-e2-28-a1":               "CB-055",
-	"career-companyName-e2-82-28":                      "CB-055",
-	"career-companyName-end-e2-82-28":                  "CB-055",
-	"project-frontendLanguages-e2-82-28":               "CB-055",
-	"career-companyName-f0-28-8c-bc":                   "CB-055",
-	"career-companyName-end-f0-28-8c-bc":               "CB-055",
-	"project-frontendLanguages-f0-28-8c-bc":            "CB-055",
-	"career-companyName-overlong-c0-af":                "CB-055",
-	"career-companyName-end-overlong-c0-af":            "CB-055",
-	"project-frontendLanguages-overlong-c0-af":         "CB-055",
-	"career-companyName-surrogate-ed-a0-80":            "CB-055",
-	"career-companyName-end-surrogate-ed-a0-80":        "CB-055",
-	"project-frontendLanguages-surrogate-ed-a0-80":     "CB-055",
-	"career-companyName-above-max-f4-90-80-80":         "CB-055",
-	"career-companyName-end-above-max-f4-90-80-80":     "CB-055",
-	"project-frontendLanguages-above-max-f4-90-80-80":  "CB-055",
-	"career-companyName-lone-continuation-80":          "CB-055",
-	"career-companyName-end-lone-continuation-80":      "CB-055",
-	"project-frontendLanguages-lone-continuation-80":   "CB-055",
-	"career-companyName-truncated-e3-81":               "CB-055",
-	"career-companyName-end-truncated-e3-81":           "CB-055",
-	"project-frontendLanguages-truncated-e3-81":        "CB-055",
-	"career-companyName-overlong-c1-bf":                "CB-055",
-	"career-companyName-end-overlong-c1-bf":            "CB-055",
-	"project-frontendLanguages-overlong-c1-bf":         "CB-055",
-	"career-companyName-overlong-c0-80":                "CB-055",
-	"career-companyName-end-overlong-c0-80":            "CB-055",
-	"project-frontendLanguages-overlong-c0-80":         "CB-055",
-	"career-companyName-overlong3-e0-80-af":            "CB-055",
-	"career-companyName-end-overlong3-e0-80-af":        "CB-055",
-	"project-frontendLanguages-overlong3-e0-80-af":     "CB-055",
-	"career-companyName-overlong4-f0-80-80-af":         "CB-055",
-	"career-companyName-end-overlong4-f0-80-80-af":     "CB-055",
-	"project-frontendLanguages-overlong4-f0-80-80-af":  "CB-055",
-	"career-companyName-low-surrogate-ed-bf-bf":        "CB-055",
-	"career-companyName-end-low-surrogate-ed-bf-bf":    "CB-055",
-	"project-frontendLanguages-low-surrogate-ed-bf-bf": "CB-055",
-	"career-companyName-f5-80-80-80":                   "CB-055",
-	"career-companyName-end-f5-80-80-80":               "CB-055",
-	"project-frontendLanguages-f5-80-80-80":            "CB-055",
-	"career-companyName-f7-bf-bf-bf":                   "CB-055",
-	"career-companyName-end-f7-bf-bf-bf":               "CB-055",
-	"project-frontendLanguages-f7-bf-bf-bf":            "CB-055",
-	"career-companyName-f8-88-80-80-80":                "CB-055",
-	"career-companyName-end-f8-88-80-80-80":            "CB-055",
-	"project-frontendLanguages-f8-88-80-80-80":         "CB-055",
-}
-
-// rawStringValue は、本文の中の、鍵 key の文字列の値(並びのときは最初の要素)のバイトを、JSON の書き方のまま返す。
-func rawStringValue(t *testing.T, name string, body []byte, key string) []byte {
-	t.Helper()
-	for _, prefix := range []string{`"` + key + `":"`, `"` + key + `":["`} {
-		i := bytes.Index(body, []byte(prefix))
-		if i < 0 {
-			continue
-		}
-		rest := body[i+len(prefix):]
-		j := bytes.IndexByte(rest, '"')
-		if j < 0 || bytes.IndexByte(rest[:j], '\\') >= 0 {
-			t.Fatalf("本文 %s の鍵 %s の値を、エスケープの無い文字列として取り出せない", name, key)
-		}
-		return rest[:j]
-	}
-	t.Fatalf("本文 %s に鍵 %s の文字列が無い", name, key)
-	return nil
-}
-
-// TestDecodeBody_InvalidUTF8 は、Java 版に送って testdata/utf8.json に控えたすべての本文で、Go 版が、UTF-8 として
-// 誤ったバイトを1バイトずつ U+FFFD に置き換えた値を読み、Java 版と違う答えになる本文が、テストの中の表と合うことを確かめる。
-func TestDecodeBody_InvalidUTF8(t *testing.T) {
-	techColumns := loadTechColumns(t, loadBodyJSON(t))
-	cases := loadUTF8JSON(t)
-	seen := map[string]bool{}
-	for _, c := range cases {
-		seen[c.Name] = true
-		body := c.bytes(t)
-		goRes := decodeFor(t, c.Endpoint, body)
-		if goRes.state != bodyRead {
-			t.Errorf("本文 %s を、Go 版は読めなかった", c.Name)
-			continue
-		}
-
-		// 誤ったバイトを1バイトずつ U+FFFD に置き換えた値を、送った本文のバイトから作る
-		var got any
-		var raw []byte
-		switch c.Endpoint {
-		case endpointCreateCareer:
-			got, raw = goRes.view["companyName"], rawStringValue(t, c.Name, body, "companyName")
-		case endpointCreateProject:
-			list, _ := goRes.view["frontendLanguages"].([]any)
-			if len(list) != 1 {
-				t.Errorf("本文 %s: Go 版が読んだ frontendLanguages %v の要素が1つでない", c.Name, list)
-				continue
-			}
-			got, raw = list[0], rawStringValue(t, c.Name, body, "frontendLanguages")
-		default:
-			t.Fatalf("本文 %s の経路 %s は、控えの形に無い", c.Name, c.Endpoint)
-		}
-		var want strings.Builder
-		for _, r := range string(raw) {
-			want.WriteRune(r)
-		}
-		if got != want.String() {
-			t.Errorf("本文 %s: Go 版が読んだ値 %q が、誤ったバイトを U+FFFD に置き換えた値 %q でない", c.Name, got, want.String())
-		}
-		// 送った本文は U+FFFD そのものを含まないので、置き換えた値が U+FFFD を含むのは、誤ったバイトを含む本文だけである。
-		// これにより、置き換えた値を作る手順が、誤ったバイトを置き換えずに素通ししていないことを確かめる
-		if utf8.ValidString(string(raw)) && strings.Contains(string(raw), "�") {
-			t.Fatalf("本文 %s の値が U+FFFD そのものを含む", c.Name)
-		}
-		if strings.ContainsRune(want.String(), utf8.RuneError) == utf8.Valid(raw) {
-			t.Errorf("本文 %s: UTF-8 として正しいかと、置き換えた値が U+FFFD を含むかが合わない", c.Name)
-		}
-
-		checkBodyAgainstJava(t, c.Name, goRes, javaResult(t, c, techColumns), utf8Diffs,
-			screenBody(body, requestTypeOf(t, c.Endpoint)))
-	}
-	for name := range utf8Diffs {
-		if !seen[name] {
-			t.Errorf("表の本文 %s が、正解のファイルに無い", name)
+		// 画面は、resumeId に、答えに返った小文字の形の ID か、空の文字列か null を入れるか、鍵を入れない
+		screen := tt.input == resumeIDAbsent ||
+			screenValue(reflect.TypeFor[jsonResumeID](), json.RawMessage(tt.input))
+		if tt.cb != "" && screen {
+			t.Errorf("書き方 %s は画面が送る書き方なのに、%s がある", tt.input, tt.cb)
 		}
 	}
 }
 
 // TestDecodeBody_DiffTableInChangedBehaviors は、本文の読み手のテストの中の表の番号が、変えた動きの一覧にあることを確かめる。
 func TestDecodeBody_DiffTableInChangedBehaviors(t *testing.T) {
-	t.Run("型の違う値を入れた本文", func(t *testing.T) { checkDiffTableInChangedBehaviors(t, bodyDiffs) })
-	t.Run("経歴書の作成の resumeId", func(t *testing.T) { checkDiffTableInChangedBehaviors(t, resumeIDDiffs) })
-	t.Run("UTF-8 として誤ったバイト", func(t *testing.T) { checkDiffTableInChangedBehaviors(t, utf8Diffs) })
+	t.Run("型の違う値を入れた本文", func(t *testing.T) {
+		table := map[string]string{}
+		for _, tt := range bodyTests {
+			if tt.cb != "" {
+				table[tt.name] = tt.cb
+			}
+		}
+		checkDiffTableInChangedBehaviors(t, table)
+	})
+	t.Run("経歴書の作成の resumeId", func(t *testing.T) {
+		table := map[string]string{}
+		for _, tt := range resumeIDTests {
+			if tt.cb != "" {
+				table[tt.input] = tt.cb
+			}
+		}
+		checkDiffTableInChangedBehaviors(t, table)
+	})
+	t.Run("UTF-8 として誤ったバイト", func(t *testing.T) {
+		table := map[string]string{}
+		for _, tt := range utf8Tests {
+			if tt.cb != "" {
+				table[tt.name] = tt.cb
+			}
+		}
+		checkDiffTableInChangedBehaviors(t, table)
+	})
 }
 
 // TestDecodeBody_WholeBody は、本文の全体が null のときに、すべての欄の値が無いことにし、本文の全体が並び、文字列、数、

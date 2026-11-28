@@ -3,21 +3,9 @@ package resume
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 	"regexp"
 	"testing"
 )
-
-// datesCase は、testdata/dates.json の1つの書き方と、Java 版の答えである。
-type datesCase struct {
-	Input  string `json:"input"`
-	Status int    `json:"status"`
-	Value  string `json:"value"`
-	Body   struct {
-		Errors  map[string][]string `json:"errors"`
-		Message string              `json:"message"`
-	} `json:"body"`
-}
 
 // dateState は、1つの書き方を読んだ結果の種類である。
 type dateState int
@@ -25,9 +13,9 @@ type dateState int
 const (
 	// dateRead は、値を読めたことである。
 	dateRead dateState = iota
-	// dateAbsent は、値が無いことである。Java 版は入力必須の文言で断る。
+	// dateAbsent は、値が無いことである。入力の検査が入力必須の文言で断る。
 	dateAbsent
-	// dateUnreadable は、値を読めないことである。Java 版は 400 と空の errors で断る。
+	// dateUnreadable は、値を読めないことである。400 と空の errors で断る。
 	dateUnreadable
 )
 
@@ -43,7 +31,7 @@ func (s dateState) String() string {
 	return fmt.Sprintf("dateState(%d)", int(s))
 }
 
-// dateResult は、1つの書き方の答えである。Java 版の答えと Go 版の答えを、この形にそろえて比べる。
+// dateResult は、1つの書き方の答えである。
 type dateResult struct {
 	state dateState
 	// value は、範囲の中の値を読めたときの値である。
@@ -62,33 +50,7 @@ func (r dateResult) String() string {
 	return "読めた " + r.value
 }
 
-// resultFromJava は、Java 版の答えを、dateResult に直す。
-// invalid と required は、その欄の範囲の外の文言と、入力必須の文言である。
-func resultFromJava(t *testing.T, c datesCase, invalid, required string) dateResult {
-	t.Helper()
-	switch {
-	case c.Status == 200 || c.Status == 201:
-		return dateResult{state: dateRead, value: c.Value}
-	case c.Status != 400 || c.Body.Message != MessageInvalidInput:
-		t.Fatalf("書き方 %s の Java 版の答え %d %q は、控えの形に無い", c.Input, c.Status, c.Body.Message)
-	case len(c.Body.Errors) == 0:
-		return dateResult{state: dateUnreadable}
-	}
-	msgs := c.Body.Errors["date"]
-	if len(c.Body.Errors) != 1 || len(msgs) != 1 {
-		t.Fatalf("書き方 %s の Java 版の errors %v は、控えの形に無い", c.Input, c.Body.Errors)
-	}
-	switch msgs[0] {
-	case required:
-		return dateResult{state: dateAbsent}
-	case invalid:
-		return dateResult{state: dateRead, outOfRange: true}
-	}
-	t.Fatalf("書き方 %s の Java 版の文言 %q は、控えの形に無い", c.Input, msgs[0])
-	return dateResult{}
-}
-
-// resultFromGo は、Go 版の読み方の結果を、dateResult に直す。
+// resultFromGo は、読み方の結果を、dateResult に直す。
 func resultFromGo(err error, present bool, year int, value string) dateResult {
 	switch {
 	case err != nil:
@@ -96,7 +58,7 @@ func resultFromGo(err error, present bool, year int, value string) dateResult {
 	case !present:
 		return dateResult{state: dateAbsent}
 	case year < 1900 || year > 2100:
-		// Java 版と Go 版の入力の検査は、1900年から2100年までを受ける
+		// 入力の検査は、1900年から2100年までを受ける
 		return dateResult{state: dateRead, outOfRange: true}
 	}
 	return dateResult{state: dateRead, value: value}
@@ -110,139 +72,213 @@ func formatDate(d Date) string {
 	return fmt.Sprintf("%04d-%02d-%02d", d.Year, int(d.Month), d.Day)
 }
 
-// yearMonthDiffs は、年月の書き方のうち、Go 版の答えが Java 版と違う書き方と、違いを載せた一覧の番号である。
-var yearMonthDiffs = map[string]string{
-	`"+12024-01"`:   "CB-053",
-	`"0000-01"`:     "CB-053",
-	`" 2024-01 "`:   "CB-053",
-	`"\t2024-01\n"`: "CB-053",
-	`"2024-01 "`:    "CB-053",
-	`"  "`:          "CB-053",
-	`[2024,1]`:      "CB-053",
-	`[1899,12]`:     "CB-053",
-	`[2101,1]`:      "CB-053",
-	`[]`:            "CB-053",
-}
-
-// dateDiffs は、日付の書き方のうち、Go 版の答えが Java 版と違う書き方と、違いを載せた一覧の番号である。
-var dateDiffs = map[string]string{
-	`" 2024-01-15 "`:                  "CB-053",
-	`"\t2024-01-15\n"`:                "CB-053",
-	`"2024-01-15T10:00:00"`:           "CB-053",
-	`"2024-01-15T10:00"`:              "CB-053",
-	`"2024-01-15T10:00:00.123456789"`: "CB-053",
-	`"2024-01-15T10:00:00Z"`:          "CB-053",
-	`"-2024-01-15"`:                   "CB-053",
-	`"+12024-01-15"`:                  "CB-053",
-	`"  "`:                            "CB-053",
-	`[2024,1,15]`:                     "CB-053",
-	`[1899,12,31]`:                    "CB-053",
-	`[]`:                              "CB-053",
-	`19737`:                           "CB-053",
-	`0`:                               "CB-053",
-	`-1`:                              "CB-053",
-	`-25567`:                          "CB-053",
-	`73049`:                           "CB-053",
-	`73050`:                           "CB-053",
-}
-
 // 画面が送る書き方は、年月の入力欄と日付の入力欄が送る形の文字列と、空の文字列と null である。
 var (
 	screenYearMonth = regexp.MustCompile(`^(?:"[0-9]{4}-[0-9]{2}"|""|null)$`)
 	screenDate      = regexp.MustCompile(`^(?:"[0-9]{4}-[0-9]{2}-[0-9]{2}"|""|null)$`)
 )
 
-func loadDatesCases(t *testing.T) (yearMonth, date []datesCase) {
-	t.Helper()
-	b, err := os.ReadFile("testdata/dates.json")
-	if err != nil {
-		t.Fatal(err)
-	}
-	var data struct {
-		YearMonth []datesCase `json:"yearMonth"`
-		Date      []datesCase `json:"date"`
-	}
-	if err := json.Unmarshal(b, &data); err != nil {
-		t.Fatal(err)
-	}
-	if len(data.YearMonth) == 0 || len(data.Date) == 0 {
-		t.Fatalf("控えの書き方が無い: 年月 %d 件、日付 %d 件", len(data.YearMonth), len(data.Date))
-	}
-	return data.YearMonth, data.Date
+// dateTest は、年月か日付の1つの書き方と、その答えである。
+// cb は、Java 版と答えが違い、変えた動きの一覧に載せた番号である。
+type dateTest struct {
+	cb, input, want string
 }
 
-// checkAgainstJava は、1つの書き方の Go 版の答えを、Java 版の答えとテストの中の表と照らす。
-// screen は、画面が送る書き方かどうかである。screenDiff は、画面が送る書き方のうち、表に載せてよい書き方である。
-func checkAgainstJava(t *testing.T, input string, goRes, javaRes dateResult, diffs map[string]string, screen bool, screenDiff map[string]bool) {
+// yearMonthTests は、年月の書き方と答えである。年月は time.Parse の "2006-01" の形の文字列だけを読む。
+var yearMonthTests = []dateTest{
+	{"", "\"2024-01\"", "読めた 2024-01"},
+	{"", "\"2024-1\"", "読めない"},
+	{"", "\"2024-001\"", "読めない"},
+	{"", "\"24-01\"", "読めない"},
+	{"", "\"02024-01\"", "読めない"},
+	{"", "\"+2024-01\"", "読めない"},
+	{"", "\"-2024-01\"", "読めない"},
+	{"CB-053", "\"+12024-01\"", "読めない"},
+	{"", "\"12024-01\"", "読めない"},
+	{"", "\"9999-12\"", "読めたが範囲の外"},
+	{"CB-053", "\"0000-01\"", "読めたが範囲の外"},
+	{"", "\"2024/01\"", "読めない"},
+	{"", "\"202401\"", "読めない"},
+	{"", "\"2024-01-15\"", "読めない"},
+	{"", "\"2024-01-15T00:00:00\"", "読めない"},
+	{"", "\"2024-01T00:00\"", "読めない"},
+	{"", "\"2024-01+09:00\"", "読めない"},
+	{"", "\"2024-01Z\"", "読めない"},
+	{"", "\"2024-13\"", "読めない"},
+	{"", "\"2024-00\"", "読めない"},
+	{"", "\"1899-12\"", "読めたが範囲の外"},
+	{"", "\"1900-01\"", "読めた 1900-01"},
+	{"", "\"2100-12\"", "読めた 2100-12"},
+	{"", "\"2101-01\"", "読めたが範囲の外"},
+	{"CB-053", "\" 2024-01 \"", "読めない"},
+	{"CB-053", "\"\\t2024-01\\n\"", "読めない"},
+	{"", "\"\u30002024-01\"", "読めない"},
+	{"CB-053", "\"2024-01 \"", "読めない"},
+	{"", "\"2024- 01\"", "読めない"},
+	{"", "\"２０２４-０１\"", "読めない"},
+	{"", "\"2024-1-1\"", "読めない"},
+	{"", "\"\"", "値が無い"},
+	{"CB-053", "\"  \"", "読めない"},
+	{"", "\"null\"", "読めない"},
+	{"", "null", "値が無い"},
+	{"CB-053", "[2024,1]", "読めない"},
+	{"", "[2024,13]", "読めない"},
+	{"CB-053", "[1899,12]", "読めない"},
+	{"CB-053", "[2101,1]", "読めない"},
+	{"", "[2024]", "読めない"},
+	{"", "[2024,1,1]", "読めない"},
+	{"CB-053", "[]", "読めない"},
+	{"", "[\"2024\",\"1\"]", "読めない"},
+	{"", "[\"2024\",1]", "読めない"},
+	{"", "[\" 2024 \",1]", "読めない"},
+	{"", "[2024.0,1]", "読めない"},
+	{"", "[2024,1.5]", "読めない"},
+	{"", "[2024,null]", "読めない"},
+	{"", "[null,1]", "読めない"},
+	{"", "[[2024],1]", "読めない"},
+	{"", "202401", "読めない"},
+	{"", "2024", "読めない"},
+	{"", "0", "読めない"},
+	{"", "-1", "読めない"},
+	{"", "1.5", "読めない"},
+	{"", "true", "読めない"},
+	{"", "false", "読めない"},
+	{"", "{}", "読めない"},
+	{"", "{\"year\":2024,\"month\":1}", "読めない"},
+	{"", "\"Invalid Date\"", "読めない"},
+}
+
+// dateTests は、日付の書き方と答えである。日付は time.Parse の "2006-01-02" の形の文字列だけを読む。
+var dateTests = []dateTest{
+	{"", "\"2024-01-15\"", "読めた 2024-01-15"},
+	{"CB-053", "\" 2024-01-15 \"", "読めない"},
+	{"CB-053", "\"\\t2024-01-15\\n\"", "読めない"},
+	{"", "\"\u30002024-01-15\"", "読めない"},
+	{"", "\"2024-1-15\"", "読めない"},
+	{"", "\"2024-01-5\"", "読めない"},
+	{"", "\"2024/01/15\"", "読めない"},
+	{"", "\"20240115\"", "読めない"},
+	{"", "\"2024-001\"", "読めない"},
+	{"", "\"2024-W03-1\"", "読めない"},
+	{"", "\"2024-02-29\"", "読めた 2024-02-29"},
+	{"", "\"2023-02-29\"", "読めない"},
+	{"", "\"2024-02-30\"", "読めない"},
+	{"", "\"2024-04-31\"", "読めない"},
+	{"", "\"2024-13-01\"", "読めない"},
+	{"", "\"2024-00-10\"", "読めない"},
+	{"", "\"2024-01-00\"", "読めない"},
+	{"CB-053", "\"2024-01-15T10:00:00\"", "読めない"},
+	{"CB-053", "\"2024-01-15T10:00\"", "読めない"},
+	{"", "\"2024-01-15T10\"", "読めない"},
+	{"", "\"2024-01-15T\"", "読めない"},
+	{"", "\"2024-01-15T25:00\"", "読めない"},
+	{"CB-053", "\"2024-01-15T10:00:00.123456789\"", "読めない"},
+	{"", "\"2024-01-15T10:00:00.1234567891\"", "読めない"},
+	{"CB-053", "\"2024-01-15T10:00:00Z\"", "読めない"},
+	{"", "\"2024-01-15T10:00:00+09:00\"", "読めない"},
+	{"", "\"2024-01-15+09:00\"", "読めない"},
+	{"", "\"2024-01-15Z\"", "読めない"},
+	{"", "\"2024-01-15t10:00\"", "読めない"},
+	{"", "\"2024-01-15 10:00:00\"", "読めない"},
+	{"", "\"2024-01\"", "読めない"},
+	{"", "\"+2024-01-15\"", "読めない"},
+	{"CB-053", "\"-2024-01-15\"", "読めない"},
+	{"CB-053", "\"+12024-01-15\"", "読めない"},
+	{"", "\"10000-01-01\"", "読めない"},
+	{"", "\"1899-12-31\"", "読めたが範囲の外"},
+	{"", "\"1900-01-01\"", "読めた 1900-01-01"},
+	{"", "\"2100-12-31\"", "読めた 2100-12-31"},
+	{"", "\"2101-01-01\"", "読めたが範囲の外"},
+	{"", "\"２０２４-01-15\"", "読めない"},
+	{"", "\"\"", "値が無い"},
+	{"CB-053", "\"  \"", "読めない"},
+	{"", "\"null\"", "読めない"},
+	{"", "null", "値が無い"},
+	{"CB-053", "[2024,1,15]", "読めない"},
+	{"", "[2024,2,30]", "読めない"},
+	{"CB-053", "[1899,12,31]", "読めない"},
+	{"", "[2024,1]", "読めない"},
+	{"", "[2024,1,15,0]", "読めない"},
+	{"CB-053", "[]", "読めない"},
+	{"", "[\"2024\",\"1\",\"15\"]", "読めない"},
+	{"", "[2024,1,15.0]", "読めない"},
+	{"CB-053", "19737", "読めない"},
+	{"CB-053", "0", "読めない"},
+	{"CB-053", "-1", "読めない"},
+	{"CB-053", "-25567", "読めない"},
+	{"CB-053", "73049", "読めない"},
+	{"CB-053", "73050", "読めない"},
+	{"", "\"19737\"", "読めない"},
+	{"", "1.5", "読めない"},
+	{"", "19737.0", "読めない"},
+	{"", "1e3", "読めない"},
+	{"", "true", "読めない"},
+	{"", "{}", "読めない"},
+	{"", "\"0000-01-15\"", "読めたが範囲の外"},
+}
+
+// checkDateTests は、表のすべての書き方で、read の答えが表の答えと同じになることと、
+// cb のある書き方が、画面が送る書き方でないことを確かめる。screenDiff は、画面が送る書き方のうち、cb があってよい書き方である。
+func checkDateTests(t *testing.T, tests []dateTest, read func(string) dateResult, screen *regexp.Regexp, screenDiff map[string]bool) {
 	t.Helper()
-	id, inTable := diffs[input]
-	if goRes == javaRes {
-		if inTable {
-			t.Errorf("書き方 %s: Go 版の答えは Java 版と同じ %s なのに、表に %s がある", input, goRes, id)
+	for _, tt := range tests {
+		if got := read(tt.input).String(); got != tt.want {
+			t.Errorf("書き方 %s: 答え %s, want %s", tt.input, got, tt.want)
 		}
-		return
-	}
-	if !inTable {
-		t.Errorf("書き方 %s: Go 版の答え %s が Java 版の答え %s と違うのに、表に無い", input, goRes, javaRes)
-		return
-	}
-	if screen && !screenDiff[input] {
-		t.Errorf("書き方 %s は画面が送る書き方なのに、Go 版の答え %s が Java 版の答え %s と違う", input, goRes, javaRes)
+		if tt.cb != "" && screen.MatchString(tt.input) && !screenDiff[tt.input] {
+			t.Errorf("書き方 %s は画面が送る書き方なのに、%s がある", tt.input, tt.cb)
+		}
 	}
 }
 
-// TestDates_MatchesJava は、Java 版に送って testdata/dates.json に控えたすべての年月と日付の書き方で、
-// 画面が送る書き方は Java 版と同じ答えになり、画面が送らない書き方で Java 版と違う答えになる書き方が、
-// テストの中の表と合うことを確かめる。
-func TestDates_MatchesJava(t *testing.T) {
-	yearMonthCases, dateCases := loadDatesCases(t)
-
+// TestDates は、年月と日付の書き方の答えが表と同じになることと、
+// Java 版と答えが違う書き方が、画面が送る書き方でないことを確かめる。
+func TestDates(t *testing.T) {
 	t.Run("年月", func(t *testing.T) {
-		seen := map[string]bool{}
-		for _, c := range yearMonthCases {
-			seen[c.Input] = true
-			javaRes := resultFromJava(t, c, MessageCertificationDateInvalid, MessageCertificationDateRequired)
+		checkDateTests(t, yearMonthTests, func(input string) dateResult {
 			var v jsonYearMonth
-			err := json.Unmarshal([]byte(c.Input), &v)
-			goRes := resultFromGo(err, v.Present, v.Value.Year, formatYearMonth(v.Value))
+			err := json.Unmarshal([]byte(input), &v)
+			return resultFromGo(err, v.Present, v.Value.Year, formatYearMonth(v.Value))
+		}, screenYearMonth, map[string]bool{
 			// 年が 0000 の年月は、Java 版が読めない値として断り、Go 版が読んで範囲の外として断る(CB-053)
-			checkAgainstJava(t, c.Input, goRes, javaRes, yearMonthDiffs,
-				screenYearMonth.MatchString(c.Input), map[string]bool{`"0000-01"`: true})
-		}
+			`"0000-01"`: true,
+		})
 		// 画面が年月の入力欄から送る Invalid Date は、Java 版と同じく読めない
-		if !seen[`"Invalid Date"`] {
-			t.Error(`正解のファイルに年月の "Invalid Date" が無い`)
-		}
-		if _, ok := yearMonthDiffs[`"Invalid Date"`]; ok {
-			t.Error(`年月の "Invalid Date" が表にある`)
-		}
-		for input := range yearMonthDiffs {
-			if !seen[input] {
-				t.Errorf("表の書き方 %s が、正解のファイルの年月に無い", input)
+		found := false
+		for _, tt := range yearMonthTests {
+			if tt.input == `"Invalid Date"` {
+				found = true
+				if tt.cb != "" || tt.want != "読めない" {
+					t.Errorf(`年月の "Invalid Date" の答えが %s で、番号が %q である`, tt.want, tt.cb)
+				}
 			}
+		}
+		if !found {
+			t.Error(`表に年月の "Invalid Date" が無い`)
 		}
 	})
-
 	t.Run("日付", func(t *testing.T) {
-		seen := map[string]bool{}
-		for _, c := range dateCases {
-			seen[c.Input] = true
-			javaRes := resultFromJava(t, c, MessageDateInvalid, MessageDateRequired)
+		checkDateTests(t, dateTests, func(input string) dateResult {
 			var v jsonDate
-			err := json.Unmarshal([]byte(c.Input), &v)
-			goRes := resultFromGo(err, v.Present, v.Value.Year, formatDate(v.Value))
-			checkAgainstJava(t, c.Input, goRes, javaRes, dateDiffs, screenDate.MatchString(c.Input), nil)
-		}
-		for input := range dateDiffs {
-			if !seen[input] {
-				t.Errorf("表の書き方 %s が、正解のファイルの日付に無い", input)
-			}
-		}
+			err := json.Unmarshal([]byte(input), &v)
+			return resultFromGo(err, v.Present, v.Value.Year, formatDate(v.Value))
+		}, screenDate, nil)
 	})
 }
 
-// TestDates_DiffTableInChangedBehaviors は、年月と日付のテストの中の表の番号が、変えた動きの一覧にあることを確かめる。
+// dateDiffTable は、表の書き方のうち cb のある書き方と、その番号である。
+func dateDiffTable(tests []dateTest) map[string]string {
+	table := map[string]string{}
+	for _, tt := range tests {
+		if tt.cb != "" {
+			table[tt.input] = tt.cb
+		}
+	}
+	return table
+}
+
+// TestDates_DiffTableInChangedBehaviors は、年月と日付の表の番号が、変えた動きの一覧にあることを確かめる。
 func TestDates_DiffTableInChangedBehaviors(t *testing.T) {
-	t.Run("年月", func(t *testing.T) { checkDiffTableInChangedBehaviors(t, yearMonthDiffs) })
-	t.Run("日付", func(t *testing.T) { checkDiffTableInChangedBehaviors(t, dateDiffs) })
+	t.Run("年月", func(t *testing.T) { checkDiffTableInChangedBehaviors(t, dateDiffTable(yearMonthTests)) })
+	t.Run("日付", func(t *testing.T) { checkDiffTableInChangedBehaviors(t, dateDiffTable(dateTests)) })
 }
