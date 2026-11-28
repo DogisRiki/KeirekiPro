@@ -174,35 +174,31 @@ func TestRegistration_FindByEmailMax5(t *testing.T) {
 	}
 }
 
-// TestRegistration_FindByEmailCreatedAtMissing は、作った日時の無い記録を、1件だけなら返し、
-// 2件以上を並べるときは、Java 版の並べ替えと同じく誤りにすることを確かめる。開発環境の Java 版で確かめた結果である。
+// TestRegistration_FindByEmailCreatedAtMissing は、作った日時の無い記録を、最も古い記録として並べることを確かめる。
+// 作った日時の無い記録は、どの版も書かない(変えた動きの一覧の CB-132)。
 func TestRegistration_FindByEmailCreatedAtMissing(t *testing.T) {
 	ctx := t.Context()
 	s, _ := newRedisService(t)
 	email := uniqueEmail()
 	noDate := pendingRegistration{ID: uuid.New(), Email: email, PasswordHash: "h", Username: "u"}
-	if err := s.savePendingRegistration(ctx, noDate, time.Minute); err != nil {
-		t.Fatal(err)
+	dated := pendingRegistration{ID: uuid.New(), Email: email, PasswordHash: "h", Username: "u", CreatedAt: time.Date(2026, 11, 11, 7, 8, 40, 0, time.UTC)}
+	for _, r := range []pendingRegistration{noDate, dated} {
+		if err := s.savePendingRegistration(ctx, r, time.Minute); err != nil {
+			t.Fatal(err)
+		}
 	}
 	got, err := s.findPendingRegistrationsByEmail(ctx, email, maxPendingRegistrations)
-	if err != nil || len(got) != 1 || got[0] != noDate {
-		t.Errorf("1件の結果 = %+v, %v", got, err)
-	}
-	dated := pendingRegistration{ID: uuid.New(), Email: email, PasswordHash: "h", Username: "u", CreatedAt: time.Now()}
-	if err := s.savePendingRegistration(ctx, dated, time.Minute); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := s.findPendingRegistrationsByEmail(ctx, email, maxPendingRegistrations); err == nil {
-		t.Error("作った日時の無い記録を並べて誤りにならない")
+	if err != nil || !slices.Equal(got, []pendingRegistration{dated, noDate}) {
+		t.Errorf("結果 = %+v, %v, want 作った日時のある記録、無い記録の順", got, err)
 	}
 }
 
-// TestRegistration_FindByEmailBadMember は、集合の要素が UUID の JSON の文字列でないとき、
-// Java 版と同じく誤りにすることを確かめる。
-func TestRegistration_FindByEmailBadMember(t *testing.T) {
+// TestRegistration_FindByEmailMembers は、集合の要素を、JSON の文字列にした形とそのままの形のどちらでも UUID として読み、
+// UUID として読めない要素を誤りにすることを確かめる。
+func TestRegistration_FindByEmailMembers(t *testing.T) {
 	ctx := t.Context()
 	s, client := newRedisService(t)
-	for _, member := range []string{`"zz"`, `123`, `abc`, `"` + uuid.NewString() + `0"`, `"{` + uuid.NewString() + `}"`} {
+	for _, member := range []string{`"zz"`, `123`, `abc`, `"` + uuid.NewString() + `0"`, `"` + uuid.NewString()} {
 		email := uniqueEmail()
 		if err := client.SAdd(ctx, "pending-registration:email:"+email, member).Err(); err != nil {
 			t.Fatal(err)
@@ -211,18 +207,42 @@ func TestRegistration_FindByEmailBadMember(t *testing.T) {
 			t.Errorf("要素 %s で誤りにならない", member)
 		}
 	}
-	// 大文字の UUID は読み、記録は小文字のキーで探す
-	r := pendingRegistration{ID: uuid.New(), Email: uniqueEmail(), PasswordHash: "h", Username: "u", CreatedAt: time.Now().UTC()}
-	if err := client.Set(ctx, "pending-registration:"+r.ID.String(), jsonQuoted(t, `{"id":"`+r.ID.String()+`","email":"`+r.Email+`","passwordHash":"h","username":"u","createdAt":"`+formatJavaInstant(r.CreatedAt)+`"}`), time.Minute).Err(); err != nil {
+	// どの形の要素でも読み、記録は小文字のキーで探す。そのままの形と、大文字、ハイフンの無い形、波括弧で囲んだ形は、
+	// どの版も書かない(変えた動きの一覧の CB-132)
+	for _, form := range []func(string) string{
+		func(id string) string { return `"` + id + `"` },
+		func(id string) string { return id },
+		func(id string) string { return `"` + strings.ToUpper(id) + `"` },
+		func(id string) string { return `"` + strings.ReplaceAll(id, "-", "") + `"` },
+		func(id string) string { return `"{` + id + `}"` },
+	} {
+		r := pendingRegistration{ID: uuid.New(), Email: uniqueEmail(), PasswordHash: "h", Username: "u", CreatedAt: time.Now().UTC()}
+		if err := s.savePendingRegistration(ctx, r, time.Minute); err != nil {
+			t.Fatal(err)
+		}
+		emailKey := "pending-registration:email:" + r.Email
+		if err := client.Del(ctx, emailKey).Err(); err != nil {
+			t.Fatal(err)
+		}
+		member := form(r.ID.String())
+		if err := client.SAdd(ctx, emailKey, member).Err(); err != nil {
+			t.Fatal(err)
+		}
+		got, err := s.findPendingRegistrationsByEmail(ctx, r.Email, maxPendingRegistrations)
+		if err != nil || len(got) != 1 || got[0].ID != r.ID {
+			t.Errorf("要素 %s の結果 = %+v, %v", member, got, err)
+		}
+	}
+	// 記録の無い要素は、置かれた形のまま集合から除く
+	email := uniqueEmail()
+	if err := client.SAdd(ctx, "pending-registration:email:"+email, uuid.NewString()).Err(); err != nil {
 		t.Fatal(err)
 	}
-	upper := `"` + strings.ToUpper(r.ID.String()) + `"`
-	if err := client.SAdd(ctx, "pending-registration:email:"+r.Email, upper).Err(); err != nil {
-		t.Fatal(err)
+	if got, err := s.findPendingRegistrationsByEmail(ctx, email, maxPendingRegistrations); err != nil || len(got) != 0 {
+		t.Errorf("記録の無い要素の結果 = %+v, %v, want 空", got, err)
 	}
-	got, err := s.findPendingRegistrationsByEmail(ctx, r.Email, maxPendingRegistrations)
-	if err != nil || len(got) != 1 || got[0].ID != r.ID {
-		t.Errorf("大文字の要素の結果 = %+v, %v", got, err)
+	if n := len(setMembers(t, client, "pending-registration:email:"+email)); n != 0 {
+		t.Errorf("集合の要素の数 = %d, want 0", n)
 	}
 }
 
@@ -263,6 +283,7 @@ func TestRegistration_Extend24h(t *testing.T) {
 }
 
 // TestRegistration_Delete は、記録を消し、メールアドレスの集合から記録の ID だけを除くことを確かめる。
+// 集合の要素は、JSON の文字列にした形と、そのままの形の、どちらも除く。
 func TestRegistration_Delete(t *testing.T) {
 	ctx := t.Context()
 	s, client := newRedisService(t)
@@ -273,6 +294,9 @@ func TestRegistration_Delete(t *testing.T) {
 		if err := s.savePendingRegistration(ctx, r, time.Minute); err != nil {
 			t.Fatal(err)
 		}
+	}
+	if err := client.SAdd(ctx, "pending-registration:email:"+email, a.ID.String()).Err(); err != nil {
+		t.Fatal(err)
 	}
 	if err := s.deletePendingRegistration(ctx, a); err != nil {
 		t.Fatalf("deletePendingRegistration: %v", err)
@@ -285,9 +309,9 @@ func TestRegistration_Delete(t *testing.T) {
 	}
 }
 
-// registrationCases は、開発環境の Java 版の Redis に、記録の中の JSON inner を JSON の文字列にして置き、
-// 同じメールアドレスでログインを求めて、記録を読めたか(読めないときは集合から ID が除かれる)を調べた結果である。
-// __ID__ は記録のキーの ID に置き換える。want が nil のときは、Java 版が読めず、無い記録として扱った。
+// registrationCases は、記録の中の JSON inner を JSON の文字列にして置いたときに、Go 版が読む記録である。
+// __ID__ は記録のキーの ID に置き換える。want が nil のときは、encoding/json で記録として読めないか、ID が無いので、
+// 無い記録として扱う。どの版も書くのは最初の2つの形だけで、ほかは、どの版も書かない形である(変えた動きの一覧の CB-132)。
 var registrationCases = []struct {
 	name, inner string
 	want        *pendingRegistration
@@ -296,36 +320,33 @@ var registrationCases = []struct {
 	{"秒より細かい部分が無い", `{"id":"__ID__","createdAt":"2026-11-11T07:08:40Z"}`, &pendingRegistration{CreatedAt: time.Date(2026, 11, 11, 7, 8, 40, 0, time.UTC)}},
 	{"秒より細かい部分が1桁", `{"id":"__ID__","createdAt":"2026-11-11T07:08:40.1Z"}`, &pendingRegistration{CreatedAt: time.Date(2026, 11, 11, 7, 8, 40, 100000000, time.UTC)}},
 	{"時差の付いた日時", `{"id":"__ID__","createdAt":"2026-11-11T16:08:40+09:00"}`, &pendingRegistration{CreatedAt: time.Date(2026, 11, 11, 7, 8, 40, 0, time.UTC)}},
-	{"小文字の t と z", `{"id":"__ID__","createdAt":"2026-11-11t07:08:40z"}`, &pendingRegistration{CreatedAt: time.Date(2026, 11, 11, 7, 8, 40, 0, time.UTC)}},
-	{"秒の数", `{"id":"__ID__","createdAt":1762844920}`, &pendingRegistration{CreatedAt: time.Unix(1762844920, 0).UTC()}},
-	{"小数の秒の数", `{"id":"__ID__","createdAt":1762844920.5}`, &pendingRegistration{CreatedAt: time.Unix(1762844920, 500000000).UTC()}},
-	{"秒の数の文字列", `{"id":"__ID__","createdAt":"1762844920"}`, &pendingRegistration{CreatedAt: time.Unix(1762844920, 0).UTC()}},
-	{"小数の秒の数の文字列", `{"id":"__ID__","createdAt":"1762844920.5"}`, &pendingRegistration{CreatedAt: time.Unix(1762844920, 500000000).UTC()}},
 	{"作った日時が null", `{"id":"__ID__","createdAt":null}`, &pendingRegistration{}},
 	{"作った日時が無い", `{"id":"__ID__"}`, &pendingRegistration{}},
-	{"作った日時が空の文字列", `{"id":"__ID__","createdAt":""}`, &pendingRegistration{}},
-	{"作った日時の前に空白", `{"id":"__ID__","createdAt":" 2026-11-11T07:08:40Z"}`, &pendingRegistration{CreatedAt: time.Date(2026, 11, 11, 7, 8, 40, 0, time.UTC)}},
+	{"パスワードのハッシュが null", `{"id":"__ID__","passwordHash":null}`, &pendingRegistration{}},
+	{"知らない項目", `{"id":"__ID__","x":1}`, &pendingRegistration{}},
+	{"小文字の t と z", `{"id":"__ID__","createdAt":"2026-11-11t07:08:40z"}`, nil},
+	{"秒の数", `{"id":"__ID__","createdAt":1762844920}`, nil},
+	{"秒の数の文字列", `{"id":"__ID__","createdAt":"1762844920"}`, nil},
+	{"作った日時が空の文字列", `{"id":"__ID__","createdAt":""}`, nil},
+	{"作った日時の前に空白", `{"id":"__ID__","createdAt":" 2026-11-11T07:08:40Z"}`, nil},
 	{"時差の無い日時", `{"id":"__ID__","createdAt":"2026-11-11T07:08:40"}`, nil},
 	{"日時でない文字列", `{"id":"__ID__","createdAt":"x"}`, nil},
 	{"作った日時が真偽", `{"id":"__ID__","createdAt":true}`, nil},
-	{"作った日時が並び", `{"id":"__ID__","createdAt":[2026,11,11,7,8,40]}`, nil},
-	{"パスワードのハッシュが数", `{"id":"__ID__","passwordHash":5}`, &pendingRegistration{PasswordHash: "5"}},
-	{"パスワードのハッシュが null", `{"id":"__ID__","passwordHash":null}`, &pendingRegistration{}},
+	{"パスワードのハッシュが数", `{"id":"__ID__","passwordHash":5}`, nil},
 	{"パスワードのハッシュがオブジェクト", `{"id":"__ID__","passwordHash":{}}`, nil},
-	{"パスワードのハッシュが並び", `{"id":"__ID__","passwordHash":["h"]}`, nil},
-	{"利用者の名前が数", `{"id":"__ID__","username":12}`, &pendingRegistration{Username: "12"}},
-	{"利用者の名前が真偽", `{"id":"__ID__","username":true}`, &pendingRegistration{Username: "true"}},
-	{"ID が無い", `{"email":"e"}`, &pendingRegistration{ID: uuid.Nil, Email: "e"}},
+	{"利用者の名前が真偽", `{"id":"__ID__","username":true}`, nil},
+	{"ID が無い", `{"email":"e"}`, nil},
+	{"ID が全部 0", `{"id":"00000000-0000-0000-0000-000000000000","email":"e"}`, nil},
 	{"ID が UUID でない", `{"id":"zz"}`, nil},
-	{"知らない項目", `{"id":"__ID__","x":1}`, &pendingRegistration{}},
-	{"あとの文字", `{"id":"__ID__"}}`, &pendingRegistration{}},
+	{"あとの文字", `{"id":"__ID__"}}`, nil},
+	{"中の JSON が null", `null`, nil},
 	{"並び", `[1]`, nil},
 	{"空", ``, nil},
 }
 
-// TestRegistration_ReadsLikeJackson は、記録の中の JSON を、Java 版の Jackson と同じ規則で読むことを、
-// 開発環境の Java 版で確かめた結果と照らして確かめる。
-func TestRegistration_ReadsLikeJackson(t *testing.T) {
+// TestRegistration_ReadsRecord は、記録の中の JSON を encoding/json で読み、読めない記録と ID の無い記録を、
+// 無い記録として扱うことを確かめる。
+func TestRegistration_ReadsRecord(t *testing.T) {
 	ctx := t.Context()
 	s, client := newRedisService(t)
 	for _, tt := range registrationCases {
@@ -346,9 +367,7 @@ func TestRegistration_ReadsLikeJackson(t *testing.T) {
 				return
 			}
 			want := *tt.want
-			if want.ID == uuid.Nil && strings.Contains(tt.inner, "__ID__") {
-				want.ID = id
-			}
+			want.ID = id
 			if !ok || got != want {
 				t.Errorf("記録 = %+v, %v, want %+v", got, ok, want)
 			}
@@ -373,37 +392,44 @@ func TestRegistration_ReadsLikeJackson(t *testing.T) {
 	})
 }
 
-// TestRegistration_ValueForms は、記録の値そのものが JSON の文字列でないときと、中の JSON が null のときに、
-// Java 版と同じく、無い記録とするか誤りにすることを確かめる。
+// TestRegistration_ValueForms は、記録の値を、JSON の文字列にした形(今の書き方)と、そのままの形(書き方を替えたあとの形)の、
+// どちらで置いても読み、どちらの形でもない値を無い記録とし、閉じていない JSON の文字列を誤りにすることを確かめる。
 func TestRegistration_ValueForms(t *testing.T) {
 	ctx := t.Context()
 	s, client := newRedisService(t)
 	cases := []struct {
-		name, value string
-		wantErr     bool
+		name, value     string
+		wantOK, wantErr bool
 	}{
-		{"値が null", `null`, false},
-		{"値がオブジェクト", `{"id":"x"}`, true},
-		{"値が数", `5`, true},
-		{"値が JSON でない", `abc`, true},
-		{"中の JSON が null", `"null"`, true},
+		{"JSON の文字列にした記録", `"{\"id\":\"__ID__\",\"email\":\"__EMAIL__\"}"`, true, false},
+		{"そのままの形の記録", `{"id":"__ID__","email":"__EMAIL__"}`, true, false},
+		{"値が null", `null`, false, false},
+		{"値が数", `5`, false, false},
+		{"値が JSON でない", `abc`, false, false},
+		{"中の JSON が null", `"null"`, false, false},
+		{"値が閉じていない JSON の文字列", `"{`, false, true},
 	}
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
 			id := uuid.New()
-			if err := client.Set(ctx, "pending-registration:"+id.String(), tt.value, time.Minute).Err(); err != nil {
+			email := uniqueEmail()
+			value := strings.NewReplacer("__ID__", id.String(), "__EMAIL__", email).Replace(tt.value)
+			if err := client.Set(ctx, "pending-registration:"+id.String(), value, time.Minute).Err(); err != nil {
 				t.Fatal(err)
 			}
-			_, ok, err := s.findPendingRegistration(ctx, id)
-			if ok || (err != nil) != tt.wantErr {
-				t.Errorf("findPendingRegistration = %v, %v, want 誤り %v", ok, err, tt.wantErr)
+			got, ok, err := s.findPendingRegistration(ctx, id)
+			if ok != tt.wantOK || (err != nil) != tt.wantErr {
+				t.Errorf("findPendingRegistration = %+v, %v, %v, want 読める %v, 誤り %v", got, ok, err, tt.wantOK, tt.wantErr)
 			}
-			email := uniqueEmail()
+			if tt.wantOK && (got.ID != id || got.Email != email) {
+				t.Errorf("記録 = %+v, want ID %s とメールアドレス %s", got, id, email)
+			}
 			if err := client.SAdd(ctx, "pending-registration:email:"+email, `"`+id.String()+`"`).Err(); err != nil {
 				t.Fatal(err)
 			}
-			if _, err := s.findPendingRegistrationsByEmail(ctx, email, maxPendingRegistrations); (err != nil) != tt.wantErr {
-				t.Errorf("findPendingRegistrationsByEmail の誤り = %v, want 誤り %v", err, tt.wantErr)
+			found, err := s.findPendingRegistrationsByEmail(ctx, email, maxPendingRegistrations)
+			if (err != nil) != tt.wantErr || (err == nil && (len(found) == 1) != tt.wantOK) {
+				t.Errorf("findPendingRegistrationsByEmail = %+v, %v, want 読める %v, 誤り %v", found, err, tt.wantOK, tt.wantErr)
 			}
 			if err := s.extendPendingRegistration(ctx, id, time.Minute); (err != nil) != tt.wantErr {
 				t.Errorf("extendPendingRegistration の誤り = %v, want 誤り %v", err, tt.wantErr)

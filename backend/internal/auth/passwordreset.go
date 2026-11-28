@@ -42,7 +42,7 @@ func (s *Service) findPasswordResetUserID(ctx context.Context, token string) (uu
 	if err != nil || !ok {
 		return uuid.Nil, false, err
 	}
-	userID, err := parseJavaUUIDText(text)
+	userID, err := uuid.Parse(text)
 	if err != nil {
 		return uuid.Nil, false, errPasswordResetUserID
 	}
