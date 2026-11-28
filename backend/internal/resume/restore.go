@@ -174,20 +174,18 @@ type restoreBuilder struct {
 
 // text は、空白だけでなく長さが limit 以下であるべき字 s を確かめ、字を返す。
 func (b *restoreBuilder) text(s *string, limit int) string {
-	if s == nil || !auth.NotBlank(*s) || auth.UTF16Len(*s) > limit {
+	if s == nil || !notBlank(*s) || auth.UTF16Len(*s) > limit {
 		b.ok = false
 		return ""
 	}
 	return *s
 }
 
-// resumeName は、経歴書の名前 s を Java 版の ResumeName の決まりで確かめる。Java 版は正規表現 .*[...].* で照らすので、
-// 5つの改行の文字のどれかを含む名前では、使えない文字を断らない。
+// resumeName は、経歴書の名前 s が、空白だけでなく、長さが上限以下で、. で始まらず . で終わらないことを確かめる。
+// 使えない文字は確かめない。以前の版は改行の文字を含む名前に使えない文字を許したので、このアプリが書き出したファイルにも
+// 使えない文字を含む名前があるためである。ファイル名を作るときは、使えない文字を _ にする。
 func (b *restoreBuilder) resumeName(s *string) string {
 	name := b.text(s, resumeNameMaxLength)
-	if strings.ContainsAny(name, resumeNameInvalidChars) && !strings.ContainsAny(name, resumeNameLineTerminators) {
-		b.ok = false
-	}
 	if strings.HasPrefix(name, ".") || strings.HasSuffix(name, ".") {
 		b.ok = false
 	}
@@ -196,7 +194,7 @@ func (b *restoreBuilder) resumeName(s *string) string {
 
 // fullName は、姓と名を Java 版の FullName の決まりで確かめる。両方が無いか空白だけなら、氏名の無い経歴書にする。
 func (b *restoreBuilder) fullName(lastName, firstName *string) (*string, *string) {
-	blank := func(s *string) bool { return s == nil || !auth.NotBlank(*s) }
+	blank := func(s *string) bool { return s == nil || !notBlank(*s) }
 	if blank(lastName) && blank(firstName) {
 		return nil, nil
 	}
@@ -227,7 +225,7 @@ func (b *restoreBuilder) period(start, end jsonYearMonth, active bool) Period {
 
 // link は、リンクが空白だけでなく、https: で始まることを確かめる。
 func (b *restoreBuilder) link(s *string) string {
-	if s == nil || !auth.NotBlank(*s) {
+	if s == nil || !notBlank(*s) {
 		b.ok = false
 		return ""
 	}

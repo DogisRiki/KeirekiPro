@@ -1,10 +1,6 @@
 package resume
 
-import (
-	"strings"
-
-	"github.com/DogisRiki/KeirekiPro/backend/internal/auth"
-)
+import "strings"
 
 // defaultFileName は、名前が空白だけのときと、使えない字と制御の字を直したあとに _ だけが残るときのファイル名である。
 const defaultFileName = "resume"
@@ -29,7 +25,7 @@ func sanitizeFileName(raw string) string {
 		return r
 	}, raw)
 	name = strings.Trim(name, " ")
-	if strings.Trim(name, "_") == "" || !auth.NotBlank(name) {
+	if strings.Trim(name, "_") == "" || !notBlank(name) {
 		return defaultFileName
 	}
 	if runes := []rune(name); len(runes) > maxFileNameRunes {

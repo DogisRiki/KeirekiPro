@@ -105,10 +105,10 @@ func (s *Service) UpdateUserInfo(ctx context.Context, in UpdateInput) error {
 	})
 }
 
-// normalizeUsername は、Java 版の User.changeUsername と同じく、名前の前後から Java の String.strip() が取り除く空白を除き、
+// normalizeUsername は、名前の前後から空白(unicode.IsSpace)を除き、
 // 除いた名前を返す。除いた名前が空か、UTF-16 の単位で50を超えるときは、項目 username の文言を返す。誤りが無ければ文言は空にする。
 func normalizeUsername(name string) (string, string) {
-	stripped := strings.TrimFunc(name, auth.IsJavaWhitespace)
+	stripped := strings.TrimSpace(name)
 	switch {
 	case stripped == "":
 		return "", MessageUsernameRequired
@@ -119,9 +119,9 @@ func normalizeUsername(name string) (string, string) {
 }
 
 // profileImageKey は、Java 版の ProfileImageKeys の PREFIX と fileName と同じく、利用者 id の画像の名前を作る。
-// 拡張子が空か空白だけなら、. も付けない(String.isBlank)。
+// 拡張子が空か空白だけなら、. も付けない。
 func profileImageKey(id uuid.UUID, ext string) string {
-	if strings.TrimFunc(ext, auth.IsJavaWhitespace) == "" {
+	if strings.TrimSpace(ext) == "" {
 		return profileImagePrefix + id.String()
 	}
 	return profileImagePrefix + id.String() + "." + ext

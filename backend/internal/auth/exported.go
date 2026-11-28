@@ -122,11 +122,6 @@ func UTF16Len(s string) int {
 	return utf16Len(s)
 }
 
-// IsJavaWhitespace は、Java の Character.isWhitespace と同じく、r が空白かを返す。
-func IsJavaWhitespace(r rune) bool {
-	return isJavaWhitespace(r)
-}
-
 // PasswordPatternOK は、Java 版のパスワードの形の決まりに s が合うかを返す。
 func PasswordPatternOK(s string) bool {
 	return passwordPatternOK(s)

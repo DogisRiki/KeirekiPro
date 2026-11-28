@@ -111,6 +111,7 @@ func TestRules_Names(t *testing.T) {
 	t.Run("経歴書の名前", func(t *testing.T) {
 		type nameCase = validateCase[string]
 		const field = "resumeName"
+		checkDiffTableInChangedBehaviors(t, map[string]string{"改行の文字を含む名前の使えない文字": "CB-115", "改行しない空白だけの名前": "CB-114"})
 		cases := []nameCase{
 			{name: "漢字と英字", req: "職務経歴書_2024 v1", want: nil},
 			{name: "途中の.", req: "a.b", want: nil},
@@ -119,12 +120,16 @@ func TestRules_Names(t *testing.T) {
 			{name: "先頭の.", req: ".経歴書", want: map[string][]string{field: {MessageResumeNameDotEdge}}},
 			{name: "末尾の.", req: "経歴書.", want: map[string][]string{field: {MessageResumeNameDotEdge}}},
 			{name: "使えない文字と末尾の.", req: "a/b.", want: map[string][]string{field: {MessageResumeNameInvalidChars, MessageResumeNameDotEdge}}},
-			// Java 版の ResumeName は正規表現 .*[...].* で照らすので、5つの改行の文字のどれかを含む名前では、使えない文字を断らない。
-			{name: "改行の文字の後ろの使えない文字と末尾の.", req: "a\u2028/b.", want: map[string][]string{field: {MessageResumeNameDotEdge}}},
+			// 使えない文字は、改行の文字を含む名前でも断る(変えた動きの一覧の CB-115)。
+			{name: "改行の文字の後ろの使えない文字と末尾の.", req: "a\u2028/b.", want: map[string][]string{field: {MessageResumeNameInvalidChars, MessageResumeNameDotEdge}}},
 			{name: "改行の文字に似たタブと使えない文字", req: "a\t/b", want: map[string][]string{field: {MessageResumeNameInvalidChars}}},
 			{name: "改行の文字に似た U+000B と使えない文字", req: "a\v/b", want: map[string][]string{field: {MessageResumeNameInvalidChars}}},
 			{name: "空", req: "", want: map[string][]string{field: {MessageResumeNameRequired}}},
 			{name: "全角の空白だけ", req: fullSpace, want: map[string][]string{field: {MessageResumeNameRequired}}},
+			// 空白だけかは unicode.IsSpace で決める(変えた動きの一覧の CB-114)。
+			{name: "改行しない空白だけ", req: "\u00a0\u2007\u202f", want: map[string][]string{field: {MessageResumeNameRequired}}},
+			{name: "次の行の字だけ", req: "\u0085", want: map[string][]string{field: {MessageResumeNameRequired}}},
+			{name: "情報の区切りの制御の字だけ", req: "\u001c\u001f", want: nil},
 			// 空白だけの名前は、長さが上限を超えても、入力が要ることだけを返す。
 			{name: "上限を超える空白だけ", req: strings.Repeat(" ", resumeNameMaxLength+1), want: map[string][]string{field: {MessageResumeNameRequired}}},
 			{name: "空白だけと使えない文字の無い.", req: halfSpace + "." + halfSpace, want: nil},
@@ -135,8 +140,8 @@ func TestRules_Names(t *testing.T) {
 		}
 		for _, lt := range []string{"\n", "\r", "\u0085", "\u2028", "\u2029"} {
 			cases = append(cases,
-				nameCase{name: "改行の文字の後ろの使えない文字_" + quote(lt), req: "経歴" + lt + "/書", want: nil},
-				nameCase{name: "改行の文字の前の使えない文字_" + quote(lt), req: "経歴/書" + lt, want: nil})
+				nameCase{name: "改行の文字の後ろの使えない文字_" + quote(lt), req: "経歴" + lt + "/書", want: map[string][]string{field: {MessageResumeNameInvalidChars}}},
+				nameCase{name: "改行の文字の前の使えない文字_" + quote(lt), req: "経歴/書" + lt, want: map[string][]string{field: {MessageResumeNameInvalidChars}}})
 		}
 		ok, tooLong := lengthCases(resumeNameMaxLength)
 		for _, s := range ok {

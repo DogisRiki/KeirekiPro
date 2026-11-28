@@ -42,25 +42,25 @@ func checkResumeNameDuplicated(name string, existing []string) *auth.Error {
 	return nil
 }
 
-// resumeNameInvalidChars は、経歴書の名前に使えない9つの文字である(Java 版の ResumeName.INVALID_PATTERN)。
+// resumeNameInvalidChars は、経歴書の名前に使えない9つの文字である。
 const resumeNameInvalidChars = `\/:*?"<>|`
 
-// resumeNameLineTerminators は、Java の正規表現の「.」が当たらない5つの改行の文字である。
-const resumeNameLineTerminators = "\n\r\u0085\u2028\u2029"
+// notBlank は、s が空白(unicode.IsSpace)でない字を1つ以上含むかを返す。
+func notBlank(s string) bool {
+	return strings.TrimSpace(s) != ""
+}
 
-// checkResumeName は、経歴書の名前の値の決まり(Java 版の ResumeName)を検査し、誤りを項目 resumeName に足す。
+// checkResumeName は、経歴書の名前の値の決まりを検査し、誤りを項目 resumeName に足す。
 // 名前が空白だけなら、入力が要ることだけを足す。入力が要ることと長さの上限は、要求の検査(validate.go)と同じ決まりである。
-// Java 版は正規表現 .*[...].* で照らすので、5つの改行の文字のどれかを含む名前では、使えない文字を断らない。
-// 画面の1行の入力欄は、U+0085 と U+2028 と U+2029 を貼り付けで送れるので、Go 版も同じ条件で断る。
+// 使えない文字は、名前のどこにあっても断る。
 func checkResumeName(f auth.FieldErrors, name string) {
 	const field = "resumeName"
-	if !auth.NotBlank(name) {
+	if !notBlank(name) {
 		f.Check(field, false, MessageResumeNameRequired)
 		return
 	}
-	invalid := strings.ContainsAny(name, resumeNameInvalidChars) && !strings.ContainsAny(name, resumeNameLineTerminators)
 	f.Check(field, auth.UTF16Len(name) <= resumeNameMaxLength, MessageResumeNameTooLong)
-	f.Check(field, !invalid, MessageResumeNameInvalidChars)
+	f.Check(field, !strings.ContainsAny(name, resumeNameInvalidChars), MessageResumeNameInvalidChars)
 	f.Check(field, !strings.HasPrefix(name, ".") && !strings.HasSuffix(name, "."), MessageResumeNameDotEdge)
 }
 
@@ -72,7 +72,7 @@ func checkFullName(f auth.FieldErrors, lastName, firstName *string) {
 
 // checkPersonName は、姓か名の1つを検査する。値が無いか空白だけなら、入力が要ることだけを足す。
 func checkPersonName(f auth.FieldErrors, field string, s *string, required, tooLong, invalid string) {
-	if s == nil || !auth.NotBlank(*s) {
+	if s == nil || !notBlank(*s) {
 		f.Check(field, false, required)
 		return
 	}

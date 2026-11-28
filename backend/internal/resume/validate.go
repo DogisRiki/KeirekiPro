@@ -28,7 +28,7 @@ const (
 // 値が無いか空白だけなら required を、UTF-16 の単位で数えた長さが limit を超えれば tooLong を、項目 field に足す。
 // 前後の空白は取り除かずに数える。
 func checkRequiredText(f auth.FieldErrors, field string, s *string, limit int, required, tooLong string) {
-	f.Check(field, s != nil && auth.NotBlank(*s), required)
+	f.Check(field, s != nil && notBlank(*s), required)
 	f.Check(field, s == nil || auth.UTF16Len(*s) <= limit, tooLong)
 }
 
@@ -91,7 +91,7 @@ func checkOptionalText(f auth.FieldErrors, field string, s *string, limit int, t
 // checkLink は、ポートフォリオと SNS のリンクの欄が、空白だけでなく、スキームが https でホスト名のある URL で、
 // 255字以下であることを確かめる。https の URL の検査は、値が無いときと空の文字列のときに誤りにしない。
 func checkLink(f auth.FieldErrors, s *string) {
-	f.Check("link", s != nil && auth.NotBlank(*s), MessageLinkRequired)
+	f.Check("link", s != nil && notBlank(*s), MessageLinkRequired)
 	f.Check("link", s == nil || isHTTPSLink(*s), MessageLinkNotHTTPS)
 	f.Check("link", s == nil || auth.UTF16Len(*s) <= linkMaxLength, MessageLinkTooLong)
 }
