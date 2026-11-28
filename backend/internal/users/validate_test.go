@@ -45,10 +45,10 @@ func checkValidateCases(t *testing.T, tests []validateCase) {
 	}
 }
 
-// emailOf は、長さが n の、形の正しいメールアドレスを返す。後ろの部分は63文字のラベルを「.」でつなぐ。
+// emailOf は、長さが n の、形の正しいメールアドレスを返す。前の部分は64文字にし、後ろの部分は63文字までのラベルを「.」でつなぐ。後ろの部分は253文字を超えない。
 func emailOf(n int) string {
-	domain := strings.Repeat("c", 63) + "." + strings.Repeat("c", 63) + "." + strings.Repeat("c", 63) + "."
-	return "a@" + domain + strings.Repeat("d", n-2-len(domain))
+	domain := strings.Repeat("c", 63) + "." + strings.Repeat("c", 63) + "."
+	return strings.Repeat("a", 64) + "@" + domain + strings.Repeat("d", n-65-len(domain))
 }
 
 // ptr は、s を指すポインタを返す。

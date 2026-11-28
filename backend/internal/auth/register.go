@@ -41,13 +41,13 @@ type VerifyEmailResult struct {
 
 // Register は、Java 版の UserRegistrationUseCase と同じ順で、新規の登録を受け付ける。
 //
-//  1. メールアドレスを Email.create と同じく確かめ、誤りを覚えておく
+//  1. メールアドレスを保存できる形か確かめ、誤りを覚えておく
 //  2. 同じメールアドレスの利用者が居れば、400 の「このメールアドレスは登録できません。」で断る
 //  3. 1 で誤りがあれば、入力の誤りで断る(Java 版はパスワードのハッシュを作ってから断るが、答えは同じである)
 //  4. パスワードのハッシュを作り、登録の途中の記録を24時間置き、目的 REGISTRATION の確認のメールを送る。
 //     送り直せる間隔の中で送れなくても、受け付ける。メールを送れなければ、置いた記録を消してから誤りを返す
 func (s *Service) Register(ctx context.Context, in RegisterInput) error {
-	emailErrors := emailCreateErrors(in.Email)
+	emailMessages := emailErrors(in.Email)
 	_, found, err := s.findAccountByEmail(ctx, in.Email)
 	if err != nil {
 		return err
@@ -55,8 +55,8 @@ func (s *Service) Register(ctx context.Context, in RegisterInput) error {
 	if found {
 		return errBusiness(MessageEmailNotRegistrable)
 	}
-	if emailErrors != nil {
-		return errInvalidInput(map[string][]string{"email": emailErrors})
+	if emailMessages != nil {
+		return errInvalidInput(map[string][]string{"email": emailMessages})
 	}
 	hash, err := bcrypt.GenerateFromPassword([]byte(in.Password), registerBcryptCost)
 	if err != nil {

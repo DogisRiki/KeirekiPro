@@ -18,7 +18,7 @@ const changedPhrase = "N3wPhrase456"
 // wrongPhrase は、利用者のパスワードと合わない文字列である。
 const wrongPhrase = "Wr0ngPhrase789"
 
-// Java 版の Email.create の文言である。期待の値は、処理の側の定数に頼らずに書く。
+// 保存するメールアドレスの誤りの文言である。期待の値は、処理の側の定数に頼らずに書く。
 const (
 	emailBlankMessage   = "メールアドレスが空です。"
 	emailInvalidMessage = "メールアドレスの形式が不正です。"

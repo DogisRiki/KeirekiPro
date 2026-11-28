@@ -80,7 +80,7 @@ func (s *Service) SetEmailAndPassword(ctx context.Context, in SetEmailAndPasswor
 
 		f := auth.FieldErrors{}
 		if in.Email != nil {
-			for _, m := range auth.EmailCreateErrors(*in.Email) {
+			for _, m := range auth.EmailErrors(*in.Email) {
 				f.Check("email", false, m)
 			}
 			inUse, err := s.deps.Auth.EmailInUse(ctx, *in.Email)
