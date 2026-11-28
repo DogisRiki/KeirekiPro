@@ -822,7 +822,7 @@ func TestService_CreateResumeCopyOrdersByNewIDs(t *testing.T) {
 	if err != nil {
 		t.Fatalf("経歴書を写して作れません: %v", err)
 	}
-	if !slices.IsSortedFunc(got.Certifications, func(a, b Certification) int { return compareJavaUUID(a.ID, b.ID) }) {
+	if !slices.IsSortedFunc(got.Certifications, func(a, b Certification) int { return compareID(a.ID, b.ID) }) {
 		t.Errorf("写した資格が新しい ID の順に並んでいない: %+v", got.Certifications)
 	}
 	if len(got.Certifications) != len(src.Certifications) {

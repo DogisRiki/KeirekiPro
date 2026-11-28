@@ -3,8 +3,6 @@ package resume
 import (
 	"regexp"
 	"testing"
-
-	"github.com/google/uuid"
 )
 
 // screenID は、画面が経路に入れて送る書き方である。画面は、答えに返った小文字の形の ID だけを送る。
@@ -83,32 +81,4 @@ func TestParseID_DiffTableInChangedBehaviors(t *testing.T) {
 		}
 	}
 	checkDiffTableInChangedBehaviors(t, table)
-}
-
-// TestCompareJavaUUID_SignedOrder は、compareJavaUUID が、java.util.UUID.compareTo と同じく、
-// 上位の64ビットと下位の64ビットを符号付きの整数として比べ、8 から f で始まる UUID を 0 から 7 で始まる UUID より前に並べることを確かめる。
-func TestCompareJavaUUID_SignedOrder(t *testing.T) {
-	tests := []struct {
-		name string
-		a, b string
-		want int
-	}{
-		{"上位の先頭が 8 以上の UUID は、7 以下の UUID より前", "80000000-0000-0000-0000-000000000000", "7fffffff-ffff-ffff-ffff-ffffffffffff", -1},
-		{"上位の先頭が f の UUID は、0 の UUID より前", "ffffffff-ffff-ffff-ffff-ffffffffffff", "00000000-0000-0000-0000-000000000001", -1},
-		{"上位が同じなら、下位の先頭が 8 以上の UUID が前", "00000000-0000-0000-8000-000000000000", "00000000-0000-0000-7fff-ffffffffffff", -1},
-		{"上位が同じで下位の符号が同じなら、小さいほうが前", "00000000-0000-0000-0000-000000000001", "00000000-0000-0000-0000-000000000002", -1},
-		{"上位の符号が同じなら、小さいほうが前", "00000001-0000-0000-ffff-ffffffffffff", "00000002-0000-0000-0000-000000000000", -1},
-		{"同じ UUID", "1b4e28ba-2fa1-11d2-883f-0016d3cca427", "1b4e28ba-2fa1-11d2-883f-0016d3cca427", 0},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			a, b := uuid.MustParse(tt.a), uuid.MustParse(tt.b)
-			if got := compareJavaUUID(a, b); got != tt.want {
-				t.Errorf("compareJavaUUID(%s, %s) = %d, want %d", tt.a, tt.b, got, tt.want)
-			}
-			if got := compareJavaUUID(b, a); got != -tt.want {
-				t.Errorf("compareJavaUUID(%s, %s) = %d, want %d", tt.b, tt.a, got, -tt.want)
-			}
-		})
-	}
 }

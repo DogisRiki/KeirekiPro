@@ -1,58 +1,12 @@
 package resume
 
 import (
-	"encoding/json"
-	"os"
+	"fmt"
 	"slices"
 	"testing"
 
 	"github.com/google/uuid"
 )
-
-// orderEntry は、testdata/order.json の1つの項目である。項目の欄のうち、並べ方が見る欄だけを読む。
-type orderEntry struct {
-	ID        uuid.UUID     `json:"id"`
-	Active    bool          `json:"active"`
-	StartDate jsonYearMonth `json:"startDate"`
-	EndDate   jsonYearMonth `json:"endDate"`
-	Date      jsonYearMonth `json:"date"`
-	Name      string        `json:"name"`
-	Title     string        `json:"title"`
-}
-
-// orderFile は、testdata/order.json の、Java 版が返した6つの欄の項目の並びである。
-type orderFile struct {
-	Careers        []orderEntry `json:"careers"`
-	Projects       []orderEntry `json:"projects"`
-	Certifications []orderEntry `json:"certifications"`
-	Portfolios     []orderEntry `json:"portfolios"`
-	SnsPlatforms   []orderEntry `json:"snsPlatforms"`
-	SelfPromotions []orderEntry `json:"selfPromotions"`
-}
-
-// loadOrderJSON は、testdata/order.json を読む。
-func loadOrderJSON(t *testing.T) orderFile {
-	t.Helper()
-	b, err := os.ReadFile("testdata/order.json")
-	if err != nil {
-		t.Fatalf("testdata/order.json を読めない: %v", err)
-	}
-	var f orderFile
-	if err := json.Unmarshal(b, &f); err != nil {
-		t.Fatalf("testdata/order.json の JSON を読めない: %v", err)
-	}
-	return f
-}
-
-// period は、控えの項目の期間を、経歴書の期間の型に直す。
-func (e orderEntry) period() Period {
-	p := Period{StartDate: e.StartDate.Value, Active: e.Active}
-	if e.EndDate.Present {
-		end := e.EndDate.Value
-		p.EndDate = &end
-	}
-	return p
-}
 
 // permuted は、項目の並び entries を、並べ替えの順 perm のとおりに並べ直した写しを返す。
 func permuted[E any](entries []E, perm []int) []E {
@@ -63,7 +17,7 @@ func permuted[E any](entries []E, perm []int) []E {
 	return out
 }
 
-// orderPermutations は、n 個の項目の並べ替えの順を返す。控えの順と、逆の順を1つずつずらした n 通りの順である。
+// orderPermutations は、n 個の項目の並べ替えの順を返す。元の順と、逆の順を1つずつずらした n 通りの順である。
 func orderPermutations(n int) [][]int {
 	identity := make([]int, n)
 	for i := range identity {
@@ -89,94 +43,108 @@ func ids[E any](entries []E, id func(E) uuid.UUID) []uuid.UUID {
 	return out
 }
 
-// goNameOrder は、控えのポートフォリオと SNS の名前と自己PR の題を、Go の日本語の並べ方(golang.org/x/text/collate)で並べた順である。
-// 名前か題が違う項目どうしの並びは、変えた動きの一覧の CB-001 のとおり、Java 版と違ってよい。
-// Java 版は半角のカタカナの「ｱｲｳ」を最後に並べ、Go 版は「Zenn」と「あいう」のあいだに並べる。そのほかの名前の順は Java 版と同じである。
-var goNameOrder = []string{"1番", "abc", "ABC", "github", "GitHub", "Zenn", "ｱｲｳ", "あいう", "アイウ", "漢字", "同じ名前"}
-
-// wantByGoNameOrder は、控えの項目を goNameOrder の名前の順に並べ、名前が同じ項目どうしは控えの順(Java 版の ID の順)のまま並べた ID を返す。
-func wantByGoNameOrder(t *testing.T, entries []orderEntry, name func(orderEntry) string) []uuid.UUID {
+// checkSorted は、欄の項目を並べたい順 want から並べ替えた、どの並びを sortEntries に渡しても、want の順に並べることを確かめる。
+// set は経歴書の欄に項目を入れ、get は経歴書の欄の項目を取り出す。
+func checkSorted[E any](t *testing.T, section string, want []E, set func(*Resume, []E), get func(Resume) []E, id func(E) uuid.UUID) {
 	t.Helper()
-	var want []uuid.UUID
-	for _, n := range goNameOrder {
-		for _, e := range entries {
-			if name(e) == n {
-				want = append(want, e.ID)
-			}
-		}
-	}
-	if len(want) != len(entries) {
-		t.Fatalf("控えに goNameOrder に無い名前がある: 控えの項目 %d 件のうち %d 件だけが goNameOrder の名前", len(entries), len(want))
-	}
-	return want
-}
-
-// TestOrder_MatchesJava は、6つの欄の項目を、どの順で受け取っても、Java 版が返した並び(testdata/order.json)と同じ順に並べることを確かめる
-// (要件1の受入基準1)。ポートフォリオと SNS と自己PR は、名前か題が同じ項目どうしの並びを Java 版と比べ、名前か題が違う項目どうしの並びは、
-// 変えた動きの一覧の CB-001 のとおり Go の日本語の並べ方の順(goNameOrder)と比べる。
-func TestOrder_MatchesJava(t *testing.T) {
-	f := loadOrderJSON(t)
-	byName := func(e orderEntry) string { return e.Name }
-	byTitle := func(e orderEntry) string { return e.Title }
-	want := map[string][]uuid.UUID{
-		"職歴":      ids(f.Careers, func(e orderEntry) uuid.UUID { return e.ID }),
-		"プロジェクト":  ids(f.Projects, func(e orderEntry) uuid.UUID { return e.ID }),
-		"資格":      ids(f.Certifications, func(e orderEntry) uuid.UUID { return e.ID }),
-		"ポートフォリオ": wantByGoNameOrder(t, f.Portfolios, byName),
-		"SNS":     wantByGoNameOrder(t, f.SnsPlatforms, byName),
-		"自己PR":    wantByGoNameOrder(t, f.SelfPromotions, byTitle),
-	}
-
-	var r Resume
-	for _, e := range f.Careers {
-		r.Careers = append(r.Careers, Career{ID: e.ID, CompanyName: e.Name, Period: e.period()})
-	}
-	for _, e := range f.Projects {
-		r.Projects = append(r.Projects, Project{ID: e.ID, Name: e.Name, Period: e.period()})
-	}
-	for _, e := range f.Certifications {
-		r.Certifications = append(r.Certifications, Certification{ID: e.ID, Name: e.Name, Date: e.Date.Value})
-	}
-	for _, e := range f.Portfolios {
-		r.Portfolios = append(r.Portfolios, Portfolio{ID: e.ID, Name: e.Name})
-	}
-	for _, e := range f.SnsPlatforms {
-		r.SnsPlatforms = append(r.SnsPlatforms, SnsPlatform{ID: e.ID, Name: e.Name})
-	}
-	for _, e := range f.SelfPromotions {
-		r.SelfPromotions = append(r.SelfPromotions, SelfPromotion{ID: e.ID, Title: e.Title})
-	}
-
-	check := func(t *testing.T, section string, got []uuid.UUID) {
-		t.Helper()
-		if !slices.Equal(got, want[section]) {
-			t.Errorf("%s の並び\n got: %v\nwant: %v", section, got, want[section])
-		}
-	}
-	// 6つの欄の項目の数は、控えでは同じではないので、欄ごとに並べ替えの順を作る。
-	for i := range 20 {
-		in := Resume{
-			Careers:        permuted(r.Careers, orderPermutations(len(r.Careers))[i%(len(r.Careers)+1)]),
-			Projects:       permuted(r.Projects, orderPermutations(len(r.Projects))[i%(len(r.Projects)+1)]),
-			Certifications: permuted(r.Certifications, orderPermutations(len(r.Certifications))[i%(len(r.Certifications)+1)]),
-			Portfolios:     permuted(r.Portfolios, orderPermutations(len(r.Portfolios))[i%(len(r.Portfolios)+1)]),
-			SnsPlatforms:   permuted(r.SnsPlatforms, orderPermutations(len(r.SnsPlatforms))[i%(len(r.SnsPlatforms)+1)]),
-			SelfPromotions: permuted(r.SelfPromotions, orderPermutations(len(r.SelfPromotions))[i%(len(r.SelfPromotions)+1)]),
-		}
-		sortEntries(&in)
-		check(t, "職歴", ids(in.Careers, func(e Career) uuid.UUID { return e.ID }))
-		check(t, "プロジェクト", ids(in.Projects, func(e Project) uuid.UUID { return e.ID }))
-		check(t, "資格", ids(in.Certifications, func(e Certification) uuid.UUID { return e.ID }))
-		check(t, "ポートフォリオ", ids(in.Portfolios, func(e Portfolio) uuid.UUID { return e.ID }))
-		check(t, "SNS", ids(in.SnsPlatforms, func(e SnsPlatform) uuid.UUID { return e.ID }))
-		check(t, "自己PR", ids(in.SelfPromotions, func(e SelfPromotion) uuid.UUID { return e.ID }))
-		if t.Failed() {
-			t.Fatalf("並べ替えの順 %d 番目で並びが違う", i)
+	wantIDs := ids(want, id)
+	for _, perm := range orderPermutations(len(want)) {
+		var r Resume
+		set(&r, permuted(want, perm))
+		sortEntries(&r)
+		if got := ids(get(r), id); !slices.Equal(got, wantIDs) {
+			t.Errorf("%s の並び(並べ替えの順 %v)\n got: %v\nwant: %v", section, perm, got, wantIDs)
 		}
 	}
 }
 
-// TestOrder_EndDateMissing は、継続中でない職歴とプロジェクトに終了の年月が無いとき、Java 版の ResumeEntryOrderPolicy と同じく、
+// orderID は、n 番目の項目の ID を返す。
+func orderID(n int) uuid.UUID {
+	return uuid.MustParse(fmt.Sprintf("00000000-0000-4000-8000-%012d", n))
+}
+
+// tieLow と tieHigh は、並べ方の値が同じ項目どうしの ID の順を確かめる2つの ID である。
+// 2つは先頭のバイトだけが違い、Go 版はバイトの順に比べるので tieLow を先に並べる。
+// Java 版は上位の64ビットを符号付きの整数として比べ、tieHigh を先に並べていた(変えた動きの一覧の CB-111)。
+var (
+	tieLow  = uuid.MustParse("7f000000-0000-4000-8000-000000000001")
+	tieHigh = uuid.MustParse("80000000-0000-4000-8000-000000000001")
+)
+
+// TestSortEntries_Periods は、職歴とプロジェクトを、継続中の期間を先に、開始の年月の新しい順に並べ、
+// 継続中でない期間を終了の年月の新しい順に、終了の年月が同じなら開始の年月の新しい順に並べ、期間が同じなら ID の順に並べることを確かめる。
+func TestSortEntries_Periods(t *testing.T) {
+	checkDiffTableInChangedBehaviors(t, map[string]string{"期間が同じ職歴とプロジェクト": "CB-111"})
+	periods := []struct {
+		id     uuid.UUID
+		period Period
+	}{
+		{orderID(1), Period{StartDate: YearMonth{Year: 2020, Month: 4}, Active: true}},
+		{orderID(2), Period{StartDate: YearMonth{Year: 2018, Month: 1}, Active: true}},
+		{orderID(3), Period{StartDate: YearMonth{Year: 2016, Month: 1}, EndDate: yearMonth(2019, 12)}},
+		{orderID(4), Period{StartDate: YearMonth{Year: 2015, Month: 1}, EndDate: yearMonth(2019, 12)}},
+		{orderID(5), Period{StartDate: YearMonth{Year: 2017, Month: 1}, EndDate: yearMonth(2019, 3)}},
+		{tieLow, Period{StartDate: YearMonth{Year: 2009, Month: 1}, EndDate: yearMonth(2010, 3)}},
+		{tieHigh, Period{StartDate: YearMonth{Year: 2009, Month: 1}, EndDate: yearMonth(2010, 3)}},
+	}
+	var careers []Career
+	var projects []Project
+	for _, p := range periods {
+		careers = append(careers, Career{ID: p.id, Period: p.period})
+		projects = append(projects, Project{ID: p.id, Period: p.period})
+	}
+	checkSorted(t, "職歴", careers,
+		func(r *Resume, e []Career) { r.Careers = e }, func(r Resume) []Career { return r.Careers }, func(e Career) uuid.UUID { return e.ID })
+	checkSorted(t, "プロジェクト", projects,
+		func(r *Resume, e []Project) { r.Projects = e }, func(r Resume) []Project { return r.Projects }, func(e Project) uuid.UUID { return e.ID })
+}
+
+// TestSortEntries_Certifications は、資格を、取得の年月の新しい順に並べ、取得の年月が同じなら ID の順に並べることを確かめる。
+func TestSortEntries_Certifications(t *testing.T) {
+	checkDiffTableInChangedBehaviors(t, map[string]string{"取得の年月が同じ資格": "CB-111"})
+	want := []Certification{
+		{ID: orderID(1), Date: YearMonth{Year: 2022, Month: 4}},
+		{ID: orderID(2), Date: YearMonth{Year: 2022, Month: 3}},
+		{ID: orderID(3), Date: YearMonth{Year: 2021, Month: 12}},
+		{ID: tieLow, Date: YearMonth{Year: 2019, Month: 5}},
+		{ID: tieHigh, Date: YearMonth{Year: 2019, Month: 5}},
+	}
+	checkSorted(t, "資格", want,
+		func(r *Resume, e []Certification) { r.Certifications = e }, func(r Resume) []Certification { return r.Certifications },
+		func(e Certification) uuid.UUID { return e.ID })
+}
+
+// nameOrder は、名前を Go の日本語の並べ方(golang.org/x/text/collate)で並べた順である。
+// 半角のカタカナの「ｱｲｳ」の位置は、変えた動きの一覧の CB-001 のとおり Java 版と違う。
+var nameOrder = []string{"1番", "abc", "ABC", "github", "GitHub", "Zenn", "ｱｲｳ", "あいう", "アイウ", "漢字"}
+
+// TestSortEntries_Names は、ポートフォリオと SNS を名前の、自己PR を題の、日本語の並べ方の順に並べ、
+// 名前か題が同じなら ID の順に並べることを確かめる。
+func TestSortEntries_Names(t *testing.T) {
+	checkDiffTableInChangedBehaviors(t, map[string]string{"名前が同じポートフォリオと SNS と、題が同じ自己PR": "CB-111"})
+	var portfolios []Portfolio
+	var sns []SnsPlatform
+	var selfPromotions []SelfPromotion
+	add := func(id uuid.UUID, name string) {
+		portfolios = append(portfolios, Portfolio{ID: id, Name: name})
+		sns = append(sns, SnsPlatform{ID: id, Name: name})
+		selfPromotions = append(selfPromotions, SelfPromotion{ID: id, Title: name})
+	}
+	for i, name := range nameOrder {
+		add(orderID(i+1), name)
+	}
+	add(tieLow, "同じ名前")
+	add(tieHigh, "同じ名前")
+	checkSorted(t, "ポートフォリオ", portfolios,
+		func(r *Resume, e []Portfolio) { r.Portfolios = e }, func(r Resume) []Portfolio { return r.Portfolios }, func(e Portfolio) uuid.UUID { return e.ID })
+	checkSorted(t, "SNS", sns,
+		func(r *Resume, e []SnsPlatform) { r.SnsPlatforms = e }, func(r Resume) []SnsPlatform { return r.SnsPlatforms }, func(e SnsPlatform) uuid.UUID { return e.ID })
+	checkSorted(t, "自己PR", selfPromotions,
+		func(r *Resume, e []SelfPromotion) { r.SelfPromotions = e }, func(r Resume) []SelfPromotion { return r.SelfPromotions },
+		func(e SelfPromotion) uuid.UUID { return e.ID })
+}
+
+// TestOrder_EndDateMissing は、継続中でない職歴とプロジェクトに終了の年月が無いとき、
 // 終了の年月が無い項目を後ろに並べ、2つとも無ければ開始の年月の新しい順に並べることを確かめる。
 func TestOrder_EndDateMissing(t *testing.T) {
 	idA := uuid.MustParse("00000000-0000-4000-8000-00000000000a")
@@ -201,7 +169,7 @@ func TestOrder_EndDateMissing(t *testing.T) {
 	}
 }
 
-// TestOrder_ActiveIgnoresEndDate は、2つとも継続中の職歴とプロジェクトを、Java 版の ResumeEntryOrderPolicy と同じく、
+// TestOrder_ActiveIgnoresEndDate は、2つとも継続中の職歴とプロジェクトを、
 // 終了の年月を見ずに開始の年月の新しい順に並べることを確かめる。継続中の期間の終了の年月は値の決まりで断るので、
 // 終了の年月を見ないことは、終了の年月が入った継続中の期間でしか確かめられない。
 func TestOrder_ActiveIgnoresEndDate(t *testing.T) {
