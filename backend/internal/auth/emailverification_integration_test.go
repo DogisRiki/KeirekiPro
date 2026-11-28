@@ -566,13 +566,29 @@ func TestEmailVerificationComplete_ClassifyLink(t *testing.T) {
 		wantBusinessError(t, err, MessageTwoFactorPrerequisiteMissing)
 	})
 
-	t.Run("今のリンクの記録が JSON でなければ誤り", func(t *testing.T) {
+	t.Run("今のリンクの記録が閉じていない JSON の文字列なら誤り", func(t *testing.T) {
 		id, email := uuid.New(), uniqueEmail()
-		if err := client.Set(ctx, "email-verification:current:"+id.String(), "not-json", time.Minute).Err(); err != nil {
+		if err := client.Set(ctx, "email-verification:current:"+id.String(), `"not-json`, time.Minute).Err(); err != nil {
 			t.Fatal(err)
 		}
 		if got, err := s.classifyEmailVerificationLink(ctx, usableClaims(id, purposeAccountEmail, email)); err == nil {
 			t.Errorf("classifyEmailVerificationLink = %q, nil, want 誤り", got)
+		}
+	})
+
+	t.Run("今のリンクの記録を、JSON の文字列にした形とそのままの形のどちらでも読む", func(t *testing.T) {
+		for _, quote := range []bool{true, false} {
+			c := usableClaims(uuid.New(), purposeAccountEmail, uniqueEmail())
+			stored := c.JTI
+			if quote {
+				stored = jsonQuoted(t, c.JTI)
+			}
+			if err := client.Set(ctx, "email-verification:current:"+c.SubjectID.String(), stored, time.Minute).Err(); err != nil {
+				t.Fatal(err)
+			}
+			if live, err := s.isLiveEmailVerificationLink(ctx, c); err != nil || !live {
+				t.Errorf("記録 %s の isLiveEmailVerificationLink = %v, %v, want true, nil", stored, live, err)
+			}
 		}
 	})
 }
