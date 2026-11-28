@@ -88,11 +88,11 @@ func checkOptionalText(f auth.FieldErrors, field string, s *string, limit int, t
 	f.Check(field, s == nil || auth.UTF16Len(*s) <= limit, tooLong)
 }
 
-// checkLink は、ポートフォリオと SNS のリンクの欄の @NotBlank と @URL(protocol = "https") と @Size(max = 255) を写す。
-// @URL は、値が無いときと空の文字列のときに誤りにしない。
+// checkLink は、ポートフォリオと SNS のリンクの欄が、空白だけでなく、スキームが https でホスト名のある URL で、
+// 255字以下であることを確かめる。https の URL の検査は、値が無いときと空の文字列のときに誤りにしない。
 func checkLink(f auth.FieldErrors, s *string) {
 	f.Check("link", s != nil && auth.NotBlank(*s), MessageLinkRequired)
-	f.Check("link", s == nil || isHibernateHTTPSURL(*s), MessageLinkNotHTTPS)
+	f.Check("link", s == nil || isHTTPSLink(*s), MessageLinkNotHTTPS)
 	f.Check("link", s == nil || auth.UTF16Len(*s) <= linkMaxLength, MessageLinkTooLong)
 }
 

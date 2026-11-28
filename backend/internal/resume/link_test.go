@@ -1,171 +1,114 @@
 package resume
 
-import (
-	"encoding/json"
-	"os"
-	"slices"
-	"strconv"
-	"testing"
-	"unicode/utf16"
-)
+import "testing"
 
-// linkJavaCase は、testdata/link.json の1つのリンクの値と、Java 版の答えである。
-type linkJavaCase struct {
-	Input  string              `json:"input"`
-	Status int                 `json:"status"`
-	Errors map[string][]string `json:"errors"`
+// linkCase は、リンクの検査の1つの値と、Go 版の答えである。cb は、Java 版と答えが違う値に付ける、変えた動きの一覧の番号である。
+type linkCase struct {
+	input string
+	want  bool
+	cb    string
 }
 
-// linkJDKCase は、testdata/link_jdk.json の1つの値と、JDK で控えた答えである。
-// Valid は、リンクの判定と、IPAddressUtil の部品の判定の答えである。
-// Want は、Integer.parseInt の答えで、数値か、NumberFormatException を表す "NFE" である。
-type linkJDKCase struct {
-	Input string          `json:"input"`
-	Valid bool            `json:"valid"`
-	Want  json.RawMessage `json:"want"`
-}
-
-// linkJDKData は、testdata/link_jdk.json の全体である。
-type linkJDKData struct {
-	Cases    []linkJDKCase `json:"cases"`
-	IPv6     []linkJDKCase `json:"ipv6"`
-	Host     []linkJDKCase `json:"host"`
-	UserInfo []linkJDKCase `json:"userinfo"`
-	Auth     []linkJDKCase `json:"auth"`
-	Int      []linkJDKCase `json:"int"`
-}
-
-func loadLinkJavaCases(t *testing.T) []linkJavaCase {
+// checkLinkCases は、検査 fn が表のどの値にも Go 版の答えを返すことと、cb の番号がすべて変えた動きの一覧にあることを確かめる。
+func checkLinkCases(t *testing.T, name string, fn func(string) bool, cases []linkCase) {
 	t.Helper()
-	b, err := os.ReadFile("testdata/link.json")
-	if err != nil {
-		t.Fatal(err)
+	diff := map[string]string{}
+	for _, c := range cases {
+		if got := fn(c.input); got != c.want {
+			t.Errorf("%s(%q) = %v, want %v", name, c.input, got, c.want)
+		}
+		if c.cb != "" {
+			diff[c.input] = c.cb
+		}
 	}
-	var data struct {
-		Cases []linkJavaCase `json:"cases"`
-	}
-	if err := json.Unmarshal(b, &data); err != nil {
-		t.Fatal(err)
-	}
-	if len(data.Cases) == 0 {
-		t.Fatal("控えのリンクの値が無い")
-	}
-	return data.Cases
+	checkDiffTableInChangedBehaviors(t, diff)
 }
 
-func loadLinkJDKData(t *testing.T) linkJDKData {
-	t.Helper()
-	b, err := os.ReadFile("testdata/link_jdk.json")
-	if err != nil {
-		t.Fatal(err)
-	}
-	var data linkJDKData
-	if err := json.Unmarshal(b, &data); err != nil {
-		t.Fatal(err)
-	}
-	for name, cases := range map[string][]linkJDKCase{
-		"cases": data.Cases, "ipv6": data.IPv6, "host": data.Host, "userinfo": data.UserInfo, "auth": data.Auth, "int": data.Int,
-	} {
-		if len(cases) == 0 {
-			t.Fatalf("控えの %s の値が無い", name)
-		}
-	}
-	return data
-}
-
-// TestLink_MatchesJava は、isHibernateHTTPSURL が、Java 版に送って控えたすべてのリンクの値と、
-// JDK で判定して控えたすべてのリンクの値で、Java 版と同じ判定をすることを確かめる。
-func TestLink_MatchesJava(t *testing.T) {
-	t.Run("Java 版に送った値", func(t *testing.T) {
-		valid, invalid := 0, 0
-		for _, c := range loadLinkJavaCases(t) {
-			// Java 版は、リンクが https の形の URL でないときに、この文言を返す。
-			// 入力必須と長さの文言だけが出た値は、https の形の判定に通っている
-			want := !slices.Contains(c.Errors["link"], MessageLinkNotHTTPS)
-			if c.Status != 201 && c.Status != 400 {
-				t.Fatalf("値 %q の Java 版の答え %d は、控えの形に無い", c.Input, c.Status)
-			}
-			if want {
-				valid++
-			} else {
-				invalid++
-			}
-			if got := isHibernateHTTPSURL(c.Input); got != want {
-				t.Errorf("isHibernateHTTPSURL(%q) = %v, Java 版は %v", c.Input, got, want)
-			}
-		}
-		if valid == 0 || invalid == 0 {
-			t.Errorf("控えに、Java 版が通した値(%d 件)と断った値(%d 件)の両方が要る", valid, invalid)
-		}
-	})
-
-	t.Run("JDK で判定した値", func(t *testing.T) {
-		valid, invalid := 0, 0
-		for _, c := range loadLinkJDKData(t).Cases {
-			if c.Valid {
-				valid++
-			} else {
-				invalid++
-			}
-			if got := isHibernateHTTPSURL(c.Input); got != c.Valid {
-				t.Errorf("isHibernateHTTPSURL(%q) = %v, JDK は %v", c.Input, got, c.Valid)
-			}
-		}
-		if valid == 0 || invalid == 0 {
-			t.Errorf("控えに、JDK が通した値(%d 件)と断った値(%d 件)の両方が要る", valid, invalid)
-		}
+// TestIsHTTPSLink は、入力の検査が、スキームが https でホスト名のある URL だけを通すことを確かめる。
+func TestIsHTTPSLink(t *testing.T) {
+	checkLinkCases(t, "isHTTPSLink", isHTTPSLink, []linkCase{
+		// Java 版と答えが同じ書き方
+		{input: "", want: true},
+		{input: "https://example.com", want: true},
+		{input: "https://example.com/path?q=1#frag", want: true},
+		{input: "HTTPS://example.com", want: true},
+		{input: "Https://example.com", want: true},
+		{input: "HtTpS://a", want: true},
+		{input: "https://u@[::1]:8/", want: true},
+		{input: "https://example.com:8080", want: true},
+		{input: "https://example.com:65536", want: true},
+		{input: "https://[::1]/", want: true},
+		{input: "https://127.0.0.1", want: true},
+		{input: "https://xn--r8jz45g.jp", want: true},
+		{input: "https://example.com/%E3%81%82", want: true},
+		{input: "http://example.com", want: false},
+		{input: "ftp://example.com", want: false},
+		{input: "mailto:a@example.com", want: false},
+		{input: "//example.com", want: false},
+		{input: "example.com", want: false},
+		{input: " ", want: false},
+		{input: " https://example.com", want: false},
+		{input: "https://", want: false},
+		{input: "https:", want: false},
+		{input: "https://exa mple.com", want: false},
+		{input: "https://example.com:abc", want: false},
+		{input: "https://[::1", want: false},
+		{input: "https://example.com/%zz", want: false},
+		// Java 版が通し、Go 版が断る書き方
+		{input: "https:example.com", want: false, cb: "CB-109"},
+		{input: "https:/example.com", want: false, cb: "CB-109"},
+		{input: "https:///path", want: false, cb: "CB-109"},
+		{input: "https://:80", want: false, cb: "CB-109"},
+		{input: "https://?q", want: false, cb: "CB-109"},
+		{input: "https://#f", want: false, cb: "CB-109"},
+		{input: "https://a@", want: false, cb: "CB-109"},
+		{input: "url:https://example.com", want: false, cb: "CB-109"},
+		{input: "https://example.com:-1", want: false, cb: "CB-109"},
+		{input: "https://a:+5", want: false, cb: "CB-109"},
+		{input: "https://a:\uff11\uff10", want: false, cb: "CB-109"},
+		{input: "https://a:\u0663", want: false, cb: "CB-109"},
+		{input: "https://[::1%eth0]/", want: false, cb: "CB-109"},
+		{input: "https://ex%41mple.com", want: false, cb: "CB-109"},
+		{input: "https://u\uff03@a", want: false, cb: "CB-109"},
+		// Java 版が断り、Go 版が通す書き方
+		{input: "https://example.com/a b", want: true, cb: "CB-109"},
+		{input: "https://a?b c", want: true, cb: "CB-109"},
+		{input: "https://example.com/\"", want: true, cb: "CB-109"},
+		{input: "https://example.com/<", want: true, cb: "CB-109"},
+		{input: "https://example.com/{}", want: true, cb: "CB-109"},
+		{input: "https://example.com/|", want: true, cb: "CB-109"},
+		{input: "https://example.com/^", want: true, cb: "CB-109"},
+		{input: "https://example.com/`", want: true, cb: "CB-109"},
+		{input: "https://example.com#a#b", want: true, cb: "CB-109"},
+		{input: "https://example.com/\u3000", want: true, cb: "CB-109"},
+		{input: "https://a\u00a0b", want: true, cb: "CB-109"},
+		{input: "https://a\u2028", want: true, cb: "CB-109"},
+		{input: "https://example.com:99999999999", want: true, cb: "CB-109"},
+		{input: "https://a\uff03b", want: true, cb: "CB-109"},
+		{input: "https://\uff20", want: true, cb: "CB-109"},
 	})
 }
 
-// TestLink_JDKParts は、リンクの判定が使う JDK の部品の写しが、JDK で控えた答えと同じ答えを返すことを確かめる。
-func TestLink_JDKParts(t *testing.T) {
-	data := loadLinkJDKData(t)
-	parts := []struct {
-		name  string
-		cases []linkJDKCase
-		fn    func([]uint16) bool
-	}{
-		{"IPAddressUtil.isIPv6LiteralAddress", data.IPv6, javaIsIPv6LiteralAddress},
-		{"IPAddressUtil.checkHostString", data.Host, javaCheckHost},
-		{"IPAddressUtil.checkUserInfo", data.UserInfo, javaCheckUserInfo},
-		{"IPAddressUtil.checkAuth", data.Auth, javaCheckAuth},
-	}
-	for _, p := range parts {
-		t.Run(p.name, func(t *testing.T) {
-			for _, c := range p.cases {
-				if got := p.fn(javaChars(c.Input)); got != c.Valid {
-					t.Errorf("%s(%q) = %v, JDK は %v", p.name, c.Input, got, c.Valid)
-				}
-			}
-		})
-	}
-
-	t.Run("Integer.parseInt", func(t *testing.T) {
-		for _, c := range data.Int {
-			var want string
-			if err := json.Unmarshal(c.Want, &want); err != nil {
-				// 数値の答えは、文字列に直して比べる
-				want = string(c.Want)
-			}
-			got := "NFE"
-			if v, ok := javaParseInt(javaChars(c.Input)); ok {
-				got = strconv.Itoa(v)
-			}
-			if got != want {
-				t.Errorf("Integer.parseInt(%q) = %s, JDK は %s", c.Input, got, want)
-			}
-		}
+// TestHasHTTPSScheme は、戻しの検査が、英字の大文字と小文字を区別せずに https: で始まるリンクを通し、
+// 前に付いた url: を除いてから確かめることを確かめる。
+func TestHasHTTPSScheme(t *testing.T) {
+	checkLinkCases(t, "hasHTTPSScheme", hasHTTPSScheme, []linkCase{
+		// Java 版と答えが同じ書き方
+		{input: "https://example.com", want: true},
+		{input: "HtTpS://example.com", want: true},
+		{input: "https:example.com", want: true},
+		{input: "http://example.com", want: false},
+		{input: "url:http://example.com", want: false},
+		{input: "example.com", want: false},
+		{input: "https", want: false},
+		{input: "url:", want: false},
+		{input: "", want: false},
+		// Java 版が断り、Go 版が通す書き方
+		{input: "url:https://example.com", want: true, cb: "CB-110"},
+		{input: "URL:HTTPS://example.com", want: true, cb: "CB-110"},
+		{input: "https:", want: true, cb: "CB-110"},
+		{input: "https://", want: true, cb: "CB-110"},
+		{input: "https:%zz", want: true, cb: "CB-110"},
+		{input: "https:a b", want: true, cb: "CB-110"},
 	})
-}
-
-// TestJavaChars は、javaChars が、Go の文字列を Java の String と同じ UTF-16 の単位の並びに直すことを確かめる。
-func TestJavaChars(t *testing.T) {
-	got := javaChars("aé\U0001F600")
-	want := []uint16{'a', 0xe9, 0xd83d, 0xde00}
-	if !slices.Equal(got, want) {
-		t.Errorf("javaChars = %x, want %x", got, want)
-	}
-	if s := string(utf16.Decode(got)); s != "aé\U0001F600" {
-		t.Errorf("元に戻した文字列が %q", s)
-	}
 }

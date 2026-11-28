@@ -304,33 +304,25 @@ func optionalTextCases[T any](field string, limit int, tooLongMsg string, set fu
 	return cases
 }
 
-// linkFieldCases は、リンクの欄の入力を作る。
-// testdata/link.json の値は、Java 版のポートフォリオの追加に送って控えた答えを期待する。SNS の要求の型のリンクの欄も、
-// 同じ3つの注釈(@NotBlank、@URL(protocol = "https")、@Size(max = 255))を持つので、同じ答えを期待する。
-// 加えて、値が無いときと、絵文字を含む値の長さの上限とその1つ上を確かめる。
+// linkFieldCases は、リンクの欄の入力を作る。ポートフォリオと SNS のリンクの欄は、同じ checkLink で確かめるので、同じ答えを期待する。
+// https の URL かの判定の細かな値は TestIsHTTPSLink が確かめるので、ここでは、3つの検査の文言の組み合わせと、
+// 絵文字を含む値の長さの上限とその1つ上を確かめる。
 func linkFieldCases[T any](t *testing.T, set func(*string) T) []validateCase[T] {
 	t.Helper()
-	cases := []validateCase[T]{
-		{name: "link_値なし", req: set(nil), want: map[string][]string{"link": {MessageLinkRequired}}},
-	}
-	for _, c := range loadLinkJavaCases(t) {
-		var want map[string][]string
-		switch c.Status {
-		case http.StatusCreated:
-		case http.StatusBadRequest:
-			if len(c.Errors) != 1 || len(c.Errors["link"]) == 0 {
-				t.Fatalf("値 %q の Java 版の答えの errors %v は、link だけの形でない", c.Input, c.Errors)
-			}
-			want = c.Errors
-		default:
-			t.Fatalf("値 %q の Java 版の答え %d は、控えの形に無い", c.Input, c.Status)
-		}
-		cases = append(cases, validateCase[T]{name: "link_Java版_" + quote(c.Input), req: set(ptr(c.Input)), want: want})
-	}
 	// https://example.com/ は20の単位なので、絵文字1つを足して、255と256の単位の値を作る。
 	prefix := "https://example.com/"
 	ok := prefix + strings.Repeat("a", 255-len(prefix)-2) + emoji
 	over := prefix + strings.Repeat("a", 255-len(prefix)-1) + emoji
+	httpOver := "http://example.com/" + strings.Repeat("a", 255)
+	cases := []validateCase[T]{
+		{name: "link_値なし", req: set(nil), want: map[string][]string{"link": {MessageLinkRequired}}},
+		{name: "link_空", req: set(ptr("")), want: map[string][]string{"link": {MessageLinkRequired}}},
+		{name: "link_空白だけ", req: set(ptr("   ")), want: map[string][]string{"link": {MessageLinkRequired, MessageLinkNotHTTPS}}},
+		{name: "link_https", req: set(ptr("https://example.com/path")), want: nil},
+		{name: "link_http", req: set(ptr("http://example.com")), want: map[string][]string{"link": {MessageLinkNotHTTPS}}},
+		{name: "link_ホスト名なし", req: set(ptr("https:example.com")), want: map[string][]string{"link": {MessageLinkNotHTTPS}}},
+		{name: "link_http_上限の1つ上", req: set(&httpOver), want: map[string][]string{"link": {MessageLinkNotHTTPS, MessageLinkTooLong}}},
+	}
 	cases = append(cases,
 		validateCase[T]{name: "link_絵文字で上限", req: set(&ok), want: nil},
 		validateCase[T]{name: "link_絵文字で上限の1つ上", req: set(&over), want: map[string][]string{"link": {MessageLinkTooLong}}},
