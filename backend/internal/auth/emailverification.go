@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"strconv"
@@ -34,8 +33,6 @@ const (
 	emailVerificationRateKeyPrefix      = "email-verification:rate:"
 	// emailVerificationSendInterval は、同じメールアドレスへ確認のメールを送り直せる間隔である(Java 版の INTERVAL)。
 	emailVerificationSendInterval = 60 * time.Second
-	// emailVerificationHeader は、Java 版の java-jwt が書くヘッダの JSON である。
-	emailVerificationHeader = `{"alg":"HS256","typ":"JWT"}`
 )
 
 // emailVerificationPurpose は、確認のリンクの目的である。名前は Java 版の EmailVerificationPurpose と同じにする。
@@ -69,19 +66,9 @@ type emailVerificationClaims struct {
 	LinkExpiresAt time.Time
 }
 
-// emailVerificationPayload は、確認のリンクの値の本体の JSON である。項目の順は、Java 版の java-jwt が書く順と同じである。
-type emailVerificationPayload struct {
-	Audience      string `json:"aud"`
-	JTI           string `json:"jti"`
-	Subject       string `json:"sub"`
-	Purpose       string `json:"purpose"`
-	Email         string `json:"email"`
-	LinkExpiresAt int64  `json:"lexp"`
-}
-
 // emailVerificationReadClaims は、確認のリンクの値を読むときの項目である。
-// jti と sub は、RegisteredClaims の同じ名前の項目より浅い位置に置き、Java 版と同じく、項目が無い値と
-// null の値を、空の文字列と分けて読む。aud は RegisteredClaims が読み、golang-jwt が確かめる。
+// jti と sub は、RegisteredClaims の同じ名前の項目より浅い位置に置き、項目が無い値と null の値を、
+// 空の文字列と分けて読む。aud は RegisteredClaims が読み、golang-jwt が確かめる。
 type emailVerificationReadClaims struct {
 	JTI           *string `json:"jti"`
 	Subject       *string `json:"sub"`
@@ -99,34 +86,26 @@ func emailVerificationKey(secret string) []byte {
 	return mac.Sum(nil)
 }
 
-// issueEmailVerificationToken は、確認のリンクの値を作る。Java 版の java-jwt と同じヘッダと、同じ順と書き方の本体を
-// 組み立てて署名する。golang-jwt の SignedString は本体を json.Marshal で書き、< > & を逃がして Java 版と
-// 違う値になるので、本体は encodeJSONText(Java 版の writeValueAsString と同じ書き方)で書く。
+// issueEmailVerificationToken は、確認のリンクの値を、golang-jwt で HS256 の署名を付けて作る。
 func (s *Service) issueEmailVerificationToken(c emailVerificationClaims) (string, error) {
-	payload, err := encodeJSONText(emailVerificationPayload{
-		Audience:      emailVerificationAudience,
-		JTI:           c.JTI,
-		Subject:       c.SubjectID.String(),
-		Purpose:       string(c.Purpose),
-		Email:         c.Email,
-		LinkExpiresAt: c.LinkExpiresAt.Unix(),
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"aud":     emailVerificationAudience,
+		"jti":     c.JTI,
+		"sub":     c.SubjectID.String(),
+		"purpose": string(c.Purpose),
+		"email":   c.Email,
+		"lexp":    c.LinkExpiresAt.Unix(),
 	})
-	if err != nil {
-		return "", err
-	}
-	enc := base64.RawURLEncoding
-	signing := enc.EncodeToString([]byte(emailVerificationHeader)) + "." + enc.EncodeToString([]byte(payload))
-	sig, err := jwt.SigningMethodHS256.Sign(signing, emailVerificationKey(s.deps.JWT.Secret))
+	signed, err := token.SignedString(emailVerificationKey(s.deps.JWT.Secret))
 	if err != nil {
 		return "", fmt.Errorf("auth: 確認のリンクの値に署名できない: %w", err)
 	}
-	return signing + "." + enc.EncodeToString(sig), nil
+	return signed, nil
 }
 
-// readEmailVerificationToken は、確認のリンクの値を読む。Java 版の read と同じく、署名か aud が合わないとき、
-// 5つの項目のどれかが無いとき、sub が UUID でないとき、purpose が知らない目的のときは、偽を返す。
-// Java 版の java-jwt に合わせ、署名の方式を HS256 に限り、exp と nbf と iat があれば猶予無しで確かめ、
-// base64url の末尾の = を受け付ける。
+// readEmailVerificationToken は、確認のリンクの値を読む。署名か aud が合わないとき、5つの項目のどれかが無いとき、
+// sub が UUID でないとき、purpose が知らない目的のときは、偽を返す。署名の方式を HS256 に限り、
+// exp と nbf と iat があれば猶予無しで確かめる。
 func (s *Service) readEmailVerificationToken(token string) (emailVerificationClaims, bool) {
 	var c emailVerificationReadClaims
 	_, err := jwt.ParseWithClaims(token, &c,
@@ -134,7 +113,6 @@ func (s *Service) readEmailVerificationToken(token string) (emailVerificationCla
 		jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}),
 		jwt.WithAudience(emailVerificationAudience),
 		jwt.WithIssuedAt(),
-		jwt.WithPaddingAllowed(),
 		jwt.WithTimeFunc(s.deps.Now),
 	)
 	if err != nil {

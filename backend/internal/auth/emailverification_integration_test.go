@@ -73,9 +73,10 @@ func mustSend(t *testing.T, s *Service, email string, subject uuid.UUID, purpose
 	}
 }
 
-// TestEmailVerificationToken_SendMatchesJavaMail は、Java 版と同じ鍵と時刻と乱数と宛先で確認のメールを送ると、
-// Java 版が送ったメールと同じメールを送り、今のリンクの記録と送り直せる間隔の記録を Java 版と同じ形で置くことを確かめる。
-func TestEmailVerificationToken_SendMatchesJavaMail(t *testing.T) {
+// TestEmailVerificationToken_SendMail は、Java 版と同じ鍵と時刻と乱数と宛先で確認のメールを送ると、
+// リンクの値のほかは Java 版が送ったメールと同じメールを送り、リンクの値は Java 版の値と同じ項目として読め、
+// 今のリンクの記録と送り直せる間隔の記録を Java 版と同じ形で置くことを確かめる。
+func TestEmailVerificationToken_SendMail(t *testing.T) {
 	jti := uuid.MustParse(javaSampleJTI)
 	s, client, mailer := newEmailVerificationService(t, time.Unix(javaSampleIssuedAt, 250_000_000), fixedRandom(jti[:]))
 	subject := uuid.MustParse(javaSampleSubject)
@@ -98,8 +99,20 @@ func TestEmailVerificationToken_SendMatchesJavaMail(t *testing.T) {
 	if got := deref(in.Message.Subject.Data); got != want.Subject {
 		t.Errorf("件名 = %q, want %q", got, want.Subject)
 	}
-	if got := mailedBody(t, mailer, 0); got != want.Body {
-		t.Errorf("本文 = %q\nwant %q", got, want.Body)
+	// リンクの値は項目の並びが Java 版と違う(CB-125)ので、同じ項目として読めることを確かめてから、
+	// Java 版のメールの本文のリンクの値を Go 版の値に替えて比べる。
+	token := mailedToken(t, mailer, 0)
+	javaToken := javaSampleToken(t)
+	gotClaims, gotOK := s.readEmailVerificationToken(token)
+	javaClaims, javaOK := s.readEmailVerificationToken(javaToken)
+	if !gotOK || !javaOK || !sameEmailVerificationClaims(gotClaims, javaClaims) {
+		t.Errorf("リンクの値の項目 = %+v, %v, want %+v, %v", gotClaims, gotOK, javaClaims, javaOK)
+	}
+	if !strings.Contains(want.Body, javaToken) {
+		t.Fatalf("Java 版のメールの本文 %q に、Java 版のリンクの値が無い", want.Body)
+	}
+	if got, wantBody := mailedBody(t, mailer, 0), strings.Replace(want.Body, javaToken, token, 1); got != wantBody {
+		t.Errorf("本文 = %q\nwant %q", got, wantBody)
 	}
 	if got := rawValue(t, client, currentKey); got != `"`+javaSampleJTI+`"` {
 		t.Errorf("今のリンクの記録 = %q, want %q", got, `"`+javaSampleJTI+`"`)
